@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Effect } from "effect";
 import { decodePopupResult, type PopupResult } from "@cairn/contracts";
+import { t } from "./i18n";
 
 type State = { type: "Loading" } | PopupResult;
 
@@ -37,26 +38,26 @@ export default function App() {
       <h1>Cairn</h1>
       <p role="status" aria-live="polite">
         {state.type === "Loading"
-          ? "Connexion…"
+          ? t("connecting")
           : state.type === "Connected"
-            ? "Cairn connecté"
+            ? t("connected")
             : installationError
-              ? "Connecteur à installer"
-              : "Cairn indisponible"}
+              ? t("hostMissing")
+              : t("unavailable")}
       </p>
       <p className="detail">
         {state.type === "Connected"
-          ? `Application ${state.appVersion}`
+          ? t("appVersion", state.appVersion)
           : state.type === "Loading"
-            ? "Recherche de l’application Windows."
+            ? t("searching")
             : installationError
-              ? "Enregistre le connecteur pour cette extension."
+              ? t("registerHost")
               : state.code === "AppUnavailable"
-                ? "Ouvre Cairn sur Windows, puis réessaie."
-                : `La connexion a échoué (${state.code}).`}
+                ? t("openApp")
+                : t("connectionFailed", state.code)}
       </p>
       <button disabled={state.type === "Loading"} onClick={() => setAttempt((value) => value + 1)}>
-        {state.type === "Connected" ? "Actualiser" : "Réessayer"}
+        {state.type === "Connected" ? t("refresh") : t("retry")}
       </button>
     </main>
   );

@@ -19,40 +19,42 @@ import { EntryUpdate, NewEntry, type EntrySummary } from "./vault/VaultClient";
 import { useVault } from "./vault/useVault";
 import { SiteIcon } from "./favicon/SiteIcon";
 import { ThemeToggle } from "./theme/ThemeToggle";
+import { useT } from "./i18n/I18nProvider";
 
 type Vault = ReturnType<typeof useVault>;
 
 /** Without `existing`, the fields describe a new entry. */
 function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: string | null } }) {
+  const t = useT();
   const notes = existing ? existing.notes : "";
 
   return (
     <>
       <div className="field">
-        <Label htmlFor="entry-name">Nom</Label>
+        <Label htmlFor="entry-name">{t.entry.name}</Label>
         <Input
           id="entry-name"
           name="name"
           required
           maxLength={256}
           autoComplete="off"
-          placeholder="Ex. GitHub personnel"
+          placeholder={t.entry.namePlaceholder}
           defaultValue={existing?.entry.name}
         />
       </div>
       <div className="field">
-        <Label htmlFor="entry-site">Site</Label>
+        <Label htmlFor="entry-site">{t.entry.site}</Label>
         <Input
           id="entry-site"
           name="site"
           maxLength={2048}
           autoComplete="off"
-          placeholder="https://exemple.com"
+          placeholder={t.entry.sitePlaceholder}
           defaultValue={existing?.entry.site}
         />
       </div>
       <div className="field">
-        <Label htmlFor="entry-username">Identifiant</Label>
+        <Label htmlFor="entry-username">{t.entry.username}</Label>
         <Input
           id="entry-username"
           name="username"
@@ -63,8 +65,8 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
       </div>
       <div className="field">
         <Label htmlFor="entry-password">
-          Mot de passe
-          {existing && <span className="optional">laisser vide pour le conserver</span>}
+          {t.entry.password}
+          {existing && <span className="optional">{t.entry.keepPassword}</span>}
         </Label>
         <Input
           id="entry-password"
@@ -77,12 +79,10 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
       </div>
       <div className="field">
         <Label htmlFor="entry-notes">
-          Notes <span className="optional">facultatif</span>
+          {t.entry.notes} <span className="optional">{t.entry.optional}</span>
         </Label>
         {notes === null ? (
-          <p className="field-hint">
-            Les notes restent inchangées. Affiche le mot de passe avant de modifier pour les éditer.
-          </p>
+          <p className="field-hint">{t.entry.notesUnchanged}</p>
         ) : (
           <Textarea id="entry-notes" name="notes" maxLength={16384} rows={3} defaultValue={notes} />
         )}
@@ -92,6 +92,8 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
 }
 
 function EntryDialog({ vault }: { vault: Vault }) {
+  const t = useT();
+
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -111,22 +113,22 @@ function EntryDialog({ vault }: { vault: Vault }) {
       <DialogTrigger asChild>
         <Button disabled={vault.busy} size="sm">
           <Plus />
-          Ajouter un identifiant
+          {t.add.open}
         </Button>
       </DialogTrigger>
       <DialogContent className="entry-dialog">
         <DialogHeader>
-          <DialogTitle>Nouvel identifiant</DialogTitle>
-          <DialogDescription>Enregistré dans le coffre de cet ordinateur.</DialogDescription>
+          <DialogTitle>{t.add.title}</DialogTitle>
+          <DialogDescription>{t.add.description}</DialogDescription>
         </DialogHeader>
         <form onSubmit={save} className="entry-form">
           <EntryFields />
           <DialogFooter className="flex-row justify-end">
             <Button type="button" variant="outline" onClick={() => vault.setAdding(false)}>
-              Annuler
+              {t.common.cancel}
             </Button>
             <Button disabled={vault.busy} type="submit">
-              Enregistrer
+              {t.common.save}
             </Button>
           </DialogFooter>
         </form>
@@ -136,6 +138,7 @@ function EntryDialog({ vault }: { vault: Vault }) {
 }
 
 function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
+  const t = useT();
   const editing = vault.editing?.id === entry.id ? vault.editing : null;
 
   function update(event: FormEvent<HTMLFormElement>) {
@@ -158,20 +161,18 @@ function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
     <Dialog open={editing !== null} onOpenChange={(open) => !open && vault.stopEdit()}>
       <DialogContent className="entry-dialog">
         <DialogHeader>
-          <DialogTitle>Modifier l'identifiant</DialogTitle>
-          <DialogDescription>
-            La version précédente reste dans la sauvegarde du coffre.
-          </DialogDescription>
+          <DialogTitle>{t.edit.title}</DialogTitle>
+          <DialogDescription>{t.edit.description}</DialogDescription>
         </DialogHeader>
         {editing && (
           <form onSubmit={update} className="entry-form">
             <EntryFields existing={{ entry, notes: editing.notes }} />
             <DialogFooter className="flex-row justify-end">
               <Button type="button" variant="outline" onClick={vault.stopEdit}>
-                Annuler
+                {t.common.cancel}
               </Button>
               <Button disabled={vault.busy} type="submit">
-                Enregistrer
+                {t.common.save}
               </Button>
             </DialogFooter>
           </form>
@@ -182,6 +183,8 @@ function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
 }
 
 function DeleteDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
+  const t = useT();
+
   return (
     <Dialog
       open={vault.deleting === entry.id}
@@ -189,22 +192,19 @@ function DeleteDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Supprimer « {entry.name} » ?</DialogTitle>
-          <DialogDescription>
-            L'identifiant disparaît du coffre. La sauvegarde de la version précédente le garde
-            jusqu'à la prochaine modification.
-          </DialogDescription>
+          <DialogTitle>{t.remove.title(entry.name)}</DialogTitle>
+          <DialogDescription>{t.remove.description}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex-row justify-end">
           <Button type="button" variant="outline" onClick={() => vault.setDeleting(null)}>
-            Annuler
+            {t.common.cancel}
           </Button>
           <Button
             disabled={vault.busy}
             variant="destructive"
             onClick={() => vault.remove(entry.id)}
           >
-            Supprimer
+            {t.remove.confirm}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -213,6 +213,7 @@ function DeleteDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
 }
 
 function Credentials({ vault }: { vault: Vault }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -230,23 +231,23 @@ function Credentials({ vault }: { vault: Vault }) {
       <div className="toolbar">
         <div className="toolbar-title">
           <KeyRound size={16} />
-          <h1>Identifiants</h1>
+          <h1>{t.credentials.title}</h1>
           <span className="count">{vault.snapshot.entries.length}</span>
         </div>
         <ThemeToggle />
         <EntryDialog vault={vault} />
         <Button variant="outline" size="sm" onClick={vault.lock}>
           <LockKeyhole />
-          Verrouiller
+          {t.credentials.lock}
         </Button>
       </div>
       <div className="workspace">
-        <aside className="credential-pane" aria-label="Liste des identifiants">
+        <aside className="credential-pane" aria-label={t.credentials.list}>
           <div className="search-field">
             <Search size={15} />
             <Input
-              aria-label="Rechercher les identifiants"
-              placeholder="Rechercher"
+              aria-label={t.credentials.search}
+              placeholder={t.credentials.searchPlaceholder}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -254,7 +255,7 @@ function Credentials({ vault }: { vault: Vault }) {
               }}
             />
           </div>
-          <div className="list-label">Tous les identifiants</div>
+          <div className="list-label">{t.credentials.all}</div>
           <ul className="credential-list">
             {entries.map((entry) => (
               <li key={entry.id}>
@@ -269,17 +270,17 @@ function Credentials({ vault }: { vault: Vault }) {
                   <SiteIcon key={entry.site} id={entry.id} name={entry.name} />
                   <span className="row-text">
                     <strong>{entry.name}</strong>
-                    <span>{entry.username || entry.site || "Sans identifiant"}</span>
+                    <span>{entry.username || entry.site || t.credentials.noUsername}</span>
                   </span>
                 </button>
               </li>
             ))}
           </ul>
           {entries.length === 0 && (
-            <p className="list-empty">{query ? "Aucun résultat" : "Aucun identifiant"}</p>
+            <p className="list-empty">{query ? t.credentials.noResults : t.credentials.empty}</p>
           )}
         </aside>
-        <section className="detail-pane" aria-label="Détails de l'identifiant">
+        <section className="detail-pane" aria-label={t.credentials.details}>
           {selected ? (
             <article className="credential-detail">
               <header className="detail-heading">
@@ -291,7 +292,7 @@ function Credentials({ vault }: { vault: Vault }) {
                 />
                 <div className="detail-title">
                   <h2>{selected.name}</h2>
-                  <p>Identifiant</p>
+                  <p>{t.credentials.kind}</p>
                 </div>
                 <div className="detail-actions">
                   <Button
@@ -301,14 +302,14 @@ function Credentials({ vault }: { vault: Vault }) {
                     onClick={() => vault.startEdit(selected.id)}
                   >
                     <Pencil />
-                    Modifier
+                    {t.edit.open}
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon-sm"
                     disabled={vault.busy}
-                    aria-label="Supprimer l'identifiant"
-                    title="Supprimer l'identifiant"
+                    aria-label={t.remove.open}
+                    title={t.remove.open}
                     onClick={() => {
                       vault.hideSecret();
                       vault.setDeleting(selected.id);
@@ -322,38 +323,34 @@ function Credentials({ vault }: { vault: Vault }) {
               <DeleteDialog vault={vault} entry={selected} />
               <dl className="detail-fields">
                 <div>
-                  <dt>Identifiant</dt>
-                  <dd>{selected.username || "Non renseigné"}</dd>
+                  <dt>{t.entry.username}</dt>
+                  <dd>{selected.username || t.common.notSet}</dd>
                 </div>
                 <div>
-                  <dt>Mot de passe</dt>
+                  <dt>{t.entry.password}</dt>
                   <dd className="password-value">
                     <code>{secret ? secret.password : "••••••••••••"}</code>
                     <Button
                       variant="ghost"
                       size="icon"
                       disabled={vault.busy}
-                      aria-label={secret ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                      title={secret ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                      aria-label={secret ? t.credentials.hidePassword : t.credentials.showPassword}
+                      title={secret ? t.credentials.hidePassword : t.credentials.showPassword}
                       onClick={() => vault.reveal(selected.id)}
                     >
                       {secret ? <EyeOff /> : <Eye />}
                     </Button>
                   </dd>
-                  {secret && (
-                    <p className="field-hint">Masqué automatiquement après 30 secondes.</p>
-                  )}
+                  {secret && <p className="field-hint">{t.credentials.autoHide}</p>}
                 </div>
                 <div>
-                  <dt>Site</dt>
-                  <dd>{selected.site || "Non renseigné"}</dd>
+                  <dt>{t.entry.site}</dt>
+                  <dd>{selected.site || t.common.notSet}</dd>
                 </div>
                 <div>
-                  <dt>Notes</dt>
+                  <dt>{t.entry.notes}</dt>
                   <dd className="notes">
-                    {secret
-                      ? secret.notes || "Aucune note"
-                      : "Affiche le mot de passe pour lire les notes."}
+                    {secret ? secret.notes || t.credentials.noNotes : t.credentials.notesHidden}
                   </dd>
                 </div>
               </dl>
@@ -361,12 +358,8 @@ function Credentials({ vault }: { vault: Vault }) {
           ) : (
             <div className="empty-detail">
               <KeyRound size={28} strokeWidth={1.25} />
-              <h2>{query ? "Aucun identifiant trouvé" : "Aucun identifiant"}</h2>
-              <p>
-                {query
-                  ? "Essaie un autre nom, site ou identifiant."
-                  : "Ajoute un identifiant pour le retrouver ici."}
-              </p>
+              <h2>{query ? t.credentials.notFound : t.credentials.empty}</h2>
+              <p>{query ? t.credentials.notFoundHint : t.credentials.emptyHint}</p>
             </div>
           )}
         </section>
@@ -376,6 +369,7 @@ function Credentials({ vault }: { vault: Vault }) {
 }
 
 function Authentication({ vault }: { vault: Vault }) {
+  const t = useT();
   const creating = vault.snapshot.status === "missing";
 
   function authenticate(event: FormEvent<HTMLFormElement>) {
@@ -385,7 +379,7 @@ function Authentication({ vault }: { vault: Vault }) {
     const password = Schema.decodeUnknownSync(Schema.String)(data.get("password"));
 
     if (creating && password !== data.get("confirmation")) {
-      toast.error("Les deux mots de passe ne correspondent pas.", { id: "master-password-error" });
+      toast.error(t.auth.mismatch, { id: "master-password-error" });
 
       return;
     }
@@ -398,15 +392,11 @@ function Authentication({ vault }: { vault: Vault }) {
     <section className="auth-view">
       <div className="auth-form">
         <LockKeyhole className="auth-icon" size={28} strokeWidth={1.3} />
-        <h1>{creating ? "Créer un coffre" : "Coffre verrouillé"}</h1>
-        <p>
-          {creating
-            ? "Choisis un mot de passe maître d’au moins 12 caractères. Il ne peut pas être réinitialisé."
-            : "Saisis ton mot de passe maître pour ouvrir le coffre."}
-        </p>
+        <h1>{creating ? t.auth.createTitle : t.auth.lockedTitle}</h1>
+        <p>{creating ? t.auth.createDescription : t.auth.unlockDescription}</p>
         <form onSubmit={authenticate}>
           <div className="field">
-            <Label htmlFor="master-password">Mot de passe maître</Label>
+            <Label htmlFor="master-password">{t.auth.masterPassword}</Label>
             <Input
               id="master-password"
               name="password"
@@ -421,7 +411,7 @@ function Authentication({ vault }: { vault: Vault }) {
           </div>
           {creating && (
             <div className="field">
-              <Label htmlFor="confirmation">Confirmer le mot de passe</Label>
+              <Label htmlFor="confirmation">{t.auth.confirmation}</Label>
               <Input
                 id="confirmation"
                 name="confirmation"
@@ -435,7 +425,7 @@ function Authentication({ vault }: { vault: Vault }) {
             </div>
           )}
           <Button disabled={vault.busy} type="submit">
-            {vault.busy ? "Ouverture…" : creating ? "Créer le coffre" : "Déverrouiller"}
+            {vault.busy ? t.auth.opening : creating ? t.auth.create : t.auth.unlock}
           </Button>
         </form>
       </div>
@@ -445,32 +435,30 @@ function Authentication({ vault }: { vault: Vault }) {
 
 export default function App() {
   const vault = useVault();
+  const t = useT();
 
   return (
     <main className="vault-shell" aria-label="Cairn">
       {vault.error && (
         <p className="error" role="alert">
-          {vault.error}
+          {t.errors[vault.error]}
         </p>
       )}
       {Match.value(vault.snapshot.status).pipe(
         Match.when("unlocked", () => <Credentials vault={vault} />),
         Match.when("loading", () => (
           <section className="auth-view">
-            <p role="status">Ouverture de Cairn…</p>
-            {vault.error && <Button onClick={vault.retry}>Réessayer</Button>}
+            <p role="status">{t.app.loading}</p>
+            {vault.error && <Button onClick={vault.retry}>{t.common.retry}</Button>}
           </section>
         )),
         Match.when("recovery", () => (
           <section className="auth-view">
             <div className="auth-form">
-              <h1>Sauvegarde disponible</h1>
-              <p>
-                Le coffre principal est introuvable. Ferme Cairn et restaure backups/previous.cairn
-                dans le dossier du coffre.
-              </p>
+              <h1>{t.app.recoveryTitle}</h1>
+              <p>{t.app.recoveryDescription}</p>
               <p>%LOCALAPPDATA%\com.hezaerd.cairn</p>
-              <Button onClick={vault.retry}>Vérifier à nouveau</Button>
+              <Button onClick={vault.retry}>{t.app.checkAgain}</Button>
             </div>
           </section>
         )),

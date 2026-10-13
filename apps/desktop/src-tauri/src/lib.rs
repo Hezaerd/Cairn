@@ -6,6 +6,7 @@ pub fn run() {
             tray::restore(app);
         }))
         .setup(|app| {
+            app.manage(locale::Locale::detect());
             vault::setup(app)?;
             app.manage(favicon::Downloads::default());
             tray::setup(app)?;
@@ -31,11 +32,13 @@ pub fn run() {
             vault::reveal_password,
             favicon::favicon_cached,
             favicon::favicon_refresh,
+            locale::locale,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cairn");
 }
 mod bridge;
 mod favicon;
+mod locale;
 mod tray;
 mod vault;

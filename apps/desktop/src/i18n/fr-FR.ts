@@ -1,0 +1,110 @@
+import type { Messages } from "./en-US";
+
+export const frFR: Messages = {
+  common: {
+    cancel: "Annuler",
+    close: "Fermer",
+    save: "Enregistrer",
+    retry: "Réessayer",
+    notSet: "Non renseigné",
+  },
+  entry: {
+    name: "Nom",
+    namePlaceholder: "Ex. GitHub personnel",
+    site: "Site",
+    sitePlaceholder: "https://exemple.com",
+    username: "Identifiant",
+    password: "Mot de passe",
+    keepPassword: "laisser vide pour le conserver",
+    notes: "Notes",
+    optional: "facultatif",
+    notesUnchanged:
+      "Les notes restent inchangées. Affiche le mot de passe avant de modifier pour les éditer.",
+  },
+  add: {
+    open: "Ajouter un identifiant",
+    title: "Nouvel identifiant",
+    description: "Enregistré dans le coffre de cet ordinateur.",
+  },
+  edit: {
+    open: "Modifier",
+    title: "Modifier l'identifiant",
+    description: "La version précédente reste dans la sauvegarde du coffre.",
+  },
+  remove: {
+    open: "Supprimer l'identifiant",
+    title: (name) => `Supprimer « ${name} » ?`,
+    description:
+      "L'identifiant disparaît du coffre. La sauvegarde de la version précédente le garde jusqu'à la prochaine modification.",
+    confirm: "Supprimer",
+  },
+  credentials: {
+    title: "Identifiants",
+    lock: "Verrouiller",
+    list: "Liste des identifiants",
+    search: "Rechercher les identifiants",
+    searchPlaceholder: "Rechercher",
+    all: "Tous les identifiants",
+    noUsername: "Sans identifiant",
+    noResults: "Aucun résultat",
+    empty: "Aucun identifiant",
+    details: "Détails de l'identifiant",
+    kind: "Identifiant",
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
+    autoHide: "Masqué automatiquement après 30 secondes.",
+    noNotes: "Aucune note",
+    notesHidden: "Affiche le mot de passe pour lire les notes.",
+    notFound: "Aucun identifiant trouvé",
+    notFoundHint: "Essaie un autre nom, site ou identifiant.",
+    emptyHint: "Ajoute un identifiant pour le retrouver ici.",
+  },
+  auth: {
+    createTitle: "Créer un coffre",
+    lockedTitle: "Coffre verrouillé",
+    createDescription:
+      "Choisis un mot de passe maître d’au moins 12 caractères. Il ne peut pas être réinitialisé.",
+    unlockDescription: "Saisis ton mot de passe maître pour ouvrir le coffre.",
+    masterPassword: "Mot de passe maître",
+    confirmation: "Confirmer le mot de passe",
+    mismatch: "Les deux mots de passe ne correspondent pas.",
+    opening: "Ouverture…",
+    create: "Créer le coffre",
+    unlock: "Déverrouiller",
+  },
+  app: {
+    loading: "Ouverture de Cairn…",
+    recoveryTitle: "Sauvegarde disponible",
+    recoveryDescription:
+      "Le coffre principal est introuvable. Ferme Cairn et restaure backups/previous.cairn dans le dossier du coffre.",
+    checkAgain: "Vérifier à nouveau",
+    notFound: "Page introuvable",
+    home: "Retour à l'accueil",
+  },
+  theme: {
+    label: "Thème",
+    current: (theme) => `Thème : ${theme}`,
+    light: "Clair",
+    dark: "Sombre",
+    system: "Système",
+  },
+  errors: {
+    Storage:
+      "Impossible de lire ou d'enregistrer le coffre. Vérifie l'espace disque et les permissions, puis déverrouille-le à nouveau.",
+    InUse: "Le coffre est déjà ouvert dans une autre instance de Cairn.",
+    AlreadyExists: "Un coffre existe déjà. Déverrouille-le pour continuer.",
+    Missing: "Le fichier du coffre est introuvable.",
+    Locked: "Le coffre est verrouillé. Déverrouille-le pour continuer.",
+    InvalidInput:
+      "Vérifie les champs et leur longueur. Le mot de passe maître doit comporter au moins 12 caractères.",
+    InvalidVault:
+      "Le fichier du coffre est endommagé ou son format est invalide. Il n'a pas été remplacé.",
+    UnsupportedVersion: "Ce coffre nécessite une autre version de Cairn.",
+    UnlockFailed: "Mot de passe incorrect ou coffre endommagé.",
+    Randomness: "Windows n'a pas pu générer les données aléatoires nécessaires. Réessaie.",
+    ChangedOnDisk:
+      "Le coffre a été modifié sur disque. Verrouille-le puis déverrouille-le avant de continuer.",
+    Unavailable: "Impossible de joindre le coffre. Ouvre Cairn dans l'application Windows.",
+    InvalidResponse: "La réponse de l'application est invalide. Redémarre Cairn.",
+  },
+};

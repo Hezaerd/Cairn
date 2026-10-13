@@ -7,6 +7,8 @@ const root = document.getElementById("root");
 
 if (!root) throw new Error("Missing application root");
 
+document.documentElement.lang = chrome.i18n.getMessage("@@ui_locale").replace("_", "-");
+
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <RouterProvider router={router} />

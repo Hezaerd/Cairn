@@ -21,3 +21,5 @@ zeroize = "1"
 tokio = { version = "1", features = ["time", "sync", "macros"] }
 cairn-favicon = { path = "../../../crates/favicon" }
 base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+sys-locale = "0.3"

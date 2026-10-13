@@ -42,6 +42,8 @@ const context = await chromium.launchPersistentContext(profile, {
     `--disable-extensions-except=${extensionPath}`,
     `--load-extension=${extensionPath}`,
     "--no-first-run",
+    // The selectors below match the French popup.
+    "--lang=fr",
   ],
 });
 
@@ -130,6 +132,7 @@ try {
         `--disable-extensions-except=${extensionPath}`,
         `--load-extension=${extensionPath}`,
         "--no-first-run",
+        "--lang=fr",
       ],
     },
   );

@@ -12,6 +12,7 @@ import {
   type VaultStatus,
 } from "./VaultClient";
 import { VaultRuntime } from "./runtime";
+import { useT } from "../i18n/I18nProvider";
 
 interface Snapshot {
   status: VaultStatus | "loading";
@@ -29,26 +30,6 @@ interface EditTarget {
   /** Notes are editable only when they were revealed before opening the editor. */
   notes: string | null;
 }
-
-const messages: Record<ErrorCode, string> = {
-  Storage:
-    "Impossible de lire ou d'enregistrer le coffre. Vérifie l'espace disque et les permissions, puis déverrouille-le à nouveau.",
-  InUse: "Le coffre est déjà ouvert dans une autre instance de Cairn.",
-  AlreadyExists: "Un coffre existe déjà. Déverrouille-le pour continuer.",
-  Missing: "Le fichier du coffre est introuvable.",
-  Locked: "Le coffre est verrouillé. Déverrouille-le pour continuer.",
-  InvalidInput:
-    "Vérifie les champs et leur longueur. Le mot de passe maître doit comporter au moins 12 caractères.",
-  InvalidVault:
-    "Le fichier du coffre est endommagé ou son format est invalide. Il n'a pas été remplacé.",
-  UnsupportedVersion: "Ce coffre nécessite une autre version de Cairn.",
-  UnlockFailed: "Mot de passe incorrect ou coffre endommagé.",
-  Randomness: "Windows n'a pas pu générer les données aléatoires nécessaires. Réessaie.",
-  ChangedOnDisk:
-    "Le coffre a été modifié sur disque. Verrouille-le puis déverrouille-le avant de continuer.",
-  Unavailable: "Impossible de joindre le coffre. Ouvre Cairn dans l'application Windows.",
-  InvalidResponse: "La réponse de l'application est invalide. Redémarre Cairn.",
-};
 
 const loadSnapshot = Effect.gen(function* () {
   const vault = yield* VaultClient;
@@ -68,9 +49,10 @@ function useRuntime() {
 
 export function useVault() {
   const runtime = useRuntime();
+  const t = useT();
   const [snapshot, setSnapshot] = useState<Snapshot>({ status: "loading", entries: [] });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<EditTarget | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -97,7 +79,7 @@ export function useVault() {
     effect: Effect.Effect<A, VaultError, VaultClient>,
     success: (value: A) => void,
     clearOnFailure = false,
-    onError: (message: string) => void = setError,
+    onError: (code: ErrorCode) => void = setError,
   ) {
     const current = ++epoch.current;
     setBusy(true);
@@ -117,7 +99,7 @@ export function useVault() {
 
               if (clearOnFailure || failure.code === "Locked" || failure.code === "Storage")
                 clearSession();
-              onError(messages[failure.code]);
+              onError(failure.code);
             },
           }),
         ),
@@ -125,7 +107,7 @@ export function useVault() {
       .catch(() => {
         if (epoch.current !== current) return;
         clearSession();
-        onError(messages.Unavailable);
+        onError("Unavailable");
       });
   }
 
@@ -141,7 +123,7 @@ export function useVault() {
         if (!disposed) execute(loadSnapshot, setSnapshot);
       },
       () => {
-        if (!disposed) setError(messages.Unavailable);
+        if (!disposed) setError("Unavailable");
       },
     );
 
@@ -175,7 +157,7 @@ export function useVault() {
       }),
       setSnapshot,
       false,
-      (message) => toast.error(message, { id: "master-password-error" }),
+      (code) => toast.error(t.errors[code], { id: "master-password-error" }),
     );
   }
 
