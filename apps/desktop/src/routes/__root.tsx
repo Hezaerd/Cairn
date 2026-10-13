@@ -10,7 +10,7 @@ export const Route = createRootRoute({
     </>
   ),
   notFoundComponent: () => (
-    <main className="auth-view">
+    <main className="flex h-dvh flex-col items-center justify-center gap-4 p-8">
       <h1>Page introuvable</h1>
       <Link to="/">Retour à l'accueil</Link>
     </main>

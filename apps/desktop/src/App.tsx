@@ -1,10 +1,18 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Match, Schema } from "effect";
 import { toast } from "sonner";
 import { Eye, EyeOff, KeyRound, LockKeyhole, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -22,14 +30,28 @@ import { ThemeToggle } from "./theme/ThemeToggle";
 
 type Vault = ReturnType<typeof useVault>;
 
+function FormField({ id, label, children }: { id: string; label: ReactNode; children: ReactNode }) {
+  return (
+    <Field className="gap-2 *:data-[slot=input]:h-[34px] *:data-[slot=input]:border-b-muted-foreground">
+      <FieldLabel htmlFor={id} className="w-full text-xs font-normal">
+        {label}
+      </FieldLabel>
+      {children}
+    </Field>
+  );
+}
+
+function Optional({ children }: { children: ReactNode }) {
+  return <span className="ml-auto text-[11px] text-muted-foreground">{children}</span>;
+}
+
 /** Without `existing`, the fields describe a new entry. */
 function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: string | null } }) {
   const notes = existing ? existing.notes : "";
 
   return (
     <>
-      <div className="field">
-        <Label htmlFor="entry-name">Nom</Label>
+      <FormField id="entry-name" label="Nom">
         <Input
           id="entry-name"
           name="name"
@@ -39,9 +61,8 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
           placeholder="Ex. GitHub personnel"
           defaultValue={existing?.entry.name}
         />
-      </div>
-      <div className="field">
-        <Label htmlFor="entry-site">Site</Label>
+      </FormField>
+      <FormField id="entry-site" label="Site">
         <Input
           id="entry-site"
           name="site"
@@ -50,9 +71,8 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
           placeholder="https://exemple.com"
           defaultValue={existing?.entry.site}
         />
-      </div>
-      <div className="field">
-        <Label htmlFor="entry-username">Identifiant</Label>
+      </FormField>
+      <FormField id="entry-username" label="Identifiant">
         <Input
           id="entry-username"
           name="username"
@@ -60,12 +80,16 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
           autoComplete="off"
           defaultValue={existing?.entry.username}
         />
-      </div>
-      <div className="field">
-        <Label htmlFor="entry-password">
-          Mot de passe
-          {existing && <span className="optional">laisser vide pour le conserver</span>}
-        </Label>
+      </FormField>
+      <FormField
+        id="entry-password"
+        label={
+          <>
+            Mot de passe
+            {existing && <Optional>laisser vide pour le conserver</Optional>}
+          </>
+        }
+      >
         <Input
           id="entry-password"
           name="password"
@@ -74,19 +98,23 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
           maxLength={4096}
           autoComplete="new-password"
         />
-      </div>
-      <div className="field">
-        <Label htmlFor="entry-notes">
-          Notes <span className="optional">facultatif</span>
-        </Label>
+      </FormField>
+      <FormField
+        id="entry-notes"
+        label={
+          <>
+            Notes <Optional>facultatif</Optional>
+          </>
+        }
+      >
         {notes === null ? (
-          <p className="field-hint">
+          <FieldDescription className="text-[11px]">
             Les notes restent inchangées. Affiche le mot de passe avant de modifier pour les éditer.
-          </p>
+          </FieldDescription>
         ) : (
           <Textarea id="entry-notes" name="notes" maxLength={16384} rows={3} defaultValue={notes} />
         )}
-      </div>
+      </FormField>
     </>
   );
 }
@@ -114,12 +142,12 @@ function EntryDialog({ vault }: { vault: Vault }) {
           Ajouter un identifiant
         </Button>
       </DialogTrigger>
-      <DialogContent className="entry-dialog">
+      <DialogContent className="max-h-[calc(100dvh-32px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nouvel identifiant</DialogTitle>
           <DialogDescription>Enregistré dans le coffre de cet ordinateur.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={save} className="entry-form">
+        <form onSubmit={save} className="grid gap-4">
           <EntryFields />
           <DialogFooter className="flex-row justify-end">
             <Button type="button" variant="outline" onClick={() => vault.setAdding(false)}>
@@ -156,7 +184,7 @@ function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
 
   return (
     <Dialog open={editing !== null} onOpenChange={(open) => !open && vault.stopEdit()}>
-      <DialogContent className="entry-dialog">
+      <DialogContent className="max-h-[calc(100dvh-32px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Modifier l'identifiant</DialogTitle>
           <DialogDescription>
@@ -164,7 +192,7 @@ function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
           </DialogDescription>
         </DialogHeader>
         {editing && (
-          <form onSubmit={update} className="entry-form">
+          <form onSubmit={update} className="grid gap-4">
             <EntryFields existing={{ entry, notes: editing.notes }} />
             <DialogFooter className="flex-row justify-end">
               <Button type="button" variant="outline" onClick={vault.stopEdit}>
@@ -212,6 +240,26 @@ function DeleteDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
   );
 }
 
+function DetailField({
+  label,
+  hint,
+  className,
+  children,
+}: {
+  label: string;
+  hint?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="border-t py-4">
+      <dt className="mb-[7px] text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn("min-h-5 wrap-anywhere", className)}>{children}</dd>
+      {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
 function Credentials({ vault }: { vault: Vault }) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -227,11 +275,11 @@ function Credentials({ vault }: { vault: Vault }) {
 
   return (
     <>
-      <div className="toolbar">
-        <div className="toolbar-title">
+      <div className="flex min-h-[57px] items-center gap-2 border-b px-4 py-2.5 max-[680px]:px-3">
+        <div className="mr-auto flex items-center gap-2">
           <KeyRound size={16} />
-          <h1>Identifiants</h1>
-          <span className="count">{vault.snapshot.entries.length}</span>
+          <h1 className="font-semibold">Identifiants</h1>
+          <span className="text-xs text-muted-foreground">{vault.snapshot.entries.length}</span>
         </div>
         <ThemeToggle />
         <EntryDialog vault={vault} />
@@ -240,11 +288,15 @@ function Credentials({ vault }: { vault: Vault }) {
           Verrouiller
         </Button>
       </div>
-      <div className="workspace">
-        <aside className="credential-pane" aria-label="Liste des identifiants">
-          <div className="search-field">
-            <Search size={15} />
+      <div className="grid min-h-0 flex-1 grid-cols-[270px_minmax(0,1fr)] max-[680px]:grid-cols-[210px_minmax(0,1fr)]">
+        <aside
+          className="flex min-h-0 flex-col border-r bg-muted"
+          aria-label="Liste des identifiants"
+        >
+          <div className="relative mx-3 mt-4 mb-3">
+            <Search size={15} className="absolute top-[9px] left-2.5 text-muted-foreground" />
             <Input
+              className="h-8 bg-background pl-8 dark:bg-background"
               aria-label="Rechercher les identifiants"
               placeholder="Rechercher"
               value={query}
@@ -254,12 +306,12 @@ function Credentials({ vault }: { vault: Vault }) {
               }}
             />
           </div>
-          <div className="list-label">Tous les identifiants</div>
-          <ul className="credential-list">
+          <div className="px-4 pb-2.5 text-[11px] text-muted-foreground">Tous les identifiants</div>
+          <ul className="overflow-y-auto px-1.5 pb-1.5">
             {entries.map((entry) => (
               <li key={entry.id}>
                 <button
-                  className="credential-row"
+                  className="relative mb-0.5 flex w-full items-center gap-2.5 rounded-md p-2.5 text-left hover:bg-accent aria-[current=true]:bg-selection aria-[current=true]:before:absolute aria-[current=true]:before:left-0 aria-[current=true]:before:h-[18px] aria-[current=true]:before:w-[3px] aria-[current=true]:before:rounded-xs aria-[current=true]:before:bg-primary"
                   aria-current={selected?.id === entry.id ? "true" : undefined}
                   onClick={() => {
                     setSelectedId(entry.id);
@@ -267,33 +319,37 @@ function Credentials({ vault }: { vault: Vault }) {
                   }}
                 >
                   <SiteIcon key={entry.site} id={entry.id} name={entry.name} />
-                  <span className="row-text">
-                    <strong>{entry.name}</strong>
-                    <span>{entry.username || entry.site || "Sans identifiant"}</span>
+                  <span className="flex min-w-0 flex-col gap-0.5 *:truncate">
+                    <strong className="text-xs font-semibold">{entry.name}</strong>
+                    <span className="text-[11px] text-muted-foreground">
+                      {entry.username || entry.site || "Sans identifiant"}
+                    </span>
                   </span>
                 </button>
               </li>
             ))}
           </ul>
           {entries.length === 0 && (
-            <p className="list-empty">{query ? "Aucun résultat" : "Aucun identifiant"}</p>
+            <p className="p-4 text-xs text-muted-foreground">
+              {query ? "Aucun résultat" : "Aucun identifiant"}
+            </p>
           )}
         </aside>
-        <section className="detail-pane" aria-label="Détails de l'identifiant">
+        <section className="flex overflow-y-auto" aria-label="Détails de l'identifiant">
           {selected ? (
-            <article className="credential-detail">
-              <header className="detail-heading">
+            <article className="w-full max-w-[720px] p-8 max-[680px]:p-5.5">
+              <header className="flex items-center gap-3.5 pb-7">
                 <SiteIcon
                   key={`${selected.id}:${selected.site}`}
                   id={selected.id}
                   name={selected.name}
                   large
                 />
-                <div className="detail-title">
-                  <h2>{selected.name}</h2>
-                  <p>Identifiant</p>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl/[1.3] font-semibold wrap-anywhere">{selected.name}</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">Identifiant</p>
                 </div>
-                <div className="detail-actions">
+                <div className="flex shrink-0 items-center gap-1">
                   <Button
                     variant="outline"
                     size="sm"
@@ -320,59 +376,89 @@ function Credentials({ vault }: { vault: Vault }) {
               </header>
               <EditDialog vault={vault} entry={selected} />
               <DeleteDialog vault={vault} entry={selected} />
-              <dl className="detail-fields">
-                <div>
-                  <dt>Identifiant</dt>
-                  <dd>{selected.username || "Non renseigné"}</dd>
-                </div>
-                <div>
-                  <dt>Mot de passe</dt>
-                  <dd className="password-value">
-                    <code>{secret ? secret.password : "••••••••••••"}</code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={vault.busy}
-                      aria-label={secret ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                      title={secret ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                      onClick={() => vault.reveal(selected.id)}
-                    >
-                      {secret ? <EyeOff /> : <Eye />}
-                    </Button>
-                  </dd>
-                  {secret && (
-                    <p className="field-hint">Masqué automatiquement après 30 secondes.</p>
-                  )}
-                </div>
-                <div>
-                  <dt>Site</dt>
-                  <dd>{selected.site || "Non renseigné"}</dd>
-                </div>
-                <div>
-                  <dt>Notes</dt>
-                  <dd className="notes">
-                    {secret
-                      ? secret.notes || "Aucune note"
-                      : "Affiche le mot de passe pour lire les notes."}
-                  </dd>
-                </div>
+              <dl>
+                <DetailField label="Identifiant">
+                  {selected.username || "Non renseigné"}
+                </DetailField>
+                <DetailField
+                  label="Mot de passe"
+                  hint={secret && "Masqué automatiquement après 30 secondes."}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <code className="min-w-0 font-mono wrap-anywhere">
+                    {secret ? secret.password : "••••••••••••"}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    disabled={vault.busy}
+                    aria-label={secret ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    title={secret ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    onClick={() => vault.reveal(selected.id)}
+                  >
+                    {secret ? <EyeOff /> : <Eye />}
+                  </Button>
+                </DetailField>
+                <DetailField label="Site">{selected.site || "Non renseigné"}</DetailField>
+                <DetailField label="Notes" className="whitespace-pre-wrap">
+                  {secret
+                    ? secret.notes || "Aucune note"
+                    : "Affiche le mot de passe pour lire les notes."}
+                </DetailField>
               </dl>
             </article>
           ) : (
-            <div className="empty-detail">
-              <KeyRound size={28} strokeWidth={1.25} />
-              <h2>{query ? "Aucun identifiant trouvé" : "Aucun identifiant"}</h2>
-              <p>
-                {query
-                  ? "Essaie un autre nom, site ou identifiant."
-                  : "Ajoute un identifiant pour le retrouver ici."}
-              </p>
-            </div>
+            <Empty className="p-8 md:p-8">
+              <EmptyHeader className="gap-1.5">
+                <EmptyMedia className="text-muted-foreground">
+                  <KeyRound size={28} strokeWidth={1.25} />
+                </EmptyMedia>
+                <EmptyTitle role="heading" aria-level={2} className="text-[15px] font-semibold">
+                  {query ? "Aucun identifiant trouvé" : "Aucun identifiant"}
+                </EmptyTitle>
+                <EmptyDescription className="text-xs">
+                  {query
+                    ? "Essaie un autre nom, site ou identifiant."
+                    : "Ajoute un identifiant pour le retrouver ici."}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
         </section>
       </div>
     </>
   );
+}
+
+function AuthView({ children }: { children: ReactNode }) {
+  return (
+    <section className="flex flex-1 items-center justify-center overflow-y-auto p-8">
+      {children}
+    </section>
+  );
+}
+
+function AuthPanel({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="w-80 max-w-full">
+      {icon}
+      <h1 className="mb-2 text-[22px] font-semibold">{title}</h1>
+      {children}
+    </div>
+  );
+}
+
+function AuthText({ children }: { children: ReactNode }) {
+  return <p className="mb-6 leading-relaxed text-muted-foreground">{children}</p>;
 }
 
 function Authentication({ vault }: { vault: Vault }) {
@@ -395,18 +481,18 @@ function Authentication({ vault }: { vault: Vault }) {
   }
 
   return (
-    <section className="auth-view">
-      <div className="auth-form">
-        <LockKeyhole className="auth-icon" size={28} strokeWidth={1.3} />
-        <h1>{creating ? "Créer un coffre" : "Coffre verrouillé"}</h1>
-        <p>
+    <AuthView>
+      <AuthPanel
+        title={creating ? "Créer un coffre" : "Coffre verrouillé"}
+        icon={<LockKeyhole className="mb-5 text-muted-foreground" size={28} strokeWidth={1.3} />}
+      >
+        <AuthText>
           {creating
             ? "Choisis un mot de passe maître d’au moins 12 caractères. Il ne peut pas être réinitialisé."
             : "Saisis ton mot de passe maître pour ouvrir le coffre."}
-        </p>
-        <form onSubmit={authenticate}>
-          <div className="field">
-            <Label htmlFor="master-password">Mot de passe maître</Label>
+        </AuthText>
+        <form onSubmit={authenticate} className="grid gap-4.5">
+          <FormField id="master-password" label="Mot de passe maître">
             <Input
               id="master-password"
               name="password"
@@ -418,10 +504,9 @@ function Authentication({ vault }: { vault: Vault }) {
               autoComplete={creating ? "new-password" : "current-password"}
               disabled={vault.busy}
             />
-          </div>
+          </FormField>
           {creating && (
-            <div className="field">
-              <Label htmlFor="confirmation">Confirmer le mot de passe</Label>
+            <FormField id="confirmation" label="Confirmer le mot de passe">
               <Input
                 id="confirmation"
                 name="confirmation"
@@ -432,14 +517,14 @@ function Authentication({ vault }: { vault: Vault }) {
                 autoComplete="new-password"
                 disabled={vault.busy}
               />
-            </div>
+            </FormField>
           )}
-          <Button disabled={vault.busy} type="submit">
+          <Button disabled={vault.busy} type="submit" className="mt-0.5">
             {vault.busy ? "Ouverture…" : creating ? "Créer le coffre" : "Déverrouiller"}
           </Button>
         </form>
-      </div>
-    </section>
+      </AuthPanel>
+    </AuthView>
   );
 }
 
@@ -447,32 +532,31 @@ export default function App() {
   const vault = useVault();
 
   return (
-    <main className="vault-shell" aria-label="Cairn">
+    <main className="flex h-dvh flex-col overflow-hidden" aria-label="Cairn">
       {vault.error && (
-        <p className="error" role="alert">
+        <p className="shrink-0 border-b px-4 py-2.5 text-xs text-destructive" role="alert">
           {vault.error}
         </p>
       )}
       {Match.value(vault.snapshot.status).pipe(
         Match.when("unlocked", () => <Credentials vault={vault} />),
         Match.when("loading", () => (
-          <section className="auth-view">
+          <AuthView>
             <p role="status">Ouverture de Cairn…</p>
             {vault.error && <Button onClick={vault.retry}>Réessayer</Button>}
-          </section>
+          </AuthView>
         )),
         Match.when("recovery", () => (
-          <section className="auth-view">
-            <div className="auth-form">
-              <h1>Sauvegarde disponible</h1>
-              <p>
+          <AuthView>
+            <AuthPanel title="Sauvegarde disponible">
+              <AuthText>
                 Le coffre principal est introuvable. Ferme Cairn et restaure backups/previous.cairn
                 dans le dossier du coffre.
-              </p>
-              <p>%LOCALAPPDATA%\com.hezaerd.cairn</p>
+              </AuthText>
+              <AuthText>%LOCALAPPDATA%\com.hezaerd.cairn</AuthText>
               <Button onClick={vault.retry}>Vérifier à nouveau</Button>
-            </div>
-          </section>
+            </AuthPanel>
+          </AuthView>
         )),
         Match.orElse(() => <Authentication key={vault.snapshot.status} vault={vault} />),
       )}
