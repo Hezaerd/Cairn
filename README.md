@@ -18,13 +18,13 @@ To load the extension in Helium and connect it to the app, follow [Development](
 
 ## Commands
 
-| Command              | What it does                                          |
-| -------------------- | ----------------------------------------------------- |
-| `pnpm dev:desktop`   | Runs the desktop app with hot reload                  |
-| `pnpm dev:extension` | Rebuilds the extension into `apps/extension/dist`     |
-| `pnpm check`         | Lint, format check, TypeScript and Cargo checks       |
-| `pnpm test`          | TypeScript and Rust tests. Close Cairn first          |
-| `pnpm build:desktop` | Builds the Windows bundles in `target/release/bundle` |
+| Command              | What it does                                         |
+| -------------------- | ---------------------------------------------------- |
+| `pnpm dev:desktop`   | Runs the desktop app with hot reload                 |
+| `pnpm dev:extension` | Rebuilds the extension into `apps/extension/dist`    |
+| `pnpm check`         | Lint, format check, TypeScript and Cargo checks      |
+| `pnpm test`          | TypeScript and Rust tests. Close Cairn first         |
+| `pnpm build:desktop` | Builds the NSIS installer in `target/release/bundle` |
 
 ## Layout
 

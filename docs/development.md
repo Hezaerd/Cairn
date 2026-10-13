@@ -112,8 +112,34 @@ The test creates isolated Helium profiles under `.local` and registers the host 
 
 ## Builds
 
-| Command              | Output                                                    |
-| -------------------- | --------------------------------------------------------- |
-| `pnpm build`         | Desktop frontend and extension                            |
-| `pnpm build:desktop` | Native app and Windows bundles in `target/release/bundle` |
-| `pnpm build:host`    | Native Messaging host                                     |
+| Command              | Output                                                   |
+| -------------------- | -------------------------------------------------------- |
+| `pnpm build`         | Desktop frontend and extension                           |
+| `pnpm build:desktop` | Native app and NSIS installer in `target/release/bundle` |
+| `pnpm build:host`    | Native Messaging host                                    |
+
+Local builds aren't signed for the updater, so they can't be published as updates.
+
+## Releases
+
+Pushing a `v*` tag runs `.github/workflows/release.yml` on a Windows runner. It builds the NSIS installer with `src-tauri/tauri.release.conf.json`, signs it for the updater, and attaches the installer, its `.sig`, and `latest.json` to a draft release.
+
+1. Set the same version in `apps/desktop/src-tauri/tauri.conf.json`, `apps/desktop/src-tauri/Cargo.toml`, and `apps/desktop/package.json`, and merge it into `main`.
+2. Tag the merge and push the tag:
+
+   ```sh
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+   The workflow fails if the tag doesn't match the `tauri.conf.json` version.
+
+3. Install the draft's installer, check it, then publish the release.
+
+At launch, release builds check for an update and offer it in a notification. Debug builds skip the check, so the end-to-end tests stay offline.
+
+Installed copies only see a release once it's published and marked latest: the updater reads `https://github.com/Hezaerd/Cairn/releases/latest/download/latest.json`, which needs the repository to be public.
+
+The installer isn't Authenticode-signed. SmartScreen warns on the first manual install (More info → Run anyway). Updates are protected by the updater signature instead: the app only installs an update whose `.sig` matches the public key in `tauri.conf.json`.
+
+The private key is in `~/.tauri/cairn.key` and in the `TAURI_SIGNING_PRIVATE_KEY` repository secret. Keep a backup of it outside this machine. Without it, installed copies can't accept updates and have to be reinstalled by hand. If the key gets a password, store it as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
