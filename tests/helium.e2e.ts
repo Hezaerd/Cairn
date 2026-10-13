@@ -159,7 +159,8 @@ try {
 
   assert.ok(target, "Extension service worker target is missing");
   await cdp.send("Target.closeTarget", { targetId: target.targetId });
-  await page.getByRole("button", { name: "Actualiser" }).click();
+  // Reopening the popup asks the app again.
+  await page.reload();
   await page.getByRole("status").filter({ hasText: "Cairn connecté" }).waitFor();
   console.log("Request after service worker termination: OK");
   await cdp.detach();
@@ -173,7 +174,8 @@ try {
     ],
     { windowsHide: true, stdio: "pipe" },
   );
-  await page.getByRole("button", { name: "Actualiser" }).click();
+  // Reopening the popup asks the app again.
+  await page.reload();
   await page.getByRole("status").filter({ hasText: "Cairn connecté" }).waitFor();
   assert.equal(desktop.exitCode, null);
   console.log("Status bridge remains connected after close-to-tray: OK");
@@ -183,7 +185,8 @@ try {
     desktop!.exitCode !== null ? resolve() : desktop!.once("exit", () => resolve()),
   );
   desktop = undefined;
-  await page.getByRole("button", { name: "Actualiser" }).click();
+  // Reopening the popup asks the app again.
+  await page.reload();
   await page.getByText("Ouvre Cairn sur Windows, puis réessaie.").waitFor();
   console.log("Desktop closure: OK");
 } finally {

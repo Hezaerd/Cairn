@@ -16,7 +16,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut output = io::stdout().lock();
     while let Some(bytes) = read_frame(&mut input)? {
         let response = match parse_request(&bytes) {
-            Ok(request) => runtime.block_on(cairn_local_bridge::get_status(&request)),
+            Ok(request) => runtime.block_on(cairn_local_bridge::send(&request)),
             Err(response) => response,
         };
         write_frame(&mut output, &serde_json::to_vec(&response)?)?;

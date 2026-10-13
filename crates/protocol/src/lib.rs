@@ -1,21 +1,55 @@
 use serde::{Deserialize, Serialize};
 use std::io::{self, Read, Write};
+use zeroize::Zeroizing;
 
 pub const VERSION: u8 = 1;
 pub const MAX_MESSAGE_BYTES: usize = 16 * 1024;
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Request {
-    pub version: u8,
-    pub request_id: String,
-    #[serde(rename = "type")]
-    pub kind: RequestKind,
+/// Every request carries the protocol version and an ID echoed by its reply.
+/// Authenticated operations also carry a paired client ID, a single-use
+/// challenge from the app, and a signature over the operation.
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(tag = "type", deny_unknown_fields, rename_all_fields = "camelCase")]
+pub enum Request {
+    GetStatus {
+        version: u8,
+        request_id: String,
+    },
+    GetChallenge {
+        version: u8,
+        request_id: String,
+    },
+    Pair {
+        version: u8,
+        request_id: String,
+        public_key: String,
+        name: String,
+    },
+    ListLogins {
+        version: u8,
+        request_id: String,
+        origin: String,
+        client_id: String,
+        challenge: String,
+        signature: String,
+    },
+    GetLogin {
+        version: u8,
+        request_id: String,
+        origin: String,
+        entry_id: String,
+        client_id: String,
+        challenge: String,
+        signature: String,
+    },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub enum RequestKind {
-    GetStatus,
+/// The proof attached to an authenticated request.
+#[derive(Debug, PartialEq)]
+pub struct Auth<'a> {
+    pub client_id: &'a str,
+    pub challenge: &'a str,
+    pub signature: &'a str,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -25,18 +59,46 @@ pub enum ErrorCode {
     AppUnavailable,
     RequestTimeout,
     ProtocolMismatch,
+    VaultLocked,
+    NotPaired,
+    Unauthorized,
+    NotFound,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "type", deny_unknown_fields)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct LoginSummary {
+    pub id: String,
+    pub name: String,
+    pub username: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(tag = "type", deny_unknown_fields, rename_all_fields = "camelCase")]
 pub enum Response {
-    #[serde(rename_all = "camelCase")]
     Status {
         version: u8,
         request_id: String,
         app_version: String,
     },
-    #[serde(rename_all = "camelCase")]
+    Challenge {
+        version: u8,
+        request_id: String,
+        challenge: String,
+    },
+    /// The app shows the pairing code and waits for the user to approve it.
+    PairingRequested { version: u8, request_id: String },
+    Logins {
+        version: u8,
+        request_id: String,
+        logins: Vec<LoginSummary>,
+    },
+    Login {
+        version: u8,
+        request_id: String,
+        username: String,
+        password: Zeroizing<String>,
+    },
     Error {
         version: u8,
         request_id: Option<String>,
@@ -44,12 +106,127 @@ pub enum Response {
     },
 }
 
+/// Request IDs, client IDs, challenges, and signatures share this alphabet.
 pub fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
+/// Unpadded base64url of a fixed number of bytes.
+pub fn valid_base64url(value: &str, bytes: usize) -> bool {
+    value.len() == (bytes * 4).div_ceil(3)
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
+pub const PUBLIC_KEY_BYTES: usize = 65;
+pub const CLIENT_ID_BYTES: usize = 32;
+pub const CHALLENGE_BYTES: usize = 32;
+pub const SIGNATURE_BYTES: usize = 64;
+
+impl Request {
+    pub fn version(&self) -> u8 {
+        match self {
+            Self::GetStatus { version, .. }
+            | Self::GetChallenge { version, .. }
+            | Self::Pair { version, .. }
+            | Self::ListLogins { version, .. }
+            | Self::GetLogin { version, .. } => *version,
+        }
+    }
+
+    pub fn id(&self) -> &str {
+        match self {
+            Self::GetStatus { request_id, .. }
+            | Self::GetChallenge { request_id, .. }
+            | Self::Pair { request_id, .. }
+            | Self::ListLogins { request_id, .. }
+            | Self::GetLogin { request_id, .. } => request_id,
+        }
+    }
+
+    fn validate(&self) -> bool {
+        let fields = match self {
+            Self::GetStatus { .. } | Self::GetChallenge { .. } => true,
+            Self::Pair {
+                public_key, name, ..
+            } => {
+                valid_base64url(public_key, PUBLIC_KEY_BYTES)
+                    && !name.trim().is_empty()
+                    && name.chars().count() <= 64
+                    && !name.chars().any(char::is_control)
+            }
+            Self::ListLogins { origin, .. } => valid_origin(origin),
+            Self::GetLogin {
+                origin, entry_id, ..
+            } => {
+                valid_origin(origin)
+                    && entry_id.len() == 32
+                    && entry_id.bytes().all(|b| b.is_ascii_hexdigit())
+            }
+        };
+        let auth = self.auth().is_none_or(|auth| {
+            valid_base64url(auth.client_id, CLIENT_ID_BYTES)
+                && valid_base64url(auth.challenge, CHALLENGE_BYTES)
+                && valid_base64url(auth.signature, SIGNATURE_BYTES)
+        });
+        self.version() == VERSION && valid_id(self.id()) && fields && auth
+    }
+
+    pub fn auth(&self) -> Option<Auth<'_>> {
+        match self {
+            Self::ListLogins {
+                client_id,
+                challenge,
+                signature,
+                ..
+            }
+            | Self::GetLogin {
+                client_id,
+                challenge,
+                signature,
+                ..
+            } => Some(Auth {
+                client_id,
+                challenge,
+                signature,
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// A browser origin such as `https://example.com:8443`. The app parses it
+/// fully; this only bounds what crosses the boundary.
+fn valid_origin(origin: &str) -> bool {
+    origin.len() <= 2048
+        && (origin.starts_with("https://") || origin.starts_with("http://"))
+        && origin.bytes().all(|b| b.is_ascii_graphic())
+}
+
+/// The exact bytes a client signs for an authenticated operation. Fields
+/// can't contain newlines, so the encoding is unambiguous.
+pub fn signed_message(request: &Request) -> Option<String> {
+    match request {
+        Request::ListLogins {
+            origin, challenge, ..
+        } => Some(format!(
+            "cairn-bridge-v1\n{challenge}\nListLogins\n{origin}\n"
+        )),
+        Request::GetLogin {
+            origin,
+            entry_id,
+            challenge,
+            ..
+        } => Some(format!(
+            "cairn-bridge-v1\n{challenge}\nGetLogin\n{origin}\n{entry_id}"
+        )),
+        _ => None,
+    }
 }
 
 impl Response {
@@ -60,29 +237,71 @@ impl Response {
             code,
         }
     }
+
     pub fn status(request: &Request, app_version: &str) -> Self {
         Self::Status {
             version: VERSION,
-            request_id: request.request_id.clone(),
+            request_id: request.id().into(),
             app_version: app_version.into(),
         }
     }
+
+    /// Checks that a reply answers this request with an expected type.
     pub fn matches(&self, request: &Request) -> bool {
-        match self {
-            Self::Status {
-                version,
-                request_id,
-                app_version,
-            } => {
+        let id = request.id();
+        match (self, request) {
+            (
+                Self::Status {
+                    version,
+                    request_id,
+                    app_version,
+                },
+                Request::GetStatus { .. },
+            ) => *version == VERSION && request_id == id && valid_version(app_version),
+            (
+                Self::Challenge {
+                    version,
+                    request_id,
+                    challenge,
+                },
+                Request::GetChallenge { .. },
+            ) => {
                 *version == VERSION
-                    && request_id == &request.request_id
-                    && valid_version(app_version)
+                    && request_id == id
+                    && valid_base64url(challenge, CHALLENGE_BYTES)
             }
-            Self::Error {
-                version,
-                request_id,
-                ..
-            } => *version == VERSION && request_id.as_ref() == Some(&request.request_id),
+            (
+                Self::PairingRequested {
+                    version,
+                    request_id,
+                },
+                Request::Pair { .. },
+            )
+            | (
+                Self::Logins {
+                    version,
+                    request_id,
+                    ..
+                },
+                Request::ListLogins { .. },
+            )
+            | (
+                Self::Login {
+                    version,
+                    request_id,
+                    ..
+                },
+                Request::GetLogin { .. },
+            ) => *version == VERSION && request_id == id,
+            (
+                Self::Error {
+                    version,
+                    request_id,
+                    ..
+                },
+                _,
+            ) => *version == VERSION && request_id.as_deref() == Some(id),
+            _ => false,
         }
     }
 }
@@ -116,7 +335,7 @@ pub fn parse_request(bytes: &[u8]) -> Result<Request, Response> {
     // Parse the original bytes, so duplicate JSON fields are rejected by Serde.
     let request: Request = serde_json::from_slice(bytes)
         .map_err(|_| Response::error(request_id.clone(), ErrorCode::InvalidRequest))?;
-    if request.version != VERSION || !valid_id(&request.request_id) {
+    if !request.validate() {
         return Err(Response::error(request_id, ErrorCode::InvalidRequest));
     }
     Ok(request)
@@ -169,6 +388,17 @@ mod tests {
         assert_eq!(read_frame(&mut &data[..]).unwrap().unwrap(), b"hello");
     }
     #[test]
+    fn authenticated_requests_roundtrip() {
+        let bytes = br#"{"version":1,"requestId":"r-1","type":"GetLogin","origin":"https://example.com","entryId":"0123456789abcdef0123456789abcdef","clientId":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","challenge":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","signature":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}"#;
+        let request = parse_request(bytes).unwrap();
+        let again = parse_request(&serde_json::to_vec(&request).unwrap()).unwrap();
+        assert_eq!(request, again);
+        let message = signed_message(&request).unwrap();
+        assert!(
+            message.ends_with("\nGetLogin\nhttps://example.com\n0123456789abcdef0123456789abcdef")
+        );
+    }
+    #[test]
     fn shared_fixtures() {
         let fixtures: serde_json::Value =
             serde_json::from_str(include_str!("../../../tests/fixtures/protocol/cases.json"))
@@ -178,13 +408,14 @@ mod tests {
             let valid = if case["kind"] == "request" {
                 parse_request(&bytes).is_ok()
             } else {
-                serde_json::from_slice::<Response>(&bytes).is_ok_and(|response| {
-                    response.matches(&Request {
+                let request = serde_json::from_value::<Request>(case["request"].clone()).unwrap_or(
+                    Request::GetStatus {
                         version: VERSION,
                         request_id: "test-1".into(),
-                        kind: RequestKind::GetStatus,
-                    })
-                })
+                    },
+                );
+                serde_json::from_slice::<Response>(&bytes)
+                    .is_ok_and(|response| response.matches(&request))
             };
             assert_eq!(valid, case["valid"].as_bool().unwrap(), "{}", case["name"]);
         }

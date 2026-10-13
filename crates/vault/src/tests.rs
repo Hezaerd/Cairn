@@ -410,3 +410,60 @@ fn update_and_delete_refuse_external_changes() {
     );
     assert_eq!(vault.list().unwrap()[0].name, "Entry");
 }
+
+#[test]
+fn paired_browsers_are_encrypted_persistent_and_need_an_unlocked_vault() {
+    let (dir, mut vault) = fixture();
+    assert!(matches!(vault.browsers(), Err(VaultError::Locked)));
+    assert_eq!(
+        vault.add_browser("client-a", "Helium", "public-key-a"),
+        Err(VaultError::Locked)
+    );
+    vault.unlock(password()).unwrap();
+    assert!(vault.browsers().unwrap().is_empty());
+    vault
+        .add_browser("client-a", "Helium", "public-key-a")
+        .unwrap();
+    vault
+        .add_browser("client-b", "Work profile", "public-key-b")
+        .unwrap();
+    // Pairing the same client again replaces it.
+    vault
+        .add_browser("client-a", "Helium again", "public-key-a")
+        .unwrap();
+    let encrypted = fs::read(dir.path().join("browsers.cairn")).unwrap();
+    for value in ["client-a", "Helium", "public-key-b"] {
+        assert!(
+            !encrypted
+                .windows(value.len())
+                .any(|bytes| bytes == value.as_bytes())
+        );
+    }
+    drop(vault);
+
+    let mut reopened = Vault::open(dir.path()).unwrap();
+    reopened.unlock(password()).unwrap();
+    let names: Vec<_> = reopened
+        .browsers()
+        .unwrap()
+        .into_iter()
+        .map(|browser| browser.name)
+        .collect();
+    assert_eq!(names, ["Work profile", "Helium again"]);
+    assert_eq!(
+        reopened.browser_key("client-b").unwrap().as_deref(),
+        Some("public-key-b")
+    );
+    reopened.remove_browser("client-b").unwrap();
+    assert_eq!(reopened.browser_key("client-b").unwrap(), None);
+    assert_eq!(
+        reopened.remove_browser("client-b"),
+        Err(VaultError::InvalidInput)
+    );
+
+    // A damaged list reads as empty and never blocks the credentials.
+    fs::write(dir.path().join("browsers.cairn"), b"damaged").unwrap();
+    reopened.lock();
+    reopened.unlock(password()).unwrap();
+    assert!(reopened.browsers().unwrap().is_empty());
+}

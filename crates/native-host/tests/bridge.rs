@@ -1,6 +1,7 @@
 #![cfg(windows)]
 
-use cairn_local_bridge::{StatusServer, pipe_name};
+use cairn_local_bridge::{BridgeServer, pipe_name};
+use cairn_protocol::{Request, Response};
 use cairn_protocol::{read_frame, write_frame};
 use serde_json::{Value, json};
 use std::{
@@ -41,6 +42,10 @@ fn request(id: &str) -> Value {
     json!({"version":1,"requestId":id,"type":"GetStatus"})
 }
 
+async fn status(request: Request) -> Response {
+    Response::status(&request, "0.1.0")
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn native_process_and_windows_pipe_lifecycle() {
     // Uses the real, current-user/session endpoint. Run with Cairn closed.
@@ -49,12 +54,12 @@ async fn native_process_and_windows_pipe_lifecycle() {
         .unwrap();
     assert_eq!(unavailable[0]["code"], "AppUnavailable");
 
-    let server = StatusServer::bind().unwrap();
+    let server = BridgeServer::bind().unwrap();
     assert!(
-        StatusServer::bind().is_err(),
+        BridgeServer::bind().is_err(),
         "a second server must not bind"
     );
-    let task = tokio::spawn(server.run("0.1.0"));
+    let task = tokio::spawn(server.run(status));
     let a = tokio::task::spawn_blocking(|| exchange(vec![request("profile-a"), request("again")]));
     let b = tokio::task::spawn_blocking(|| exchange(vec![request("profile-b")]));
     let (a, b) = tokio::join!(a, b);
@@ -108,7 +113,7 @@ async fn native_process_and_windows_pipe_lifecycle() {
     drop(closing);
     assert_eq!(client.await.unwrap()[0]["code"], "AppUnavailable");
 
-    let task = tokio::spawn(StatusServer::bind().unwrap().run("0.1.0"));
+    let task = tokio::spawn(BridgeServer::bind().unwrap().run(status));
     assert_eq!(
         tokio::task::spawn_blocking(|| exchange(vec![request("restart")]))
             .await

@@ -4,6 +4,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { router } from "./router";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { FaviconServiceLive } from "./favicon/FaviconService";
+import { BrowserServiceLive } from "./bridge/BrowserService";
 import { VaultClientLive } from "./vault/VaultClientLive";
 import { VaultRuntime } from "./vault/runtime";
 import { ThemeProvider } from "./theme/ThemeProvider";
@@ -15,7 +16,9 @@ import { checkForUpdateOnLaunch } from "./updater/updates";
 // Set the theme class before the first render so the window never flashes the wrong palette.
 applyTheme(storedTheme());
 
-const vaultRuntime = ManagedRuntime.make(Layer.merge(VaultClientLive, FaviconServiceLive));
+const vaultRuntime = ManagedRuntime.make(
+  Layer.mergeAll(VaultClientLive, FaviconServiceLive, BrowserServiceLive),
+);
 
 if (import.meta.hot)
   import.meta.hot.dispose(() => {

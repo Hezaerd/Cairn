@@ -21,7 +21,8 @@
     "lint:fix": "oxlint --fix .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "test:vault": "tsx tests/vault.e2e.ts"
+    "test:vault": "tsx tests/vault.e2e.ts",
+    "test:autofill": "tsx tests/autofill.e2e.ts"
   },
   "devDependencies": {
     "@cairn/client": "workspace:*",
