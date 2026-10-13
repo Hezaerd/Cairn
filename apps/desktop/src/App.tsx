@@ -233,6 +233,7 @@ function Credentials({ vault }: { vault: Vault }) {
           <h1>Identifiants</h1>
           <span className="count">{vault.snapshot.entries.length}</span>
         </div>
+        <ThemeToggle />
         <EntryDialog vault={vault} />
         <Button variant="outline" size="sm" onClick={vault.lock}>
           <LockKeyhole />
@@ -475,18 +476,6 @@ export default function App() {
         )),
         Match.orElse(() => <Authentication key={vault.snapshot.status} vault={vault} />),
       )}
-      <footer className="statusbar">
-        <span>
-          <LockKeyhole size={12} />
-          Coffre local
-        </span>
-        <span className="statusbar-end">
-          <span role="status">
-            {vault.busy ? "Traitement en cours…" : "Verrouillage automatique après 5 min"}
-          </span>
-          <ThemeToggle />
-        </span>
-      </footer>
     </main>
   );
 }

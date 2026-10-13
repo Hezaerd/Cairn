@@ -26,12 +26,16 @@ export function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="xs" className="theme-toggle" aria-label="Changer le thème">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Thème : ${current.label}`}
+          title={`Thème : ${current.label}`}
+        >
           <current.icon />
-          {current.label}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" side="top">
+      <DropdownMenuContent align="end">
         <DropdownMenuLabel>Thème</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
