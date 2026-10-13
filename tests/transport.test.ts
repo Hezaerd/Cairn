@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Effect, Layer, Match } from "effect";
+import { Effect, Layer, Match, Option } from "effect";
+import { BrowserKey, generateKeys, keyPair } from "@cairn/client/BrowserKey";
 import { CairnClient, CairnClientLive } from "@cairn/client/CairnClient";
 import { chromiumTransport, type NativeRuntime } from "@cairn/client/ChromiumTransport";
+import { signedMessage } from "@cairn/contracts";
 
 function event() {
   const listeners = new Set<(...args: any[]) => void>();
@@ -92,13 +94,35 @@ function fakeRuntime(
   };
 }
 
+/** Keeps the key in memory, as IndexedDB would keep it in the extension. */
+function memoryKey() {
+  let stored: CryptoKeyPair | undefined;
+
+  return Layer.succeed(
+    BrowserKey,
+    BrowserKey.of({
+      load: Effect.suspend(() =>
+        stored ? Effect.map(keyPair(stored), Option.some) : Effect.succeed(Option.none()),
+      ),
+      create: Effect.gen(function* () {
+        stored = yield* generateKeys;
+
+        return yield* keyPair(stored);
+      }),
+    }),
+  );
+}
+
+const client = (runtime: NativeRuntime, key = memoryKey()) =>
+  CairnClientLive.pipe(Layer.provide(Layer.merge(chromiumTransport(runtime), key)));
+
 const program = (runtime: NativeRuntime) =>
   Effect.gen(function* () {
     const client = yield* CairnClient;
 
     return yield* client.getStatus;
   }).pipe(
-    Effect.provide(CairnClientLive.pipe(Layer.provide(chromiumTransport(runtime)))),
+    Effect.provide(client(runtime)),
     Effect.match({ onSuccess: () => "Connected", onFailure: (error) => error.code }),
   );
 
@@ -144,5 +168,138 @@ test("interruption closes the native connection", async () => {
   await assert.rejects(result);
   assert.ok(
     fake.ports.every((p) => p.closed && p.onMessage.size === 0 && p.onDisconnect.size === 0),
+  );
+});
+
+/**
+ * Plays the desktop app: issues challenges, records the paired key once
+ * "approved", and answers only requests signed by it.
+ */
+function fakeApp() {
+  const challenges = new Set<string>();
+  let pending: string | undefined;
+  let paired: CryptoKey | undefined;
+
+  const reply = async (request: any) => {
+    const header = { version: 1, requestId: request.requestId };
+    const error = (code: string) => ({ ...header, type: "Error", code });
+
+    if (request.type === "GetChallenge") {
+      const challenge = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString(
+        "base64url",
+      );
+
+      challenges.add(challenge);
+
+      return { ...header, type: "Challenge", challenge };
+    }
+
+    if (request.type === "Pair") {
+      pending = request.publicKey;
+
+      return { ...header, type: "PairingRequested" };
+    }
+
+    if (!challenges.delete(request.challenge)) return error("Unauthorized");
+
+    if (!paired) return error("NotPaired");
+
+    const valid = await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      paired,
+      Buffer.from(request.signature, "base64url"),
+      new TextEncoder().encode(signedMessage(request)),
+    );
+
+    if (!valid) return error("Unauthorized");
+
+    return request.type === "ListLogins"
+      ? {
+          ...header,
+          type: "Logins",
+          logins: [{ id: "0123456789abcdef0123456789abcdef", name: "Example", username: "u" }],
+        }
+      : { ...header, type: "Login", username: "u", password: "synthetic" };
+  };
+
+  const runtime: NativeRuntime = {
+    connectNative: () => {
+      const port = {
+        onMessage: event(),
+        onDisconnect: event(),
+        disconnect() {},
+        postMessage(request: any) {
+          void reply(request).then((response) => port.onMessage.emit(response));
+        },
+      };
+
+      return port;
+    },
+  };
+
+  return {
+    runtime,
+    approve: async () => {
+      paired = await crypto.subtle.importKey(
+        "raw",
+        Buffer.from(pending!, "base64url"),
+        { name: "ECDSA", namedCurve: "P-256" },
+        false,
+        ["verify"],
+      );
+    },
+  };
+}
+
+test("pairing, then signed requests for logins", async () => {
+  const app = fakeApp();
+  const key = memoryKey();
+
+  const run = <A>(use: (client: CairnClient["Service"]) => Effect.Effect<A, any>) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        return yield* use(yield* CairnClient);
+      }).pipe(
+        Effect.provide(client(app.runtime, key)),
+        Effect.mapError((error) => error.code),
+        Effect.flip,
+        Effect.map((code) => ({ code })),
+        Effect.catch((value) => Effect.succeed(value)),
+      ),
+    );
+
+  const origin = "https://example.com";
+  assert.deepEqual(await run((c) => c.pairingCode), Option.none());
+  assert.deepEqual(await run((c) => c.listLogins(origin)), { code: "NotPaired" });
+
+  const code = await run((c) => c.pair("Helium (Windows)"));
+  assert.match(String(code), /^\d{4} \d{4}$/);
+  assert.deepEqual(await run((c) => c.pairingCode), Option.some(code));
+  // A key the app hasn't approved yet gets nothing.
+  assert.deepEqual(await run((c) => c.listLogins(origin)), { code: "NotPaired" });
+
+  await app.approve();
+  assert.deepEqual(await run((c) => c.listLogins(origin)), [
+    { id: "0123456789abcdef0123456789abcdef", name: "Example", username: "u" },
+  ]);
+  assert.deepEqual(await run((c) => c.getLogin(origin, "0123456789abcdef0123456789abcdef")), {
+    username: "u",
+    password: "synthetic",
+  });
+
+  // A different browser's key is refused even with a fresh challenge.
+  assert.deepEqual(
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const other = yield* CairnClient;
+        yield* other.pair("Other");
+
+        return yield* other.listLogins(origin);
+      }).pipe(
+        Effect.provide(client(app.runtime)),
+        Effect.match({ onSuccess: () => "Allowed", onFailure: (error) => error.code }),
+      ),
+    ),
+    "Unauthorized",
   );
 });

@@ -12,16 +12,16 @@ Read what the task needs. [Development](docs/development.md) covers setup, the e
 
 - The repository is a pnpm workspace and a Cargo workspace. Add an app's dependencies to that app; keep only repository-wide tooling in the root `package.json`.
 - `apps/desktop` is the Tauri app. Its Rust side is in `apps/desktop/src-tauri`, and its UI uses the shadcn/ui components in `src/components/ui`. Reuse them and the tokens in `src/App.css`.
-- `apps/extension` is the popup and service worker. The service worker only accepts messages from its own popup. Keep its permissions to `nativeMessaging`.
+- `apps/extension` is the popup and service worker. The service worker only accepts messages from its own popup. Keep its permissions to `nativeMessaging`, `activeTab`, and `scripting`, with no host permissions.
 - `packages/contracts` holds the Effect Schema wire contracts and typed errors. `packages/client` holds the Effect services and the Native Messaging adapter.
-- `crates/vault` holds the vault format, crypto, sessions, and storage, and doesn't depend on Tauri. `crates/favicon` downloads site icons and owns their cache. `crates/protocol`, `crates/local-bridge`, and `crates/native-host` carry the status bridge.
+- `crates/vault` holds the vault format, crypto, sessions, storage, and the paired-browser list, and doesn't depend on Tauri. `crates/favicon` downloads site icons and owns their cache. `crates/protocol`, `crates/local-bridge`, and `crates/native-host` carry the browser bridge; the app answers it in `apps/desktop/src-tauri/src/bridge`.
 - Each app keeps its routes in `src/routes`. Don't edit the generated `src/routeTree.gen.ts` files.
 
 ## Security rules
 
-- Passwords and notes reach the UI only on an explicit reveal. Never put a credential, the master password, or a key in logs, errors, browser storage, or the favicon cache.
+- Passwords and notes reach the UI only on an explicit reveal, and a page only when you pick a login in the popup. Never put a credential, the master password, or a key in logs, errors, browser storage, or the favicon cache. The one exception is the extension's non-extractable pairing key in IndexedDB.
 - Don't change the vault file format, key derivation parameters, or nonce handling without a version bump and a migration path. Existing vaults must keep opening.
-- The bridge answers `GetStatus` only. Don't expose vault data through it before pairing, authenticated sessions, and per-operation authorization exist.
+- Over the bridge, anything beyond status and challenges needs an unlocked vault, and vault data needs a signature from a paired browser on a fresh challenge. A password goes only to a page on its login's site. Keep notes off the bridge. See [browser bridge](docs/browser-bridge.md).
 - Tests use synthetic data under `.local`. Never open the personal vault or a personal browser profile.
 
 ## Effect

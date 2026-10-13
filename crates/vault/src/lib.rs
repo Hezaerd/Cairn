@@ -1,6 +1,8 @@
 //! Local, single-writer encrypted vault. No browser or IPC dependencies.
+mod browsers;
 mod favicon;
 mod storage;
+pub use browsers::BrowserSummary;
 pub use favicon::FaviconLookup;
 
 use argon2::{Algorithm, Argon2, Block, Params, Version};
@@ -154,6 +156,14 @@ pub struct EntrySummary {
     pub username: String,
 }
 
+/// What a browser needs to fill a login form.
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct Login {
+    pub site: String,
+    pub username: String,
+    pub password: String,
+}
+
 #[derive(Serialize, Zeroize, ZeroizeOnDrop)]
 pub struct EntrySecret {
     pub password: String,
@@ -163,6 +173,7 @@ pub struct EntrySecret {
 struct Session {
     favicon_token: String,
     favicons: Option<Vec<favicon::CachedIcon>>,
+    browsers: Option<Vec<browsers::PairedBrowser>>,
     key: Zeroizing<[u8; 32]>,
     envelope: Envelope,
     entries: Vec<Entry>,
@@ -249,6 +260,7 @@ impl Vault {
         let mut session = Session {
             favicon_token: favicon::session_token()?,
             favicons: None,
+            browsers: None,
             key,
             envelope: Envelope {
                 header,
@@ -306,6 +318,7 @@ impl Vault {
         self.session = Some(Session {
             favicon_token: favicon::session_token()?,
             favicons: None,
+            browsers: None,
             key,
             envelope,
             entries,
@@ -361,6 +374,19 @@ impl Vault {
             .map(|entry| EntrySecret {
                 password: entry.password.clone(),
                 notes: entry.notes.clone(),
+            })
+            .ok_or(VaultError::InvalidInput)
+    }
+
+    pub fn login(&mut self, id: &str) -> Result<Login> {
+        self.active()?
+            .entries
+            .iter()
+            .find(|entry| entry.id == id)
+            .map(|entry| Login {
+                site: entry.site.clone(),
+                username: entry.username.clone(),
+                password: entry.password.clone(),
             })
             .ok_or(VaultError::InvalidInput)
     }

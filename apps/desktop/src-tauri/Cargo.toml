@@ -21,6 +21,11 @@ zeroize = "1"
 tokio = { version = "1", features = ["time", "sync", "macros"] }
 cairn-favicon = { path = "../../../crates/favicon" }
 base64 = "0.22"
+cairn-protocol = { path = "../../../crates/protocol" }
+getrandom = "0.4"
+p256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"
+url = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sys-locale = "0.3"

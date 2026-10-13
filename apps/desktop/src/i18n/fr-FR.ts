@@ -81,6 +81,24 @@ export const frFR: Messages = {
     notFound: "Page introuvable",
     home: "Retour à l'accueil",
   },
+  browsers: {
+    open: "Navigateurs associés",
+    title: "Navigateurs associés",
+    description:
+      "Ces navigateurs peuvent remplir tes identifiants tant que le coffre est déverrouillé.",
+    empty: "Aucun navigateur associé. Ouvre l’extension Cairn et choisis Associer à Cairn.",
+    pairedOn: (date: Date) => `Associé le ${date.toLocaleDateString("fr-FR")}`,
+    remove: (name: string) => `Retirer ${name}`,
+    removed: (name: string) => `${name} ne peut plus remplir tes identifiants.`,
+    requestTitle: "Associer un navigateur ?",
+    requestDescription: (name: string) =>
+      `${name} demande à remplir tes identifiants sur les sites auxquels ils appartiennent.`,
+    requestHint:
+      "Approuve seulement si l’extension Cairn affiche le même code. Si tu n’as rien demandé, refuse.",
+    approve: "Approuver",
+    refuse: "Refuser",
+    paired: (name: string) => `${name} est associé.`,
+  },
   theme: {
     label: "Thème",
     current: (theme) => `Thème : ${theme}`,

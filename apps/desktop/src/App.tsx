@@ -27,6 +27,7 @@ import { EntryUpdate, NewEntry, type EntrySummary } from "./vault/VaultClient";
 import { useVault } from "./vault/useVault";
 import { SiteIcon } from "./favicon/SiteIcon";
 import { ThemeToggle } from "./theme/ThemeToggle";
+import { BrowsersDialog, PairingDialog } from "./bridge/Browsers";
 import { useT } from "./i18n/I18nProvider";
 
 type Vault = ReturnType<typeof useVault>;
@@ -282,12 +283,14 @@ function Credentials({ vault }: { vault: Vault }) {
           <h1 className="font-semibold">{t.credentials.title}</h1>
           <span className="text-xs text-muted-foreground">{vault.snapshot.entries.length}</span>
         </div>
+        <BrowsersDialog />
         <ThemeToggle />
         <EntryDialog vault={vault} />
         <Button variant="outline" size="sm" onClick={vault.lock}>
           <LockKeyhole />
           {t.credentials.lock}
         </Button>
+        <PairingDialog />
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-[270px_minmax(0,1fr)] max-[680px]:grid-cols-[210px_minmax(0,1fr)]">
         <aside className="flex min-h-0 flex-col border-r bg-muted" aria-label={t.credentials.list}>

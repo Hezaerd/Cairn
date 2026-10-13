@@ -1,0 +1,7 @@
+{
+  "publicKey": "BOOW1dyCHYY4QMqAT9TMDlKO4nUm7fnNINXHblR7cydfk_ujsAkq-A6_cRTFsW46o5CxC1EP_cE6bCtz-8u_x-g",
+  "message": "cairn-bridge-v1\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\nGetLogin\nhttps://example.com\n0123456789abcdef0123456789abcdef",
+  "signature": "grn8gsLAO6R8oYr_QW99k6k2EO8rpqteP6zDosnjbzXCpMOJTkxPgSK_YaL5x4eBnWDzhRtT_DXUAfhmmPIW3g",
+  "clientId": "4nz92QQQh16FxkQr0Pb5QI8XbPqsq_NwAYQ9tt7Ip9Q",
+  "code": "9984 2265"
+}
