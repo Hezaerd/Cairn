@@ -16,5 +16,24 @@
     "placeholders": { "code": { "content": "$1" } }
   },
   "refresh": { "message": "Actualiser" },
-  "retry": { "message": "Réessayer" }
+  "retry": { "message": "Réessayer" },
+  "pairIntro": { "message": "Associe ce navigateur à Cairn pour remplir tes identifiants." },
+  "pair": { "message": "Associer à Cairn" },
+  "pairingCode": {
+    "message": "Cairn te demande d’approuver ce navigateur. Vérifie qu’il affiche ce code :"
+  },
+  "pairingThen": { "message": "Approuve-le dans Cairn, puis actualise." },
+  "pairAgain": { "message": "Redemander" },
+  "locked": { "message": "Déverrouille Cairn pour voir tes identifiants." },
+  "noSite": { "message": "Ouvre un site web pour voir ses identifiants." },
+  "loginsFor": {
+    "message": "Identifiants pour $HOST$",
+    "placeholders": { "host": { "content": "$1" } }
+  },
+  "noLogins": {
+    "message": "Aucun identifiant enregistré pour $HOST$.",
+    "placeholders": { "host": { "content": "$1" } }
+  },
+  "noUsername": { "message": "Sans nom d’utilisateur" },
+  "noForm": { "message": "Aucun formulaire de connexion trouvé sur cette page." }
 }

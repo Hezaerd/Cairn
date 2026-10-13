@@ -1,7 +1,7 @@
 #![cfg(windows)]
 
 use cairn_protocol::{ErrorCode, MAX_MESSAGE_BYTES, Request, Response, parse_request};
-use std::{io, sync::Arc, time::Duration};
+use std::{future::Future, io, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::windows::named_pipe::{ClientOptions, NamedPipeServer},
@@ -38,12 +38,12 @@ async fn write_frame(stream: &mut (impl AsyncWrite + Unpin), bytes: &[u8]) -> io
     stream.flush().await
 }
 
-pub struct StatusServer {
+pub struct BridgeServer {
     name: String,
     listener: NamedPipeServer,
 }
 
-impl StatusServer {
+impl BridgeServer {
     // Must be called inside a Tokio runtime. First-instance creation refuses a
     // competing server instead of joining a pipe owned by another process.
     pub fn bind() -> io::Result<Self> {
@@ -52,7 +52,13 @@ impl StatusServer {
         Ok(Self { name, listener })
     }
 
-    pub async fn run(mut self, version: &'static str) -> io::Result<()> {
+    /// Answers one request per connection with `handler`. Malformed requests
+    /// are answered here and never reach it.
+    pub async fn run<H, F>(mut self, handler: H) -> io::Result<()>
+    where
+        H: Fn(Request) -> F + Clone + Send + Sync + 'static,
+        F: Future<Output = Response> + Send,
+    {
         let permits = Arc::new(Semaphore::new(16));
         loop {
             let permit = permits
@@ -64,12 +70,13 @@ impl StatusServer {
             // Keep an instance alive while creating the next listener.
             let next = create_server(&self.name, false)?;
             let mut connection = std::mem::replace(&mut self.listener, next);
+            let handler = handler.clone();
             tokio::spawn(async move {
                 let _permit = permit;
                 let _ = timeout(Duration::from_millis(1500), async {
                     let bytes = read_frame(&mut connection).await?;
                     let response = match parse_request(&bytes) {
-                        Ok(request) => Response::status(&request, version),
+                        Ok(request) => handler(request).await,
                         Err(response) => response,
                     };
                     write_frame(&mut connection, &serde_json::to_vec(&response)?).await
@@ -80,7 +87,8 @@ impl StatusServer {
     }
 }
 
-pub async fn get_status(request: &Request) -> Response {
+/// Forwards one request to the desktop app and checks that the reply answers it.
+pub async fn send(request: &Request) -> Response {
     let response = timeout(Duration::from_millis(1500), async {
         let name = pipe_name().map_err(|_| ErrorCode::AppUnavailable)?;
         let mut stream = loop {
@@ -109,7 +117,7 @@ pub async fn get_status(request: &Request) -> Response {
     .await;
     match response {
         Ok(Ok(response)) => response,
-        Ok(Err(code)) => Response::error(Some(request.request_id.clone()), code),
-        Err(_) => Response::error(Some(request.request_id.clone()), ErrorCode::RequestTimeout),
+        Ok(Err(code)) => Response::error(Some(request.id().into()), code),
+        Err(_) => Response::error(Some(request.id().into()), ErrorCode::RequestTimeout),
     }
 }

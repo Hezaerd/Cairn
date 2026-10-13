@@ -2,7 +2,7 @@
 
 Cairn is a personal password manager for Windows. It has a desktop app and an extension for Helium and other Chromium browsers.
 
-The desktop app creates and unlocks an encrypted local vault. You can add, edit, and delete credentials, and reveal a password and its notes when you need them. The extension connects to the running app and shows whether it is available. It can't read vault entries yet, and pairing and autofill aren't built.
+The desktop app creates and unlocks an encrypted local vault. You can add, edit, and delete credentials, and reveal a password and its notes when you need them. Once you pair the extension with the app, its popup lists the logins for the site you're on and fills one in with a click, while the vault is unlocked.
 
 ## Quick start
 
@@ -14,7 +14,7 @@ pnpm build:host
 pnpm dev:desktop
 ```
 
-To load the extension in Helium and connect it to the app, follow [Development](docs/development.md#browser-extension).
+To load the extension in Helium and connect it to the app, follow [Development](docs/development.md#browser-extension), then pair it as described in [Browser bridge](docs/browser-bridge.md#using-it).
 
 ## Commands
 
@@ -36,7 +36,7 @@ To load the extension in Helium and connect it to the app, follow [Development](
 | `packages/client`     | Effect services and the Native Messaging adapter           |
 | `crates/vault`        | Vault format, encryption, sessions and storage             |
 | `crates/favicon`      | Site icon downloads and their encrypted cache              |
-| `crates/protocol`     | Shared request types and message framing                   |
+| `crates/protocol`     | Bridge requests, replies, and message framing              |
 | `crates/local-bridge` | Windows named pipe between the app and the host            |
 | `crates/native-host`  | Native Messaging host the browser launches                 |
 | `scripts`             | Native host registration for development                   |

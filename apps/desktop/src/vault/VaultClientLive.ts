@@ -11,7 +11,7 @@ import {
 
 const decodeError = Schema.decodeUnknownOption(ErrorCode);
 
-function request<A>(command: string, schema: Schema.Codec<A>, args?: InvokeArgs) {
+export function request<A>(command: string, schema: Schema.Codec<A>, args?: InvokeArgs) {
   return Effect.tryPromise({
     try: () => invoke(command, args),
     catch: (cause) =>
