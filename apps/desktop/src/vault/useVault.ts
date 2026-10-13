@@ -6,6 +6,7 @@ import {
   VaultClient,
   VaultError,
   type EntrySummary,
+  type EntryUpdate,
   type ErrorCode,
   type NewEntry,
   type VaultStatus,
@@ -21,6 +22,12 @@ interface RevealedPassword {
   id: string;
   password: string;
   notes: string;
+}
+
+interface EditTarget {
+  id: string;
+  /** Notes are editable only when they were revealed before opening the editor. */
+  notes: string | null;
 }
 
 const messages: Record<ErrorCode, string> = {
@@ -65,6 +72,8 @@ export function useVault() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<EditTarget | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<RevealedPassword | null>(null);
   const epoch = useRef(0);
   const revealEpoch = useRef(0);
@@ -79,6 +88,8 @@ export function useVault() {
     setSnapshot({ status: "locked", entries: [] });
     setRevealed(null);
     setAdding(false);
+    setEditing(null);
+    setDeleting(null);
     setBusy(false);
   }
 
@@ -182,6 +193,40 @@ export function useVault() {
     );
   }
 
+  function startEdit(id: string) {
+    setEditing({ id, notes: revealed?.id === id ? revealed.notes : null });
+    hideSecret();
+  }
+
+  function update(id: string, entry: EntryUpdate) {
+    setEditing(null);
+    execute(
+      Effect.gen(function* () {
+        const vault = yield* VaultClient;
+        yield* vault.update(id, entry);
+
+        return yield* loadSnapshot;
+      }),
+      setSnapshot,
+      true,
+    );
+  }
+
+  function remove(id: string) {
+    setDeleting(null);
+    hideSecret();
+    execute(
+      Effect.gen(function* () {
+        const vault = yield* VaultClient;
+        yield* vault.remove(id);
+
+        return yield* loadSnapshot;
+      }),
+      setSnapshot,
+      true,
+    );
+  }
+
   function lock() {
     clearSession();
     execute(
@@ -221,9 +266,16 @@ export function useVault() {
     busy,
     error,
     adding,
+    editing,
+    deleting,
     revealed,
     authenticate,
     save,
+    startEdit,
+    stopEdit: () => setEditing(null),
+    update,
+    setDeleting,
+    remove,
     lock,
     reveal,
     setAdding,

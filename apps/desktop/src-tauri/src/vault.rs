@@ -1,4 +1,6 @@
-use cairn_vault::{EntrySecret, EntrySummary, NewEntry, Vault, VaultError, VaultStatus};
+use cairn_vault::{
+    EntrySecret, EntrySummary, EntryUpdate, NewEntry, Vault, VaultError, VaultStatus,
+};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State, WebviewWindow};
 use zeroize::Zeroizing;
@@ -104,13 +106,46 @@ pub async fn save_entry(
     entry: NewEntry,
 ) -> Result<(), VaultError> {
     run(window, &store, move |vault| {
-        let result = vault.save(entry);
-        if result.is_err() {
-            vault.lock();
-        }
-        result
+        locking_on_error(vault, |vault| vault.save(entry))
     })
     .await
+}
+
+#[tauri::command]
+pub async fn update_entry(
+    window: WebviewWindow,
+    store: State<'_, Store>,
+    id: String,
+    entry: EntryUpdate,
+) -> Result<(), VaultError> {
+    run(window, &store, move |vault| {
+        locking_on_error(vault, |vault| vault.update(&id, entry))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_entry(
+    window: WebviewWindow,
+    store: State<'_, Store>,
+    id: String,
+) -> Result<(), VaultError> {
+    run(window, &store, move |vault| {
+        locking_on_error(vault, |vault| vault.delete(&id))
+    })
+    .await
+}
+
+/// A failed change makes the desktop reload from disk, so the list never shows unsaved state.
+fn locking_on_error(
+    vault: &mut Vault,
+    change: impl FnOnce(&mut Vault) -> Result<(), VaultError>,
+) -> Result<(), VaultError> {
+    let result = change(vault);
+    if result.is_err() {
+        vault.lock();
+    }
+    result
 }
 
 #[tauri::command]
