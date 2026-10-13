@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { Data, Effect, Schema } from "effect";
 import { toast } from "sonner";
+import type { Messages } from "../i18n/en-US";
 
 class UpdateError extends Data.TaggedError("UpdateError") {}
 
@@ -19,21 +20,19 @@ const installUpdate = Effect.tryPromise({
   catch: () => new UpdateError(),
 });
 
-function offer(version: string) {
-  toast(`Cairn ${version} est disponible`, {
+function offer(version: string, t: Messages["update"]) {
+  toast(t.available(version), {
     id: "update-available",
     duration: Infinity,
-    description: "Cairn se fermera pendant l'installation.",
+    description: t.description,
     action: {
-      label: "Installer",
+      label: t.install,
       onClick: () => {
-        toast.loading("Téléchargement de la mise à jour…", { id: "update-available" });
+        toast.loading(t.downloading, { id: "update-available" });
         void Effect.runPromise(
           installUpdate.pipe(
             Effect.catch(() =>
-              Effect.sync(() =>
-                toast.error("La mise à jour a échoué.", { id: "update-available" }),
-              ),
+              Effect.sync(() => toast.error(t.failed, { id: "update-available" })),
             ),
           ),
         );
@@ -43,12 +42,12 @@ function offer(version: string) {
 }
 
 /** A failed check stays silent: being offline shouldn't nag. */
-export function checkForUpdateOnLaunch() {
+export function checkForUpdateOnLaunch(t: Messages["update"]) {
   if (!isTauri()) return;
 
   void Effect.runPromise(
     checkForUpdate.pipe(
-      Effect.tap((version) => Effect.sync(() => version && offer(version))),
+      Effect.tap((version) => Effect.sync(() => version && offer(version, t))),
       Effect.ignore,
     ),
   );

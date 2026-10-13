@@ -17,7 +17,7 @@ pnpm build:host
 pnpm dev:desktop
 ```
 
-Create a vault with a master password of at least 12 characters. Closing the window locks the vault and hides Cairn in the system tray; its status server keeps running. Click the tray icon or launch Cairn again to restore the window. Right-click the icon for **Ouvrir Cairn**, **Verrouiller le coffre**, and **Quitter**. Only **Quitter** exits the app. Minimizing keeps the normal Windows behavior.
+Create a vault with a master password of at least 12 characters. Closing the window locks the vault and hides Cairn in the system tray; its status server keeps running. Click the tray icon or launch Cairn again to restore the window. Right-click the icon for **Open Cairn**, **Lock vault**, and **Quit**. Only **Quit** exits the app. Minimizing keeps the normal Windows behavior.
 
 The UI uses shadcn/ui components in `apps/desktop/src/components/ui`, with Tailwind CSS 4 and the Windows-style tokens in `apps/desktop/src/App.css`. Add a component with:
 
@@ -43,7 +43,7 @@ pnpm dev:extension
 
 4. Reload the extension and open its popup.
 
-The popup shows `Cairn connecté` when the app answers, `Cairn indisponible` when it is closed, and `Connecteur à installer` when the native host is missing or refused. It only asks for status when you open it or press `Actualiser` or `Réessayer`. Reload the extension after each rebuild.
+The popup shows `Cairn connected` when the app answers, `Cairn unavailable` when it is closed, and `Connector not installed` when the native host is missing or refused. It only asks for status when you open it or press `Refresh` or `Retry`. Reload the extension after each rebuild.
 
 Load the extension in each Helium profile you want to test. Running the script again with another extension ID keeps the IDs already registered.
 
@@ -56,6 +56,15 @@ The registration stores absolute paths. Before moving the checkout, unregister i
 ```
 
 The desktop installer doesn't register the host yet.
+
+## Languages
+
+Cairn ships in English (`en-US`) and French (`fr-FR`) and follows the Windows display language: any French variant gets French, everything else gets English. There is no in-app language setting yet.
+
+- The desktop window and tray menu ask Rust for the language once at startup (`src-tauri/src/locale.rs`). UI strings live in `apps/desktop/src/i18n`. Add a string to `en-US.ts` first; `fr-FR.ts` is typed against it, so `pnpm typecheck` fails until the French one exists. Read strings with `useT()`. Tray labels are in `tray.rs`.
+- The extension uses Chrome's i18n and follows Helium's UI language. Its strings live in `apps/extension/public/_locales/{en,fr}/messages.json` and are read with `t()` from `src/popup/i18n.ts`, whose keys come from the English file. `pnpm test` checks both files have the same keys and placeholders.
+
+The end-to-end tests select elements by their French text. The vault test sets `CAIRN_TEST_LOCALE=fr-FR`, which only debug builds read, and the Helium test launches with `--lang=fr`.
 
 ## Routing
 

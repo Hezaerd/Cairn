@@ -1,0 +1,20 @@
+{
+  "appDescription": { "message": "Cairn browser companion" },
+  "connecting": { "message": "Connecting…" },
+  "connected": { "message": "Cairn connected" },
+  "hostMissing": { "message": "Connector not installed" },
+  "unavailable": { "message": "Cairn unavailable" },
+  "appVersion": {
+    "message": "App $VERSION$",
+    "placeholders": { "version": { "content": "$1" } }
+  },
+  "searching": { "message": "Looking for the Windows app." },
+  "registerHost": { "message": "Register the connector for this extension." },
+  "openApp": { "message": "Open Cairn on Windows, then try again." },
+  "connectionFailed": {
+    "message": "The connection failed ($CODE$).",
+    "placeholders": { "code": { "content": "$1" } }
+  },
+  "refresh": { "message": "Refresh" },
+  "retry": { "message": "Retry" }
+}

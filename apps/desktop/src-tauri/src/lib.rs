@@ -7,6 +7,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            app.manage(locale::Locale::detect());
             vault::setup(app)?;
             app.manage(favicon::Downloads::default());
             app.manage(updater::Pending::default());
@@ -33,6 +34,7 @@ pub fn run() {
             vault::reveal_password,
             favicon::favicon_cached,
             favicon::favicon_refresh,
+            locale::locale,
             updater::update_check,
             updater::update_install,
         ])
@@ -41,6 +43,7 @@ pub fn run() {
 }
 mod bridge;
 mod favicon;
+mod locale;
 mod tray;
 mod updater;
 mod vault;
