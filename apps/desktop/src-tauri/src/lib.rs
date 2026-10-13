@@ -5,9 +5,11 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             tray::restore(app);
         }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             vault::setup(app)?;
             app.manage(favicon::Downloads::default());
+            app.manage(updater::Pending::default());
             tray::setup(app)?;
             bridge::start()
         })
@@ -31,6 +33,8 @@ pub fn run() {
             vault::reveal_password,
             favicon::favicon_cached,
             favicon::favicon_refresh,
+            updater::update_check,
+            updater::update_install,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cairn");
@@ -38,4 +42,5 @@ pub fn run() {
 mod bridge;
 mod favicon;
 mod tray;
+mod updater;
 mod vault;

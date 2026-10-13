@@ -21,3 +21,5 @@ zeroize = "1"
 tokio = { version = "1", features = ["time", "sync", "macros"] }
 cairn-favicon = { path = "../../../crates/favicon" }
 base64 = "0.22"
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
+serde_json = "1"

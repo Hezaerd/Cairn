@@ -8,6 +8,7 @@ import { VaultClientLive } from "./vault/VaultClientLive";
 import { VaultRuntime } from "./vault/runtime";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { applyTheme, storedTheme } from "./theme/theme";
+import { checkForUpdateOnLaunch } from "./updater/updates";
 
 // Set the theme class before the first render so the window never flashes the wrong palette.
 applyTheme(storedTheme());
@@ -18,6 +19,8 @@ if (import.meta.hot)
   import.meta.hot.dispose(() => {
     void vaultRuntime.dispose();
   });
+
+checkForUpdateOnLaunch();
 
 const root = document.getElementById("root");
 
