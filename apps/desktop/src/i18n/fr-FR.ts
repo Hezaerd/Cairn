@@ -88,6 +88,13 @@ export const frFR: Messages = {
     dark: "Sombre",
     system: "Système",
   },
+  update: {
+    available: (version) => `Cairn ${version} est disponible`,
+    description: "Cairn se fermera pendant l'installation.",
+    install: "Installer",
+    downloading: "Téléchargement de la mise à jour…",
+    failed: "La mise à jour a échoué.",
+  },
   errors: {
     Storage:
       "Impossible de lire ou d'enregistrer le coffre. Vérifie l'espace disque et les permissions, puis déverrouille-le à nouveau.",

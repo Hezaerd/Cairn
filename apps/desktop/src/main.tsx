@@ -9,7 +9,8 @@ import { VaultRuntime } from "./vault/runtime";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { applyTheme, storedTheme } from "./theme/theme";
 import { I18nProvider } from "./i18n/I18nProvider";
-import { detectLocale } from "./i18n/locale";
+import { detectLocale, messages } from "./i18n/locale";
+import { checkForUpdateOnLaunch } from "./updater/updates";
 
 // Set the theme class before the first render so the window never flashes the wrong palette.
 applyTheme(storedTheme());
@@ -28,6 +29,7 @@ if (!root) throw new Error("Missing application root");
 // Wait for the language so the first frame is already translated.
 void Effect.runPromise(detectLocale).then((locale) => {
   document.documentElement.lang = locale;
+  checkForUpdateOnLaunch(messages[locale].update);
   ReactDOM.createRoot(root).render(
     <React.StrictMode>
       <I18nProvider locale={locale}>

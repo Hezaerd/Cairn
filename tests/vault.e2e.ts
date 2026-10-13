@@ -151,7 +151,7 @@ try {
 
   if (faviconSite) {
     await page.waitForFunction(() => {
-      const icons = [...document.querySelectorAll<HTMLImageElement>(".entry-monogram img")];
+      const icons = [...document.querySelectorAll<HTMLImageElement>("[data-slot=site-icon] img")];
 
       return icons.length === 2 && icons.every((icon) => icon.complete && icon.naturalWidth > 0);
     });
@@ -237,7 +237,7 @@ try {
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Verrouiller", exact: true }).click();
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).waitFor();
-  assert.equal(await page.locator(".entry-monogram img").count(), 0);
+  assert.equal(await page.locator("[data-slot=site-icon] img").count(), 0);
   assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
   assert.equal(await page.getByRole("heading", { name: "Compte de test" }).count(), 0);
   await page.getByLabel("Mot de passe maître", { exact: true }).fill("wrong-password");
@@ -254,7 +254,7 @@ try {
 
   if (cachedIconFile) {
     await page.waitForFunction(() => {
-      const icons = [...document.querySelectorAll<HTMLImageElement>(".entry-monogram img")];
+      const icons = [...document.querySelectorAll<HTMLImageElement>("[data-slot=site-icon] img")];
 
       return icons.length === 2 && icons.every((icon) => icon.complete && icon.naturalWidth > 0);
     });
@@ -317,7 +317,13 @@ try {
   await page.getByRole("dialog").getByRole("button", { name: "Supprimer", exact: true }).click();
   await page.getByRole("heading", { name: "Compte modifié" }).waitFor();
   assert.equal(await page.getByRole("button", { name: /Compte jetable/ }).count(), 0);
-  assert.equal(await page.locator(".credential-row").count(), 1);
+  assert.equal(
+    await page
+      .getByRole("complementary", { name: "Liste des identifiants" })
+      .getByRole("listitem")
+      .count(),
+    1,
+  );
 
   await page.clock.install();
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
