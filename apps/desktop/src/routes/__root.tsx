@@ -1,8 +1,14 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
+import { Toaster } from "@/components/ui/sonner";
 import "../App.css";
 
 export const Route = createRootRoute({
-  component: Outlet,
+  component: () => (
+    <>
+      <Outlet />
+      <Toaster />
+    </>
+  ),
   notFoundComponent: () => (
     <main className="auth-view">
       <h1>Page introuvable</h1>

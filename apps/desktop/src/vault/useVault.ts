@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Effect } from "effect";
+import { toast } from "sonner";
 import {
   VaultClient,
   VaultError,
@@ -85,6 +86,7 @@ export function useVault() {
     effect: Effect.Effect<A, VaultError, VaultClient>,
     success: (value: A) => void,
     clearOnFailure = false,
+    onError: (message: string) => void = setError,
   ) {
     const current = ++epoch.current;
     setBusy(true);
@@ -104,7 +106,7 @@ export function useVault() {
 
               if (clearOnFailure || failure.code === "Locked" || failure.code === "Storage")
                 clearSession();
-              setError(messages[failure.code]);
+              onError(messages[failure.code]);
             },
           }),
         ),
@@ -112,7 +114,7 @@ export function useVault() {
       .catch(() => {
         if (epoch.current !== current) return;
         clearSession();
-        setError(messages.Unavailable);
+        onError(messages.Unavailable);
       });
   }
 
@@ -150,6 +152,7 @@ export function useVault() {
   }, [revealed]);
 
   function authenticate(password: string) {
+    toast.dismiss("master-password-error");
     execute(
       Effect.gen(function* () {
         const vault = yield* VaultClient;
@@ -160,6 +163,8 @@ export function useVault() {
         return yield* loadSnapshot;
       }),
       setSnapshot,
+      false,
+      (message) => toast.error(message, { id: "master-password-error" }),
     );
   }
 
@@ -222,7 +227,6 @@ export function useVault() {
     lock,
     reveal,
     setAdding,
-    setError,
     hideSecret,
     retry: () => execute(loadSnapshot, setSnapshot),
   };

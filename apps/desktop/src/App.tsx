@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Match, Schema } from "effect";
+import { toast } from "sonner";
 import { Eye, EyeOff, KeyRound, LockKeyhole, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -246,7 +247,7 @@ function Authentication({ vault }: { vault: Vault }) {
     const password = Schema.decodeUnknownSync(Schema.String)(data.get("password"));
 
     if (creating && password !== data.get("confirmation")) {
-      vault.setError("Les deux mots de passe ne correspondent pas.");
+      toast.error("Les deux mots de passe ne correspondent pas.", { id: "master-password-error" });
 
       return;
     }
