@@ -6,21 +6,25 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --config ../../.oxlintrc.json .",
+    "lint:fix": "oxlint --config ../../.oxlintrc.json --fix .",
+    "format": "oxfmt --config ../../.oxfmtrc.json --write .",
+    "format:check": "oxfmt --config ../../.oxfmtrc.json --check ."
   },
   "dependencies": {
+    "@cairn/client": "workspace:*",
+    "@cairn/contracts": "workspace:*",
     "effect": "^4.0.4",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "@cairn/client": "workspace:*",
-    "@cairn/contracts": "workspace:*"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@types/chrome": "^0.1.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.2",
     "typescript": "~6.0.3",
-    "vite": "^8.0.16",
-    "@types/chrome": "^0.1.0"
+    "vite": "^8.0.16"
   }
 }

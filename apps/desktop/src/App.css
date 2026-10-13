@@ -1,5 +1,28 @@
-:root { font-family: Inter, system-ui, sans-serif; color: #e8e5de; background: #202520; font-synthesis: none; text-rendering: optimizeLegibility; }
-body { margin: 0; }
-.welcome { display: grid; align-content: center; justify-items: center; min-height: 100vh; padding: 24px; box-sizing: border-box; }
-h1 { font-size: 42px; font-weight: 500; letter-spacing: -0.04em; margin: 0 0 12px; }
-p { color: #b8c0b4; margin: 0; }
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #e8e5de;
+  background: #202520;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+body {
+  margin: 0;
+}
+.welcome {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
+}
+h1 {
+  font-size: 42px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  margin: 0 0 12px;
+}
+p {
+  color: #b8c0b4;
+  margin: 0;
+}

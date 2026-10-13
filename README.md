@@ -69,6 +69,28 @@ register it at the new location. The registration contains absolute paths.
 
 ## Verification and builds
 
+Oxlint and Oxfmt are configured once at the workspace root for both TypeScript
+apps, shared packages, and tests. Their generated defaults are retained, with
+anti-slop's generic and Effect rules enabled as errors. Vendored and generated
+files are excluded; Cargo files remain outside Oxfmt's scope.
+
+```sh
+pnpm lint
+pnpm lint:fix
+pnpm format
+pnpm format:check
+pnpm check
+```
+
+The apps also expose these lint and format scripts individually, for example
+`pnpm --filter @cairn/extension lint`. `pnpm check` runs lint, formatting checks,
+TypeScript checks, and Cargo checks without modifying files.
+
+Anti-slop is vendored in `tools/oxlint/anti-slop`, with its revision recorded in
+[UPSTREAM.md](tools/oxlint/anti-slop/UPSTREAM.md). Its Effect service-import rule
+currently checks relative imports only, so workspace aliases such as
+`@cairn/client` are not covered by that rule.
+
 ```sh
 pnpm typecheck
 pnpm build

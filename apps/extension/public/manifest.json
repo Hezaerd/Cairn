@@ -11,7 +11,5 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": [
-    "nativeMessaging"
-  ]
+  "permissions": ["nativeMessaging"]
 }
