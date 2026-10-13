@@ -251,6 +251,16 @@
   font-size: 20px;
   background: var(--muted);
 }
+.detail-title {
+  flex: 1;
+  min-width: 0;
+}
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
 .detail-heading h2 {
   font-size: 20px;
   line-height: 1.3;

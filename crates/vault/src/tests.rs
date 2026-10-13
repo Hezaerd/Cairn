@@ -296,3 +296,117 @@ fn favicon_expiry_failure_and_corruption_do_not_affect_credentials() {
         Err(VaultError::Locked)
     ));
 }
+
+fn update(name: &str, password: Option<&str>, notes: Option<&str>) -> EntryUpdate {
+    EntryUpdate {
+        name: name.into(),
+        site: "https://example.org".into(),
+        username: "renamed@example.org".into(),
+        password: password.map(Into::into),
+        notes: notes.map(Into::into),
+    }
+}
+
+#[test]
+fn update_keeps_omitted_secrets_and_persists() {
+    let (dir, mut vault) = fixture();
+    vault.unlock(password()).unwrap();
+    vault.save(entry("Original")).unwrap();
+    let id = vault.list().unwrap()[0].id.clone();
+    vault.update(&id, update("Renamed", None, None)).unwrap();
+    let summary = &vault.list().unwrap()[0];
+    assert_eq!(
+        (
+            summary.id.as_str(),
+            summary.name.as_str(),
+            summary.site.as_str()
+        ),
+        (id.as_str(), "Renamed", "https://example.org")
+    );
+    assert_eq!(summary.username, "renamed@example.org");
+    let secret = vault.reveal(&id).unwrap();
+    assert_eq!(
+        (secret.password.as_str(), secret.notes.as_str()),
+        (SECRET, "private note")
+    );
+    drop(secret);
+    vault
+        .update(&id, update("Renamed", Some("new-test-secret"), Some("")))
+        .unwrap();
+    drop(vault);
+    let mut reopened = Vault::open(dir.path()).unwrap();
+    reopened.unlock(password()).unwrap();
+    let secret = reopened.reveal(&id).unwrap();
+    assert_eq!(
+        (secret.password.as_str(), secret.notes.as_str()),
+        ("new-test-secret", "")
+    );
+}
+
+#[test]
+fn update_and_delete_reject_invalid_input_without_writing() {
+    let (dir, mut vault) = fixture();
+    vault.unlock(password()).unwrap();
+    vault.save(entry("Kept")).unwrap();
+    let id = vault.list().unwrap()[0].id.clone();
+    let before = fs::read(dir.path().join("vault.cairn")).unwrap();
+    for (target, input) in [
+        ("missing", update("Name", None, None)),
+        (id.as_str(), update(" ", None, None)),
+        (id.as_str(), update("Name", Some(""), None)),
+    ] {
+        assert_eq!(vault.update(target, input), Err(VaultError::InvalidInput));
+    }
+    assert_eq!(vault.delete("missing"), Err(VaultError::InvalidInput));
+    assert_eq!(vault.status().unwrap(), VaultStatus::Unlocked);
+    assert_eq!(fs::read(dir.path().join("vault.cairn")).unwrap(), before);
+    assert_eq!(vault.list().unwrap()[0].name, "Kept");
+}
+
+#[test]
+fn delete_removes_entry_from_disk_and_keeps_backup() {
+    let (dir, mut vault) = fixture();
+    vault.unlock(password()).unwrap();
+    vault.save(entry("Deleted")).unwrap();
+    vault.save(entry("Kept")).unwrap();
+    let entries = vault.list().unwrap();
+    let before = fs::read(dir.path().join("vault.cairn")).unwrap();
+    vault.delete(&entries[0].id).unwrap();
+    assert_eq!(
+        fs::read(dir.path().join("backups/previous.cairn")).unwrap(),
+        before
+    );
+    assert_eq!(
+        vault.reveal(&entries[0].id).err(),
+        Some(VaultError::InvalidInput)
+    );
+    drop(vault);
+    let mut reopened = Vault::open(dir.path()).unwrap();
+    reopened.unlock(password()).unwrap();
+    let names: Vec<_> = reopened
+        .list()
+        .unwrap()
+        .into_iter()
+        .map(|e| e.name)
+        .collect();
+    assert_eq!(names, ["Kept"]);
+}
+
+#[test]
+fn update_and_delete_refuse_external_changes() {
+    let (dir, mut vault) = fixture();
+    vault.unlock(password()).unwrap();
+    vault.save(entry("Entry")).unwrap();
+    let id = vault.list().unwrap()[0].id.clone();
+    fs::write(dir.path().join("vault.cairn"), b"external change").unwrap();
+    assert_eq!(
+        vault.update(&id, update("Changed", None, None)),
+        Err(VaultError::ChangedOnDisk)
+    );
+    assert_eq!(vault.delete(&id), Err(VaultError::ChangedOnDisk));
+    assert_eq!(
+        fs::read(dir.path().join("vault.cairn")).unwrap(),
+        b"external change"
+    );
+    assert_eq!(vault.list().unwrap()[0].name, "Entry");
+}
