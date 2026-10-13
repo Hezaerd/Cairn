@@ -167,6 +167,61 @@ try {
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
   await page.getByText(secret, { exact: true }).waitFor();
   await page.getByText("Note privée de test", { exact: true }).waitFor();
+
+  // Exercise the native title-bar close, not a frontend imitation of the lock.
+  const windowHandle = execFileSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-Command",
+      `$cairnProcess = Get-Process -Id ${app.child.pid}; $cairnProcess.MainWindowHandle; if (!$cairnProcess.CloseMainWindow()) { throw 'No Cairn window to close' }`,
+    ],
+    { windowsHide: true, stdio: "pipe" },
+  )
+    .toString()
+    .trim();
+
+  assert.match(windowHandle, /^[1-9][0-9]*$/);
+  await page.getByRole("button", { name: "Déverrouiller", exact: true }).waitFor();
+  assert.equal(app.child.exitCode, null, "Close-to-tray must keep Cairn running");
+  assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
+  assert.equal(await page.getByText("Note privée de test", { exact: true }).count(), 0);
+  execFileSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-Command",
+      `Add-Type 'using System; using System.Runtime.InteropServices; public class CairnWindow { [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle); }'; if ([CairnWindow]::IsWindowVisible([IntPtr]${windowHandle})) { throw 'Cairn window is still visible' }`,
+    ],
+    { windowsHide: true, stdio: "pipe" },
+  );
+
+  const secondLaunch = spawn(executable, [], {
+    cwd: root,
+    windowsHide: true,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      CAIRN_TEST_DATA_DIR: path.join(directory, "data"),
+      WEBVIEW2_USER_DATA_FOLDER: path.join(directory, "webview"),
+    },
+  });
+
+  await once(secondLaunch, "exit");
+  execFileSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-Command",
+      `Add-Type 'using System; using System.Runtime.InteropServices; public class CairnWindow { [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle); }'; if (![CairnWindow]::IsWindowVisible([IntPtr]${windowHandle})) { throw 'Second launch did not restore Cairn' }`,
+    ],
+    { windowsHide: true, stdio: "pipe" },
+  );
+  await page.getByLabel("Mot de passe maître", { exact: true }).fill(master);
+  await page.getByRole("button", { name: "Déverrouiller", exact: true }).click();
+  await page.getByRole("heading", { name: "Compte de test" }).waitFor();
+  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
+  await page.getByText(secret, { exact: true }).waitFor();
   await page.getByRole("textbox", { name: "Rechercher les identifiants" }).fill("no-match");
   await page.getByRole("heading", { name: "Aucun identifiant trouvé" }).waitFor();
   assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
@@ -299,7 +354,7 @@ try {
   assert.equal(readFileSync(file, "utf8"), "corrupted-test-vault");
   assert.deepEqual(app.errors, []);
   console.log(
-    `Native vault E2E passed: create, save, reveal, edit, delete, lock, wrong password, restart, auto-hide, encrypted storage and corruption. Artifacts: ${directory}`,
+    `Native vault E2E passed: create, save, reveal, edit, delete, close-to-tray, second-launch restore, lock, wrong password, restart, auto-hide, encrypted storage and corruption. Artifacts: ${directory}`,
   );
 } finally {
   await stopApp(app);
