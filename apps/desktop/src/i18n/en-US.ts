@@ -86,6 +86,13 @@ export const enUS = {
     dark: "Dark",
     system: "System",
   },
+  update: {
+    available: (version: string) => `Cairn ${version} is available`,
+    description: "Cairn will close during the installation.",
+    install: "Install",
+    downloading: "Downloading the update…",
+    failed: "The update failed.",
+  },
   errors: {
     Storage:
       "Couldn't read or save the vault. Check disk space and permissions, then unlock it again.",

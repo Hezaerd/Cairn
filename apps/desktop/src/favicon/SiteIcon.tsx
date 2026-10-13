@@ -61,9 +61,23 @@ export function SiteIcon({
   const image = result?.id === id ? result.image : null;
 
   return (
-    <span ref={element} className={cn("entry-monogram", large && "large")} aria-hidden="true">
+    <span
+      ref={element}
+      data-slot="site-icon"
+      className={cn(
+        "grid size-8 shrink-0 place-items-center rounded-lg border bg-background text-sm font-semibold",
+        large && "size-11 bg-muted text-xl",
+      )}
+      aria-hidden="true"
+    >
       {image ? (
-        <img src={image} alt="" draggable={false} onError={() => setResult(null)} />
+        <img
+          src={image}
+          alt=""
+          draggable={false}
+          className={cn("size-5 object-contain", large && "size-7")}
+          onError={() => setResult(null)}
+        />
       ) : (
         name.slice(0, 1).toLocaleUpperCase()
       )}

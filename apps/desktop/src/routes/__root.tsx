@@ -17,7 +17,7 @@ function NotFound() {
   const t = useT();
 
   return (
-    <main className="auth-view">
+    <main className="flex h-dvh flex-col items-center justify-center gap-4 p-8">
       <h1>{t.app.notFound}</h1>
       <Link to="/">{t.app.home}</Link>
     </main>
