@@ -100,6 +100,23 @@ lives in `apps/desktop/components.json`.
 Search filters credential names, usernames, and sites locally. Selecting another
 entry, changing the search, or opening the add dialog hides any revealed secret.
 
+Site icons load through an Effect service and Tauri, outside the WebView. Rust
+tries `/favicon.ico`, then same-origin HTML icon links. Requests use public HTTPS
+on port 443, without cookies, authorization, stored URL paths, or a favicon proxy.
+DNS addresses are checked and pinned; private destinations and cross-origin
+redirects are rejected. PNG, ICO, JPEG, and WebP images are decoded with limits
+and converted to PNG at up to 64 pixels. Unsupported icons retain the initial.
+
+`favicons.cairn` beside the vault stores the origins and icons in a separate
+authenticated encrypted cache, using the unlocked vault key and a distinct
+encryption purpose. It is bounded to 256 origins and approximately 2 MiB of
+records. Successful downloads stay fresh for 30 days; failures retry after six
+hours, retaining an older icon when available. Refreshes are serialized and
+recheck the cache to avoid duplicate downloads. Only visible rows request icons.
+Locking cancels pending network work and removes the icons from the UI; asset
+reads never extend the vault idle timeout. Close Cairn and delete only
+`favicons.cairn` to clear the disposable cache. No credentials are stored there.
+
 Launch `pnpm dev:desktop` and create a vault with a master password of at least
 12 characters. Add a name, site, username, password, and optional notes. Lock
 the vault, close the app, then reopen and unlock it to retrieve the entry.
@@ -205,6 +222,14 @@ disk contents, and corrupted-file handling. Only debug builds honor its
 `CAIRN_TEST_DATA_DIR` environment override; release builds always use the normal
 application directory. The test's CDP debugging flag applies only to its child
 process. Neither the personal vault nor browser profiles are opened.
+
+Normal vault tests use a rejected loopback site and require no external network.
+For a live favicon smoke test in PowerShell, set
+`$env:CAIRN_TEST_FAVICON_SITE = 'https://www.google.com'` before `pnpm test:vault`.
+That additionally checks decoded icons in both panes, encrypted cache contents,
+and cache reuse after restarting. Remove the environment variable afterward.
+`cargo test -p cairn-favicon` exercises downloads against local TLS fixtures,
+including discovery, redirects, size limits, and cookie isolation.
 
 `pnpm build` builds the frontend and extension. `pnpm build:desktop` also compiles
 the native app and creates Windows bundles under `target/release/bundle`.

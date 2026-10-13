@@ -35,6 +35,9 @@ const master = "synthetic-master-password-only";
 
 const secret = "synthetic-credential-79!";
 
+// Optional live smoke test. Normal runs never contact an external website.
+const faviconSite = process.env.CAIRN_TEST_FAVICON_SITE;
+
 async function startApp() {
   const server = createServer();
   server.listen(0, "127.0.0.1");
@@ -136,12 +139,28 @@ try {
   await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
   await page.screenshot({ path: path.join(directory, "add.png") });
   await page.getByLabel("Nom", { exact: true }).fill("Compte de test");
-  await page.getByLabel("Site", { exact: true }).fill("https://example.com");
+  await page.getByLabel("Site", { exact: true }).fill(faviconSite ?? "https://127.0.0.1");
   await page.getByLabel("Identifiant", { exact: true }).fill("synthetic@example.com");
   await page.getByLabel("Mot de passe", { exact: true }).fill(secret);
   await page.getByLabel("Notes facultatif", { exact: true }).fill("Note privée de test");
   await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
   await page.getByRole("heading", { name: "Compte de test" }).waitFor();
+
+  if (faviconSite) {
+    await page.waitForFunction(() => {
+      const icons = [...document.querySelectorAll<HTMLImageElement>(".entry-monogram img")];
+
+      return icons.length === 2 && icons.every((icon) => icon.complete && icon.naturalWidth > 0);
+    });
+    const cache = readFileSync(path.join(directory, "data/favicons.cairn"));
+    assert.ok(!cache.includes(Buffer.from(new URL(faviconSite).origin)));
+    assert.ok(!cache.includes(Buffer.from("data:image/png")));
+  }
+
+  const cachedIconFile = faviconSite
+    ? readFileSync(path.join(directory, "data/favicons.cairn"))
+    : null;
+
   assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
   await page.getByText(secret, { exact: true }).waitFor();
@@ -159,6 +178,7 @@ try {
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Verrouiller", exact: true }).click();
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).waitFor();
+  assert.equal(await page.locator(".entry-monogram img").count(), 0);
   assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
   assert.equal(await page.getByRole("heading", { name: "Compte de test" }).count(), 0);
   await page.getByLabel("Mot de passe maître", { exact: true }).fill("wrong-password");
@@ -172,6 +192,17 @@ try {
   await page.getByLabel("Mot de passe maître", { exact: true }).fill(master);
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).click();
   await page.getByRole("heading", { name: "Compte de test" }).waitFor();
+
+  if (cachedIconFile) {
+    await page.waitForFunction(() => {
+      const icons = [...document.querySelectorAll<HTMLImageElement>(".entry-monogram img")];
+
+      return icons.length === 2 && icons.every((icon) => icon.complete && icon.naturalWidth > 0);
+    });
+    // A fresh cache is reused after restarting, without another encrypted write.
+    assert.deepEqual(readFileSync(path.join(directory, "data/favicons.cairn")), cachedIconFile);
+  }
+
   await page.screenshot({ path: path.join(directory, "saved.png") });
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await page.screenshot({ path: path.join(directory, "saved-dark.png") });

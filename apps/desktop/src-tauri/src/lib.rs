@@ -1,5 +1,6 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    use tauri::Manager;
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             use tauri::Manager;
@@ -9,6 +10,7 @@ pub fn run() {
         }))
         .setup(|app| {
             vault::setup(app)?;
+            app.manage(favicon::Downloads::default());
             bridge::start()
         })
         .invoke_handler(tauri::generate_handler![
@@ -19,9 +21,12 @@ pub fn run() {
             vault::list_entries,
             vault::save_entry,
             vault::reveal_password,
+            favicon::favicon_cached,
+            favicon::favicon_refresh,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cairn");
 }
 mod bridge;
+mod favicon;
 mod vault;

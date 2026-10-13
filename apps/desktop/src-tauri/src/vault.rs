@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State, WebviewWindow};
 use zeroize::Zeroizing;
 
-type Store = Arc<Mutex<Vault>>;
+pub(crate) type Store = Arc<Mutex<Vault>>;
 
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let directory = app.path().app_local_data_dir()?;
@@ -29,7 +29,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn run<T: Send + 'static>(
+pub(crate) async fn run<T: Send + 'static>(
     window: WebviewWindow,
     store: &Store,
     operation: impl FnOnce(&mut Vault) -> Result<T, VaultError> + Send + 'static,

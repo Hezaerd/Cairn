@@ -202,6 +202,15 @@
   gap: 2px;
   min-width: 0;
 }
+.entry-monogram img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.entry-monogram.large img {
+  width: 28px;
+  height: 28px;
+}
 .row-text strong {
   font-size: 12px;
   font-weight: 600;

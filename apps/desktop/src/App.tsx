@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { NewEntry } from "./vault/VaultClient";
 import { useVault } from "./vault/useVault";
+import { SiteIcon } from "./favicon/SiteIcon";
 
 type Vault = ReturnType<typeof useVault>;
 
@@ -157,9 +158,7 @@ function Credentials({ vault }: { vault: Vault }) {
                     vault.hideSecret();
                   }}
                 >
-                  <span className="entry-monogram" aria-hidden="true">
-                    {entry.name.slice(0, 1).toLocaleUpperCase()}
-                  </span>
+                  <SiteIcon id={entry.id} name={entry.name} />
                   <span className="row-text">
                     <strong>{entry.name}</strong>
                     <span>{entry.username || entry.site || "Sans identifiant"}</span>
@@ -176,9 +175,7 @@ function Credentials({ vault }: { vault: Vault }) {
           {selected ? (
             <article className="credential-detail">
               <header className="detail-heading">
-                <span className="entry-monogram large" aria-hidden="true">
-                  {selected.name.slice(0, 1).toLocaleUpperCase()}
-                </span>
+                <SiteIcon key={selected.id} id={selected.id} name={selected.name} large />
                 <div>
                   <h2>{selected.name}</h2>
                   <p>Identifiant</p>

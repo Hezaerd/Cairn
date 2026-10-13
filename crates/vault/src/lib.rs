@@ -1,5 +1,7 @@
 //! Local, single-writer encrypted vault. No browser or IPC dependencies.
+mod favicon;
 mod storage;
+pub use favicon::FaviconLookup;
 
 use argon2::{Algorithm, Argon2, Block, Params, Version};
 use chacha20poly1305::{
@@ -133,6 +135,8 @@ pub struct EntrySecret {
 }
 
 struct Session {
+    favicon_token: String,
+    favicons: Option<Vec<favicon::CachedIcon>>,
     key: Zeroizing<[u8; 32]>,
     envelope: Envelope,
     entries: Vec<Entry>,
@@ -217,6 +221,8 @@ impl Vault {
             &header.aad(b"cairn-key-v1")?,
         )?;
         let mut session = Session {
+            favicon_token: favicon::session_token()?,
+            favicons: None,
             key,
             envelope: Envelope {
                 header,
@@ -272,6 +278,8 @@ impl Vault {
             return Err(VaultError::InvalidVault);
         }
         self.session = Some(Session {
+            favicon_token: favicon::session_token()?,
+            favicons: None,
             key,
             envelope,
             entries,
