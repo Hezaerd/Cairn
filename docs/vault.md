@@ -1,0 +1,63 @@
+# Vault
+
+## What the app does
+
+- The list shows names, sites, and usernames. Search filters them locally.
+- A password or note reaches the UI only when you reveal it, and hides again after 30 seconds, or when you select another entry, search, or open the add dialog.
+- The backend locks after five minutes without a vault operation. Typing alone doesn't reset the timer. On lock, the desktop clears the list, the revealed secret, and the entry form.
+- The WebView runs in private mode with form autofill turned off. No credential goes to browser storage or logs.
+
+Editing and deleting entries, changing the master password, Windows Hello, sync, and recovery keys aren't built.
+
+## Files
+
+Cairn stores its data in Tauri's `app_local_data_dir()`:
+
+```text
+%LOCALAPPDATA%\com.hezaerd.cairn\
+  vault.cairn
+  vault.lock
+  favicons.cairn
+  backups\previous.cairn
+```
+
+`vault.cairn` is a versioned JSON envelope. It holds the public key derivation parameters, the wrapped key, nonces, and ciphertext. Names, sites, usernames, passwords, and notes are all inside the ciphertext. Cairn never writes the master password or an unwrapped key to disk.
+
+`vault.lock` is an OS writer lock, not a key. The directory has the Windows user's normal permissions.
+
+## Encryption
+
+- Argon2id v19 from RustCrypto, with 64 MiB of memory, one lane, and 3 to 10 passes. Cairn picks the pass count at creation to take about 500 ms, and checks the bounds before it processes an untrusted file.
+- A random 16-byte salt derives the wrapping key. A separate random 32-byte key encrypts the vault with XChaCha20-Poly1305.
+- The key wrap and the payload each use their own random 24-byte nonce and domain-separated header data. Every save uses a fresh payload nonce.
+- Limits: 16 MiB per file, 4 MiB of serialized plaintext, and 10,000 entries. Rust also checks each field's length.
+
+Keys, entries, secret command results, the serialization buffer, and the Argon2 work area are zeroized when dropped. That doesn't erase copies made by JavaScript, IPC, allocators, libraries, the pagefile, or crash dumps. Encryption at rest doesn't protect an unlocked app from malware running as the same Windows user.
+
+## Saving and backups
+
+- Each save writes a temporary ciphertext file in the same directory, flushes it, and atomically replaces `vault.cairn`.
+- Before the replacement, the previous version goes to `backups/previous.cairn`.
+- Creating a vault never overwrites an existing one.
+- A failed save locks the session, so the next unlock reads what is actually on disk.
+- Cairn detects changes made by another program before it saves.
+- An interrupted save leaves only ciphertext behind. The app can't guarantee the file survives a power loss.
+
+## Recovery
+
+1. Close Cairn.
+2. Keep a copy of the damaged `vault.cairn`.
+3. Copy `backups/previous.cairn` to `vault.cairn`. You lose the last change.
+
+The backup sits on the same drive, so keep separate copies of the encrypted vault. There is no password reset. If you lose the master password, you lose the vault and its backups. When only the backup survives, Cairn shows recovery steps and refuses to create a new vault over it.
+
+## Site icons
+
+Rust downloads icons outside the WebView. It tries `/favicon.ico`, then the icon links in the page's HTML.
+
+- Requests go over public HTTPS on port 443, with no cookies, no authorization, no stored URL path, and no favicon proxy.
+- Cairn checks and pins DNS addresses, and rejects private destinations and cross-origin redirects.
+- It decodes PNG, ICO, JPEG, and WebP within size limits and stores them as PNG up to 64 pixels. Other formats show the entry's initial.
+- Only visible rows ask for icons. Fetching an icon never resets the idle lock.
+
+`favicons.cairn` is a separate encrypted cache. It uses the vault key with its own encryption purpose and holds no credentials. It keeps up to 256 origins and about 2 MiB. Icons stay fresh for 30 days, and failures retry after six hours while keeping the older icon. Locking cancels pending downloads and clears icons from the UI. To clear the cache, close Cairn and delete `favicons.cairn`.
