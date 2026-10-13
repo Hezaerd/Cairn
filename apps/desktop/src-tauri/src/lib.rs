@@ -12,7 +12,7 @@ pub fn run() {
             app.manage(favicon::Downloads::default());
             app.manage(updater::Pending::default());
             tray::setup(app)?;
-            bridge::start()
+            bridge::start(app)
         })
         .on_window_event(|window, event| {
             if window.label() == "main"
@@ -32,6 +32,10 @@ pub fn run() {
             vault::update_entry,
             vault::delete_entry,
             vault::reveal_password,
+            bridge::pairing_request,
+            bridge::answer_pairing,
+            bridge::list_browsers,
+            bridge::remove_browser,
             favicon::favicon_cached,
             favicon::favicon_refresh,
             locale::locale,

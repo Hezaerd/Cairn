@@ -1,0 +1,63 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import { Effect } from "effect";
+import { base64url, generateKeys, keyPair, pairingCode } from "@cairn/client/BrowserKey";
+import { signedMessage } from "@cairn/contracts";
+
+// Made by WebCrypto; the desktop app's auth tests verify the same file in Rust.
+const fixture = JSON.parse(
+  readFileSync(new URL("./fixtures/protocol/signature.json", import.meta.url), "utf8"),
+);
+
+const decode = (value: string) => new Uint8Array(Buffer.from(value, "base64url"));
+
+test("the extension derives the same client ID and code as the app", async () => {
+  const raw = decode(fixture.publicKey);
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", raw));
+  assert.equal(base64url(digest), fixture.clientId);
+  assert.equal(pairingCode(digest), fixture.code);
+  assert.equal(pairingCode(new Uint8Array([0, 0, 0, 7])), "0000 0007");
+});
+
+test("signed messages match the bytes the app checks", async () => {
+  assert.equal(
+    signedMessage({
+      version: 1,
+      requestId: "test-1",
+      type: "GetLogin",
+      origin: "https://example.com",
+      entryId: "0123456789abcdef0123456789abcdef",
+      clientId: fixture.clientId,
+      challenge: "A".repeat(43),
+    }),
+    fixture.message,
+  );
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    decode(fixture.publicKey),
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["verify"],
+  );
+
+  assert.ok(
+    await crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      key,
+      decode(fixture.signature),
+      new TextEncoder().encode(fixture.message),
+    ),
+  );
+});
+
+test("generated keys can't be exported and sign in the expected format", async () => {
+  const keys = await Effect.runPromise(generateKeys);
+  await assert.rejects(crypto.subtle.exportKey("pkcs8", keys.privateKey));
+  const pair = await Effect.runPromise(keyPair(keys));
+  assert.equal(decode(pair.publicKey).length, 65);
+  assert.match(pair.code, /^\d{4} \d{4}$/);
+  const signature = await Effect.runPromise(pair.sign("message"));
+  assert.equal(decode(signature).length, 64);
+});

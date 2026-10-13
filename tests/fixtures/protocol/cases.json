@@ -147,5 +147,284 @@
       "type": "Status",
       "appVersion": "0.1.0\n"
     }
+  },
+  {
+    "name": "get challenge",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetChallenge"
+    }
+  },
+  {
+    "name": "pair",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Pair",
+      "publicKey": "BOOW1dyCHYY4QMqAT9TMDlKO4nUm7fnNINXHblR7cydfk_ujsAkq-A6_cRTFsW46o5CxC1EP_cE6bCtz-8u_x-g",
+      "name": "Helium (Windows)"
+    }
+  },
+  {
+    "name": "pair with a short key",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Pair",
+      "publicKey": "BOOW1dyCHYY4QMqAT9TMDlKO4nUm7fnNINXHblR7cydfk_ujsAkq-A6_cRTFsW46o5CxC1EP_cE6bCtz-8u_x-",
+      "name": "Helium"
+    }
+  },
+  {
+    "name": "pair with an empty name",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Pair",
+      "publicKey": "BOOW1dyCHYY4QMqAT9TMDlKO4nUm7fnNINXHblR7cydfk_ujsAkq-A6_cRTFsW46o5CxC1EP_cE6bCtz-8u_x-g",
+      "name": ""
+    }
+  },
+  {
+    "name": "list logins",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "ListLogins",
+      "origin": "https://example.com",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "list logins without a signature",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "ListLogins",
+      "origin": "https://example.com",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "list logins for a file page",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "ListLogins",
+      "origin": "file:///C:/",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "get login",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetLogin",
+      "origin": "https://example.com",
+      "entryId": "0123456789abcdef0123456789abcdef",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "get login with a bad entry id",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetLogin",
+      "origin": "https://example.com",
+      "entryId": "../vault",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "get login with an extra field",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetLogin",
+      "origin": "https://example.com",
+      "entryId": "0123456789abcdef0123456789abcdef",
+      "notes": "no",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "challenge",
+    "kind": "response",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Challenge",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetChallenge"
+    }
+  },
+  {
+    "name": "short challenge",
+    "kind": "response",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Challenge",
+      "challenge": "AAAA"
+    },
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetChallenge"
+    }
+  },
+  {
+    "name": "pairing requested",
+    "kind": "response",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "PairingRequested"
+    },
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Pair",
+      "publicKey": "BOOW1dyCHYY4QMqAT9TMDlKO4nUm7fnNINXHblR7cydfk_ujsAkq-A6_cRTFsW46o5CxC1EP_cE6bCtz-8u_x-g",
+      "name": "Helium"
+    }
+  },
+  {
+    "name": "logins",
+    "kind": "response",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Logins",
+      "logins": [
+        {
+          "id": "0123456789abcdef0123456789abcdef",
+          "name": "Example",
+          "username": "test@example.com"
+        }
+      ]
+    },
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "ListLogins",
+      "origin": "https://example.com",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "logins with notes",
+    "kind": "response",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Logins",
+      "logins": [
+        {
+          "id": "0123456789abcdef0123456789abcdef",
+          "name": "Example",
+          "username": "u",
+          "notes": "no"
+        }
+      ]
+    },
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "ListLogins",
+      "origin": "https://example.com",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "login",
+    "kind": "response",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Login",
+      "username": "test@example.com",
+      "password": "synthetic"
+    },
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetLogin",
+      "origin": "https://example.com",
+      "entryId": "0123456789abcdef0123456789abcdef",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "vault locked",
+    "kind": "response",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Error",
+      "code": "VaultLocked"
+    }
+  },
+  {
+    "name": "not paired",
+    "kind": "response",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Error",
+      "code": "NotPaired"
+    }
   }
 ]

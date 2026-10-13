@@ -43,7 +43,7 @@ pnpm dev:extension
 
 4. Reload the extension and open its popup.
 
-The popup shows `Cairn connected` when the app answers, `Cairn unavailable` when it is closed, and `Connector not installed` when the native host is missing or refused. It only asks for status when you open it or press `Refresh` or `Retry`. Reload the extension after each rebuild.
+The popup shows `Cairn unavailable` when the app is closed and `Connector not installed` when the native host is missing or refused. Once connected, choose **Pair with Cairn** and approve the code in the app; [browser bridge](browser-bridge.md#using-it) covers pairing and filling. The popup only talks to the app when you open it or press a button. Reload the extension after each rebuild.
 
 Load the extension in each Helium profile you want to test. Running the script again with another extension ID keeps the IDs already registered.
 
@@ -105,6 +105,19 @@ pnpm test:vault
 It covers creation, reveal and hide, locking, close-to-tray and second-launch restoration, wrong passwords, restarts, encrypted disk contents, and corrupted files. Its data and WebView2 profile live under `.local`. Only debug builds read the `CAIRN_TEST_DATA_DIR` override, so the test never opens your own vault.
 
 It uses no network by default. To also check live favicons, set `$env:CAIRN_TEST_FAVICON_SITE = 'https://www.google.com'` in PowerShell before running it, and remove the variable afterwards.
+
+### Autofill end-to-end
+
+This test pairs an isolated Helium profile with the real app and fills a login page served on `127.0.0.1`. Close Cairn and unregister this checkout's host, then run:
+
+```sh
+pnpm build
+pnpm build:host
+pnpm --filter @cairn/desktop tauri build --debug --no-bundle
+pnpm test:autofill
+```
+
+It covers pairing and its code, refusal before approval, listing only the logins for the tab's site, filling, refusing another site's login, a page without a form, a locked vault, and removing a paired browser. A browser under automation can't click the toolbar button that grants `activeTab`, so the test loads a copy of the extension with host access to `127.0.0.1` instead. It saves screenshots of the popup and the app next to its data under `.local`.
 
 ### Helium end-to-end
 

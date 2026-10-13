@@ -16,5 +16,24 @@
     "placeholders": { "code": { "content": "$1" } }
   },
   "refresh": { "message": "Refresh" },
-  "retry": { "message": "Retry" }
+  "retry": { "message": "Retry" },
+  "pairIntro": { "message": "Pair this browser with Cairn to fill your logins." },
+  "pair": { "message": "Pair with Cairn" },
+  "pairingCode": {
+    "message": "Cairn asks you to approve this browser. Check that it shows this code:"
+  },
+  "pairingThen": { "message": "Approve it in Cairn, then refresh." },
+  "pairAgain": { "message": "Ask again" },
+  "locked": { "message": "Unlock Cairn to see your logins." },
+  "noSite": { "message": "Open a website to see its logins." },
+  "loginsFor": {
+    "message": "Logins for $HOST$",
+    "placeholders": { "host": { "content": "$1" } }
+  },
+  "noLogins": {
+    "message": "No logins saved for $HOST$.",
+    "placeholders": { "host": { "content": "$1" } }
+  },
+  "noUsername": { "message": "No username" },
+  "noForm": { "message": "No login form found on this page." }
 }

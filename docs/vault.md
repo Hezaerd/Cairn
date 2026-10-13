@@ -6,7 +6,7 @@
 - A password or note reaches the UI only when you reveal it, and hides again after 30 seconds, or when you select another entry, search, or open a dialog.
 - The edit dialog leaves the password field empty, and an empty field keeps the stored password. Notes are editable only if you revealed them before opening the editor. Otherwise they stay unchanged.
 - Deleting an entry asks for confirmation. `backups/previous.cairn` keeps the version that still holds the entry until the next change.
-- The backend locks after five minutes without a vault operation, when closing the window to the tray, or through the tray's lock action. Typing alone doesn't reset the timer. On lock, the desktop clears the list, the revealed secret, and the entry form. The status bridge remains available while Cairn is in the tray.
+- The backend locks after five minutes without a vault operation, from the app or the extension, when closing the window to the tray, or through the tray's lock action. Typing alone doesn't reset the timer. On lock, the desktop clears the list, the revealed secret, and the entry form. The bridge still answers while Cairn is in the tray, but only with its status: the vault is locked.
 - The WebView runs in private mode with form autofill turned off. No credential goes to browser storage or logs.
 
 Changing the master password, Windows Hello, sync, and recovery keys aren't built.
@@ -20,10 +20,13 @@ Cairn stores its data in Tauri's `app_local_data_dir()`:
   vault.cairn
   vault.lock
   favicons.cairn
+  browsers.cairn
   backups\previous.cairn
 ```
 
 `vault.cairn` is a versioned JSON envelope. It holds the public key derivation parameters, the wrapped key, nonces, and ciphertext. Names, sites, usernames, passwords, and notes are all inside the ciphertext. Cairn never writes the master password or an unwrapped key to disk.
+
+`browsers.cairn` lists the browsers paired with the extension: their public keys, names, and pairing dates. It is encrypted with the vault key, under its own header data, so nothing can add a browser without the master password. A damaged file reads as empty, which only means pairing again. See [browser bridge](browser-bridge.md).
 
 `vault.lock` is an OS writer lock, not a key. The directory has the Windows user's normal permissions.
 

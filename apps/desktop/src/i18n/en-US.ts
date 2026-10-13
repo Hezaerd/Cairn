@@ -79,6 +79,23 @@ export const enUS = {
     notFound: "Page not found",
     home: "Back to home",
   },
+  browsers: {
+    open: "Paired browsers",
+    title: "Paired browsers",
+    description: "These browsers can fill your logins while the vault is unlocked.",
+    empty: "No browser is paired. Open the Cairn extension and choose Pair with Cairn.",
+    pairedOn: (date: Date) => `Paired on ${date.toLocaleDateString("en-US")}`,
+    remove: (name: string) => `Remove ${name}`,
+    removed: (name: string) => `${name} can no longer fill your logins.`,
+    requestTitle: "Pair a browser?",
+    requestDescription: (name: string) =>
+      `${name} asks to fill your logins on the sites they belong to.`,
+    requestHint:
+      "Approve only if the Cairn extension shows the same code. If you didn't ask for this, refuse.",
+    approve: "Approve",
+    refuse: "Refuse",
+    paired: (name: string) => `${name} is paired.`,
+  },
   theme: {
     label: "Theme",
     current: (theme: string) => `Theme: ${theme}`,

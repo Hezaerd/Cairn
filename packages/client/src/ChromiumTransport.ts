@@ -4,6 +4,8 @@ import {
   MAX_MESSAGE_BYTES,
   REQUEST_TIMEOUT_MS,
   decodeResponse,
+  replyTypes,
+  type Request,
   type Response,
 } from "@cairn/contracts";
 import { CairnClientError } from "@cairn/contracts/errors";
@@ -17,7 +19,7 @@ export interface NativePort {
     chrome.runtime.Port["onDisconnect"],
     "addListener" | "removeListener"
   >;
-  readonly postMessage: (request: import("@cairn/contracts").StatusRequest) => void;
+  readonly postMessage: (request: Request) => void;
   readonly disconnect: () => void;
 }
 
@@ -91,7 +93,11 @@ export function chromiumTransport(runtime: NativeRuntime) {
                   throw new Error();
                 const response = decodeResponse(message);
 
-                if (response.requestId !== request.requestId) throw new Error();
+                if (
+                  response.requestId !== request.requestId ||
+                  (response.type !== "Error" && response.type !== replyTypes[request.type])
+                )
+                  throw new Error();
                 finish(Effect.succeed(response));
               } catch {
                 finish(Effect.fail(new CairnClientError({ code: "InvalidResponse" })));
