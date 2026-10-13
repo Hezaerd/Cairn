@@ -38,8 +38,12 @@ pub(crate) async fn run<T: Send + 'static>(
         return Err(VaultError::Locked);
     }
     let store = store.clone();
+    let hidden = window.state::<crate::tray::Hidden>().inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let mut vault = store.lock().map_err(|_| VaultError::Storage)?;
+        if hidden.get() {
+            return Err(VaultError::Locked);
+        }
         let expired = vault.expire();
         let was_unlocked = vault.status()? == VaultStatus::Unlocked;
         let result = operation(&mut vault);

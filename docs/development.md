@@ -17,7 +17,7 @@ pnpm build:host
 pnpm dev:desktop
 ```
 
-Create a vault with a master password of at least 12 characters. Closing the window quits the app and its status server. Launching it a second time focuses the open window.
+Create a vault with a master password of at least 12 characters. Closing the window locks the vault and hides Cairn in the system tray; its status server keeps running. Click the tray icon or launch Cairn again to restore the window. Right-click the icon for **Ouvrir Cairn**, **Verrouiller le coffre**, and **Quitter**. Only **Quitter** exits the app. Minimizing keeps the normal Windows behavior.
 
 The UI uses shadcn/ui components in `apps/desktop/src/components/ui`, with Tailwind CSS 4 and the Windows-style tokens in `apps/desktop/src/App.css`. Add a component with:
 
@@ -93,7 +93,7 @@ pnpm --filter @cairn/desktop tauri build --debug --no-bundle
 pnpm test:vault
 ```
 
-It covers creation, reveal and hide, locking, wrong passwords, restarts, encrypted disk contents, and corrupted files. Its data and WebView2 profile live under `.local`. Only debug builds read the `CAIRN_TEST_DATA_DIR` override, so the test never opens your own vault.
+It covers creation, reveal and hide, locking, close-to-tray and second-launch restoration, wrong passwords, restarts, encrypted disk contents, and corrupted files. Its data and WebView2 profile live under `.local`. Only debug builds read the `CAIRN_TEST_DATA_DIR` override, so the test never opens your own vault.
 
 It uses no network by default. To also check live favicons, set `$env:CAIRN_TEST_FAVICON_SITE = 'https://www.google.com'` in PowerShell before running it, and remove the variable afterwards.
 
@@ -108,7 +108,7 @@ pnpm --filter @cairn/desktop tauri build --debug --no-bundle
 pnpm test:helium
 ```
 
-The test creates isolated Helium profiles under `.local` and registers the host only for its run. It checks a missing host, a closed app, a live connection, two profiles, service worker restarts, and the app closing. Set `CAIRN_HELIUM_PATH` if Helium isn't in its default location.
+The test creates isolated Helium profiles under `.local` and registers the host only for its run. It checks a missing host, a closed app, a live connection, two profiles, service worker restarts, connection while hidden in the tray, and process termination. Set `CAIRN_HELIUM_PATH` if Helium isn't in its default location.
 
 ## Builds
 
