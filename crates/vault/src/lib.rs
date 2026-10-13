@@ -106,18 +106,44 @@ pub struct NewEntry {
 
 impl NewEntry {
     fn validate(&self) -> Result<()> {
-        if self.name.trim().is_empty()
-            || self.password.is_empty()
-            || self.name.len() > 256
-            || self.site.len() > 2048
-            || self.username.len() > 1024
-            || self.password.len() > 4096
-            || self.notes.len() > 16_384
-        {
-            return Err(VaultError::InvalidInput);
-        }
-        Ok(())
+        validate_fields(&self.name, &self.site, &self.username)?;
+        validate_secret(Some(&self.password), Some(&self.notes))
     }
+}
+
+/// Changes to an existing entry. `None` keeps the stored password or notes,
+/// so the UI can edit an entry without revealing its secrets first.
+#[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
+#[serde(deny_unknown_fields)]
+pub struct EntryUpdate {
+    pub name: String,
+    pub site: String,
+    pub username: String,
+    pub password: Option<String>,
+    pub notes: Option<String>,
+}
+
+impl EntryUpdate {
+    fn validate(&self) -> Result<()> {
+        validate_fields(&self.name, &self.site, &self.username)?;
+        validate_secret(self.password.as_deref(), self.notes.as_deref())
+    }
+}
+
+fn validate_fields(name: &str, site: &str, username: &str) -> Result<()> {
+    if name.trim().is_empty() || name.len() > 256 || site.len() > 2048 || username.len() > 1024 {
+        return Err(VaultError::InvalidInput);
+    }
+    Ok(())
+}
+
+fn validate_secret(password: Option<&str>, notes: Option<&str>) -> Result<()> {
+    if password.is_some_and(|password| password.is_empty() || password.len() > 4096)
+        || notes.is_some_and(|notes| notes.len() > 16_384)
+    {
+        return Err(VaultError::InvalidInput);
+    }
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -341,25 +367,68 @@ impl Vault {
 
     pub fn save(&mut self, input: NewEntry) -> Result<()> {
         input.validate()?;
+        let id = random::<16>()?.iter().map(|b| format!("{b:02x}")).collect();
+        self.commit(|entries| {
+            if entries.len() >= MAX_ENTRIES {
+                return Err(VaultError::InvalidInput);
+            }
+            entries.push(Entry {
+                id,
+                name: input.name.clone(),
+                site: input.site.clone(),
+                username: input.username.clone(),
+                password: input.password.clone(),
+                notes: input.notes.clone(),
+            });
+            Ok(())
+        })
+    }
+
+    pub fn update(&mut self, id: &str, input: EntryUpdate) -> Result<()> {
+        input.validate()?;
+        self.commit(|entries| {
+            let entry = entries
+                .iter_mut()
+                .find(|entry| entry.id == id)
+                .ok_or(VaultError::InvalidInput)?;
+            // Replacing the whole entry drops the old one, which zeroizes its fields.
+            *entry = Entry {
+                id: entry.id.clone(),
+                name: input.name.clone(),
+                site: input.site.clone(),
+                username: input.username.clone(),
+                password: input
+                    .password
+                    .clone()
+                    .unwrap_or_else(|| entry.password.clone()),
+                notes: input.notes.clone().unwrap_or_else(|| entry.notes.clone()),
+            };
+            Ok(())
+        })
+    }
+
+    pub fn delete(&mut self, id: &str) -> Result<()> {
+        self.commit(|entries| {
+            let index = entries
+                .iter()
+                .position(|entry| entry.id == id)
+                .ok_or(VaultError::InvalidInput)?;
+            entries.remove(index);
+            Ok(())
+        })
+    }
+
+    /// Applies `change` and writes the vault. A rejected change leaves the
+    /// session untouched; a failed write locks it.
+    fn commit(&mut self, change: impl FnOnce(&mut Vec<Entry>) -> Result<()>) -> Result<()> {
         let path = self.path();
         let backup = self.directory.join("backups/previous.cairn");
         let session = self.active()?;
-        if session.entries.len() >= MAX_ENTRIES {
-            return Err(VaultError::InvalidInput);
-        }
         // Never silently overwrite a file restored or changed outside this process.
         if storage::read(&path)? != session.disk_bytes {
             return Err(VaultError::ChangedOnDisk);
         }
-        let id = random::<16>()?.iter().map(|b| format!("{b:02x}")).collect();
-        session.entries.push(Entry {
-            id,
-            name: input.name.clone(),
-            site: input.site.clone(),
-            username: input.username.clone(),
-            password: input.password.clone(),
-            notes: input.notes.clone(),
-        });
+        change(&mut session.entries)?;
         let result = (|| {
             let bytes = seal(session)?;
             storage::replace(&backup, &session.disk_bytes)?;
