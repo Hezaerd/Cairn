@@ -66,6 +66,12 @@ export function useVault() {
   const [adding, setAdding] = useState(false);
   const [revealed, setRevealed] = useState<RevealedPassword | null>(null);
   const epoch = useRef(0);
+  const revealEpoch = useRef(0);
+
+  function hideSecret() {
+    revealEpoch.current++;
+    setRevealed(null);
+  }
 
   function clearSession() {
     epoch.current++;
@@ -191,14 +197,17 @@ export function useVault() {
       return;
     }
 
-    setRevealed(null);
+    hideSecret();
+    const currentReveal = revealEpoch.current;
     execute(
       Effect.gen(function* () {
         const vault = yield* VaultClient;
 
         return yield* vault.reveal(id);
       }),
-      (secret) => setRevealed({ id, ...secret }),
+      (secret) => {
+        if (revealEpoch.current === currentReveal) setRevealed({ id, ...secret });
+      },
     );
   }
 
@@ -214,6 +223,7 @@ export function useVault() {
     reveal,
     setAdding,
     setError,
+    hideSecret,
     retry: () => execute(loadSnapshot, setSnapshot),
   };
 }

@@ -1,13 +1,246 @@
-import { type FormEvent } from "react";
-import { Schema } from "effect";
+import { useState, type FormEvent } from "react";
+import { Match, Schema } from "effect";
+import { Eye, EyeOff, KeyRound, LockKeyhole, Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { NewEntry } from "./vault/VaultClient";
 import { useVault } from "./vault/useVault";
 
-export default function App() {
-  const vault = useVault();
-  const { snapshot, busy, error, adding, revealed } = vault;
-  const unlocked = snapshot.status === "unlocked";
-  const creating = snapshot.status === "missing";
+type Vault = ReturnType<typeof useVault>;
+
+function EntryDialog({ vault }: { vault: Vault }) {
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const entry = Schema.decodeUnknownSync(NewEntry)(Object.fromEntries(new FormData(form)));
+    form.reset();
+    vault.save(entry);
+  }
+
+  return (
+    <Dialog
+      open={vault.adding}
+      onOpenChange={(open) => {
+        vault.hideSecret();
+        vault.setAdding(open);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button disabled={vault.busy} size="sm">
+          <Plus />
+          Ajouter un identifiant
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="entry-dialog">
+        <DialogHeader>
+          <DialogTitle>Nouvel identifiant</DialogTitle>
+          <DialogDescription>Enregistré dans le coffre de cet ordinateur.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={save} className="entry-form">
+          <div className="field">
+            <Label htmlFor="entry-name">Nom</Label>
+            <Input
+              id="entry-name"
+              name="name"
+              required
+              maxLength={256}
+              autoComplete="off"
+              placeholder="Ex. GitHub personnel"
+            />
+          </div>
+          <div className="field">
+            <Label htmlFor="entry-site">Site</Label>
+            <Input
+              id="entry-site"
+              name="site"
+              maxLength={2048}
+              autoComplete="off"
+              placeholder="https://exemple.com"
+            />
+          </div>
+          <div className="field">
+            <Label htmlFor="entry-username">Identifiant</Label>
+            <Input id="entry-username" name="username" maxLength={1024} autoComplete="off" />
+          </div>
+          <div className="field">
+            <Label htmlFor="entry-password">Mot de passe</Label>
+            <Input
+              id="entry-password"
+              name="password"
+              type="password"
+              required
+              maxLength={4096}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="field">
+            <Label htmlFor="entry-notes">
+              Notes <span className="optional">facultatif</span>
+            </Label>
+            <Textarea id="entry-notes" name="notes" maxLength={16384} rows={3} />
+          </div>
+          <DialogFooter className="flex-row justify-end">
+            <Button type="button" variant="outline" onClick={() => vault.setAdding(false)}>
+              Annuler
+            </Button>
+            <Button disabled={vault.busy} type="submit">
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Credentials({ vault }: { vault: Vault }) {
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const entries = vault.snapshot.entries.filter((entry) =>
+    [entry.name, entry.username, entry.site].some((value) =>
+      value.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+    ),
+  );
+
+  const selected = entries.find((entry) => entry.id === selectedId) ?? entries[0];
+  const secret = vault.revealed?.id === selected?.id ? vault.revealed : null;
+
+  return (
+    <>
+      <div className="toolbar">
+        <div className="toolbar-title">
+          <KeyRound size={16} />
+          <h1>Identifiants</h1>
+          <span className="count">{vault.snapshot.entries.length}</span>
+        </div>
+        <EntryDialog vault={vault} />
+        <Button variant="outline" size="sm" onClick={vault.lock}>
+          <LockKeyhole />
+          Verrouiller
+        </Button>
+      </div>
+      <div className="workspace">
+        <aside className="credential-pane" aria-label="Liste des identifiants">
+          <div className="search-field">
+            <Search size={15} />
+            <Input
+              aria-label="Rechercher les identifiants"
+              placeholder="Rechercher"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                vault.hideSecret();
+              }}
+            />
+          </div>
+          <div className="list-label">Tous les identifiants</div>
+          <ul className="credential-list">
+            {entries.map((entry) => (
+              <li key={entry.id}>
+                <button
+                  className="credential-row"
+                  aria-current={selected?.id === entry.id ? "true" : undefined}
+                  onClick={() => {
+                    setSelectedId(entry.id);
+                    vault.hideSecret();
+                  }}
+                >
+                  <span className="entry-monogram" aria-hidden="true">
+                    {entry.name.slice(0, 1).toLocaleUpperCase()}
+                  </span>
+                  <span className="row-text">
+                    <strong>{entry.name}</strong>
+                    <span>{entry.username || entry.site || "Sans identifiant"}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {entries.length === 0 && (
+            <p className="list-empty">{query ? "Aucun résultat" : "Aucun identifiant"}</p>
+          )}
+        </aside>
+        <section className="detail-pane" aria-label="Détails de l'identifiant">
+          {selected ? (
+            <article className="credential-detail">
+              <header className="detail-heading">
+                <span className="entry-monogram large" aria-hidden="true">
+                  {selected.name.slice(0, 1).toLocaleUpperCase()}
+                </span>
+                <div>
+                  <h2>{selected.name}</h2>
+                  <p>Identifiant</p>
+                </div>
+              </header>
+              <dl className="detail-fields">
+                <div>
+                  <dt>Identifiant</dt>
+                  <dd>{selected.username || "Non renseigné"}</dd>
+                </div>
+                <div>
+                  <dt>Mot de passe</dt>
+                  <dd className="password-value">
+                    <code>{secret ? secret.password : "••••••••••••"}</code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={vault.busy}
+                      aria-label={secret ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                      title={secret ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                      onClick={() => vault.reveal(selected.id)}
+                    >
+                      {secret ? <EyeOff /> : <Eye />}
+                    </Button>
+                  </dd>
+                  {secret && (
+                    <p className="field-hint">Masqué automatiquement après 30 secondes.</p>
+                  )}
+                </div>
+                <div>
+                  <dt>Site</dt>
+                  <dd>{selected.site || "Non renseigné"}</dd>
+                </div>
+                <div>
+                  <dt>Notes</dt>
+                  <dd className="notes">
+                    {secret
+                      ? secret.notes || "Aucune note"
+                      : "Affiche le mot de passe pour lire les notes."}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          ) : (
+            <div className="empty-detail">
+              <KeyRound size={28} strokeWidth={1.25} />
+              <h2>{query ? "Aucun identifiant trouvé" : "Aucun identifiant"}</h2>
+              <p>
+                {query
+                  ? "Essaie un autre nom, site ou identifiant."
+                  : "Ajoute un identifiant pour le retrouver ici."}
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+
+function Authentication({ vault }: { vault: Vault }) {
+  const creating = vault.snapshot.status === "missing";
 
   function authenticate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,192 +258,97 @@ export default function App() {
     vault.authenticate(password);
   }
 
-  function saveEntry(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const entry = Schema.decodeUnknownSync(NewEntry)(Object.fromEntries(new FormData(form)));
-    form.reset();
-    vault.save(entry);
-  }
-
   return (
-    <main className="vault-shell">
-      <header className="vault-header">
-        <div>
-          <span className="eyebrow">CAIRN / COFFRE LOCAL</span>
-          <h1>Ton espace privé.</h1>
-        </div>
-        {unlocked && (
-          <button className="secondary" onClick={vault.lock}>
-            Verrouiller
-          </button>
-        )}
-      </header>
-      {error && (
-        <p className="error" role="alert">
-          {error}
+    <section className="auth-view">
+      <div className="auth-form">
+        <LockKeyhole className="auth-icon" size={28} strokeWidth={1.3} />
+        <h1>{creating ? "Créer un coffre" : "Coffre verrouillé"}</h1>
+        <p>
+          {creating
+            ? "Choisis un mot de passe maître d’au moins 12 caractères. Il ne peut pas être réinitialisé."
+            : "Saisis ton mot de passe maître pour ouvrir le coffre."}
         </p>
-      )}
-      {snapshot.status === "loading" ? (
-        <section className="panel">
-          <p role="status">Ouverture de Cairn…</p>
-          {error && <button onClick={vault.retry}>Réessayer</button>}
-        </section>
-      ) : snapshot.status === "recovery" ? (
-        <section className="panel auth-panel">
-          <h2>Une sauvegarde est disponible.</h2>
-          <p>
-            Le coffre principal est introuvable. Ferme Cairn et restaure le fichier
-            backups/previous.cairn dans le dossier du coffre avant de continuer.
-          </p>
-          <p>Emplacement : %LOCALAPPDATA%\com.hezaerd.cairn</p>
-          <button onClick={vault.retry}>Vérifier à nouveau</button>
-        </section>
-      ) : unlocked ? (
-        <>
-          <section className="section-heading">
-            <div>
-              <h2>Identifiants</h2>
-              <p>{snapshot.entries.length} enregistré(s) sur cet ordinateur</p>
-            </div>
-            <button disabled={busy} onClick={() => vault.setAdding(true)}>
-              Ajouter un identifiant
-            </button>
-          </section>
-          {adding && (
-            <form className="panel entry-form" onSubmit={saveEntry}>
-              <h2>Nouvel identifiant</h2>
-              <label>
-                Nom
-                <input
-                  name="name"
-                  required
-                  maxLength={256}
-                  autoFocus
-                  autoComplete="off"
-                  placeholder="Ex. Compte personnel"
-                />
-              </label>
-              <label>
-                Site
-                <input
-                  name="site"
-                  maxLength={2048}
-                  autoComplete="off"
-                  placeholder="https://exemple.com"
-                />
-              </label>
-              <label>
-                Identifiant
-                <input name="username" maxLength={1024} autoComplete="off" />
-              </label>
-              <label>
-                Mot de passe
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  maxLength={4096}
-                  autoComplete="new-password"
-                />
-              </label>
-              <label>
-                Notes
-                <textarea name="notes" maxLength={16384} rows={3} />
-              </label>
-              <div className="actions">
-                <button disabled={busy} type="submit">
-                  Enregistrer
-                </button>
-                <button type="button" className="secondary" onClick={() => vault.setAdding(false)}>
-                  Annuler
-                </button>
-              </div>
-            </form>
-          )}
-          {snapshot.entries.length === 0 ? (
-            <section className="panel empty">
-              <h2>Le coffre est prêt.</h2>
-              <p>
-                Ajoute ton premier identifiant. Il sera enregistré dans le coffre chiffré de cet
-                ordinateur.
-              </p>
-            </section>
-          ) : (
-            <ul className="entries">
-              {snapshot.entries.map((entry) => (
-                <li className="panel" key={entry.id}>
-                  <div className="entry-heading">
-                    <div>
-                      <h2>{entry.name}</h2>
-                      <p>{entry.username || "Sans identifiant"}</p>
-                      {entry.site && <p className="site">{entry.site}</p>}
-                    </div>
-                    <button
-                      className="secondary"
-                      disabled={busy}
-                      onClick={() => vault.reveal(entry.id)}
-                    >
-                      {revealed?.id === entry.id ? "Masquer" : "Afficher le mot de passe"}
-                    </button>
-                  </div>
-                  {revealed?.id === entry.id && (
-                    <div className="secret">
-                      <code>{revealed.password}</code>
-                      {revealed.notes && <p>{revealed.notes}</p>}
-                      <small>Masqué automatiquement après 30 secondes.</small>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {busy && <p role="status">Traitement en cours…</p>}
-        </>
-      ) : (
-        <section className="panel auth-panel" key={snapshot.status}>
-          <span className="eyebrow">{creating ? "PREMIÈRE OUVERTURE" : "COFFRE VERROUILLÉ"}</span>
-          <h2>{creating ? "Crée ton coffre." : "Bienvenue chez toi."}</h2>
-          <p>
-            {creating
-              ? "Choisis une phrase secrète d'au moins 12 caractères. Elle protège l'accès à tous tes identifiants et ne peut pas être réinitialisée."
-              : "Saisis ton mot de passe maître pour accéder à tes identifiants."}
-          </p>
-          <form onSubmit={authenticate}>
-            <label>
-              Mot de passe maître
-              <input
-                name="password"
+        <form onSubmit={authenticate}>
+          <div className="field">
+            <Label htmlFor="master-password">Mot de passe maître</Label>
+            <Input
+              id="master-password"
+              name="password"
+              type="password"
+              required
+              minLength={creating ? 12 : 1}
+              maxLength={1024}
+              autoFocus
+              autoComplete={creating ? "new-password" : "current-password"}
+              disabled={vault.busy}
+            />
+          </div>
+          {creating && (
+            <div className="field">
+              <Label htmlFor="confirmation">Confirmer le mot de passe</Label>
+              <Input
+                id="confirmation"
+                name="confirmation"
                 type="password"
                 required
-                minLength={creating ? 12 : 1}
+                minLength={12}
                 maxLength={1024}
-                autoFocus
-                autoComplete={creating ? "new-password" : "current-password"}
-                disabled={busy}
+                autoComplete="new-password"
+                disabled={vault.busy}
               />
-            </label>
-            {creating && (
-              <label>
-                Confirmer le mot de passe
-                <input
-                  name="confirmation"
-                  type="password"
-                  required
-                  minLength={12}
-                  maxLength={1024}
-                  autoComplete="new-password"
-                  disabled={busy}
-                />
-              </label>
-            )}
-            <button disabled={busy} type="submit">
-              {busy ? "Ouverture…" : creating ? "Créer le coffre" : "Déverrouiller"}
-            </button>
-          </form>
-        </section>
+            </div>
+          )}
+          <Button disabled={vault.busy} type="submit">
+            {vault.busy ? "Ouverture…" : creating ? "Créer le coffre" : "Déverrouiller"}
+          </Button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const vault = useVault();
+
+  return (
+    <main className="vault-shell" aria-label="Cairn">
+      {vault.error && (
+        <p className="error" role="alert">
+          {vault.error}
+        </p>
       )}
-      <footer>Stockage local chiffré · Verrouillage après 5 min sans accès au coffre</footer>
+      {Match.value(vault.snapshot.status).pipe(
+        Match.when("unlocked", () => <Credentials vault={vault} />),
+        Match.when("loading", () => (
+          <section className="auth-view">
+            <p role="status">Ouverture de Cairn…</p>
+            {vault.error && <Button onClick={vault.retry}>Réessayer</Button>}
+          </section>
+        )),
+        Match.when("recovery", () => (
+          <section className="auth-view">
+            <div className="auth-form">
+              <h1>Sauvegarde disponible</h1>
+              <p>
+                Le coffre principal est introuvable. Ferme Cairn et restaure backups/previous.cairn
+                dans le dossier du coffre.
+              </p>
+              <p>%LOCALAPPDATA%\com.hezaerd.cairn</p>
+              <Button onClick={vault.retry}>Vérifier à nouveau</Button>
+            </div>
+          </section>
+        )),
+        Match.orElse(() => <Authentication key={vault.snapshot.status} vault={vault} />),
+      )}
+      <footer className="statusbar">
+        <span>
+          <LockKeyhole size={12} />
+          Coffre local
+        </span>
+        <span role="status">
+          {vault.busy ? "Traitement en cours…" : "Verrouillage automatique après 5 min"}
+        </span>
+      </footer>
     </main>
   );
 }

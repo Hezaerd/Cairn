@@ -91,6 +91,15 @@ command to regenerate them explicitly.
 
 ## Local vault
 
+The desktop uses shadcn/ui components in `apps/desktop/src/components/ui`,
+with Tailwind CSS 4 and Windows-style tokens in `src/App.css`. It follows the
+system color scheme and retains the native window title bar. Add components
+with `pnpm dlx shadcn@latest add <component> -c apps/desktop`; configuration
+lives in `apps/desktop/components.json`.
+
+Search filters credential names, usernames, and sites locally. Selecting another
+entry, changing the search, or opening the add dialog hides any revealed secret.
+
 Launch `pnpm dev:desktop` and create a vault with a master password of at least
 12 characters. Add a name, site, username, password, and optional notes. Lock
 the vault, close the app, then reopen and unlock it to retrieve the entry.

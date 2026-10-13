@@ -15,8 +15,10 @@
         "title": "Cairn",
         "incognito": true,
         "generalAutofillEnabled": false,
-        "width": 800,
-        "height": 600
+        "width": 920,
+        "height": 640,
+        "minWidth": 600,
+        "minHeight": 480
       }
     ],
     "security": {

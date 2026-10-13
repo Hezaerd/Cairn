@@ -86,9 +86,10 @@ async function startApp() {
     assert.ok(context);
     const page = context.pages()[0] ?? (await context.waitForEvent("page"));
     page.setDefaultTimeout(20_000);
+    await page.emulateMedia({ reducedMotion: "reduce" });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page.getByRole("heading", { name: "Ton espace privé." }).waitFor();
+    await page.getByRole("main", { name: "Cairn" }).waitFor();
 
     return { child, browser, page, errors };
   } catch (error) {
@@ -111,7 +112,7 @@ let app = await startApp();
 
 try {
   let page = app.page;
-  await page.getByRole("heading", { name: "Crée ton coffre." }).waitFor();
+  await page.getByRole("heading", { name: "Créer un coffre" }).waitFor();
   await page.screenshot({ path: path.join(directory, "create.png") });
   await page.getByLabel("Mot de passe maître", { exact: true }).fill(master);
   await page.getByLabel("Confirmer le mot de passe").fill(master + "mismatch");
@@ -120,20 +121,42 @@ try {
   assert.equal(existsSync(file), false);
   await page.getByLabel("Confirmer le mot de passe").fill(master);
   await page.getByRole("button", { name: "Créer le coffre" }).click();
-  await page.getByRole("heading", { name: "Le coffre est prêt." }).waitFor();
+  await page.getByRole("heading", { name: "Aucun identifiant" }).waitFor();
   assert.ok(existsSync(file));
   await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
+  await page.getByRole("dialog").waitFor();
+  assert.equal(
+    await page
+      .getByLabel("Nom", { exact: true })
+      .evaluate((element) => element === document.activeElement),
+    true,
+  );
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
+  await page.screenshot({ path: path.join(directory, "add.png") });
   await page.getByLabel("Nom", { exact: true }).fill("Compte de test");
   await page.getByLabel("Site", { exact: true }).fill("https://example.com");
   await page.getByLabel("Identifiant", { exact: true }).fill("synthetic@example.com");
   await page.getByLabel("Mot de passe", { exact: true }).fill(secret);
-  await page.getByLabel("Notes", { exact: true }).fill("Note privée de test");
+  await page.getByLabel("Notes facultatif", { exact: true }).fill("Note privée de test");
   await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
   await page.getByRole("heading", { name: "Compte de test" }).waitFor();
   assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
   await page.getByText(secret, { exact: true }).waitFor();
   await page.getByText("Note privée de test", { exact: true }).waitFor();
+  await page.getByRole("textbox", { name: "Rechercher les identifiants" }).fill("no-match");
+  await page.getByRole("heading", { name: "Aucun identifiant trouvé" }).waitFor();
+  assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
+  await page.getByRole("textbox", { name: "Rechercher les identifiants" }).fill("example.com");
+  await page.getByRole("heading", { name: "Compte de test" }).waitFor();
+  assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
+  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
+  await page.getByText(secret, { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
+  assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Verrouiller", exact: true }).click();
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).waitFor();
   assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
@@ -150,6 +173,15 @@ try {
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).click();
   await page.getByRole("heading", { name: "Compte de test" }).waitFor();
   await page.screenshot({ path: path.join(directory, "saved.png") });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.screenshot({ path: path.join(directory, "saved-dark.png") });
+  await page.setViewportSize({ width: 600, height: 480 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
+  await page.getByRole("button", { name: "Enregistrer", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(directory, "small-dialog.png") });
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 920, height: 640 });
   await page.clock.install();
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
   await page.getByText(secret, { exact: true }).waitFor();

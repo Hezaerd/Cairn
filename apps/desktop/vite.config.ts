@@ -2,12 +2,15 @@ import { defineConfig } from "vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react()],
+  plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), tailwindcss()],
+  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
