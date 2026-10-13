@@ -1,3 +1,4 @@
+use crate::locale::Locale;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -53,9 +54,13 @@ pub fn hide(app: &tauri::AppHandle) {
 
 pub fn setup(app: &tauri::App) -> tauri::Result<()> {
     app.manage(Hidden::default());
-    let open = MenuItem::with_id(app, "open", "Ouvrir Cairn", true, None::<&str>)?;
-    let lock = MenuItem::with_id(app, "lock", "Verrouiller le coffre", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
+    let (open, lock, quit) = match *app.state::<Locale>() {
+        Locale::EnUs => ("Open Cairn", "Lock vault", "Quit"),
+        Locale::FrFr => ("Ouvrir Cairn", "Verrouiller le coffre", "Quitter"),
+    };
+    let open = MenuItem::with_id(app, "open", open, true, None::<&str>)?;
+    let lock = MenuItem::with_id(app, "lock", lock, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", quit, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &lock, &quit])?;
     let mut tray = TrayIconBuilder::with_id("cairn")
         .tooltip("Cairn")

@@ -60,6 +60,7 @@ async function startApp() {
     env: {
       ...process.env,
       CAIRN_TEST_DATA_DIR: path.join(directory, "data"),
+      CAIRN_TEST_LOCALE: "fr-FR",
       WEBVIEW2_USER_DATA_FOLDER: path.join(directory, "webview"),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
     },
@@ -203,6 +204,7 @@ try {
     env: {
       ...process.env,
       CAIRN_TEST_DATA_DIR: path.join(directory, "data"),
+      CAIRN_TEST_LOCALE: "fr-FR",
       WEBVIEW2_USER_DATA_FOLDER: path.join(directory, "webview"),
     },
   });
