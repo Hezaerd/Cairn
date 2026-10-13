@@ -1,0 +1,19 @@
+{
+  "name": "cairn",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev:desktop": "pnpm --filter @cairn/desktop tauri dev",
+    "dev:extension": "pnpm --filter @cairn/extension dev",
+    "build": "pnpm -r build",
+    "build:desktop": "pnpm --filter @cairn/desktop tauri build",
+    "build:extension": "pnpm --filter @cairn/extension build",
+    "typecheck": "pnpm -r typecheck",
+    "check:rust": "cargo check --workspace",
+    "check": "pnpm typecheck && pnpm check:rust"
+  }
+}

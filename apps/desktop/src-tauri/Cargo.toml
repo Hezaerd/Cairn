@@ -1,0 +1,16 @@
+[package]
+name = "cairn-desktop"
+version = "0.1.0"
+description = "Cairn desktop application"
+authors = ["Hezaerd"]
+edition = "2024"
+
+[lib]
+name = "cairn_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
