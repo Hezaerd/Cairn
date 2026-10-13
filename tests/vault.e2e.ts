@@ -35,6 +35,8 @@ const master = "synthetic-master-password-only";
 
 const secret = "synthetic-credential-79!";
 
+const changedSecret = "synthetic-credential-changed-80!";
+
 // Optional live smoke test. Normal runs never contact an external website.
 const faviconSite = process.env.CAIRN_TEST_FAVICON_SITE;
 
@@ -120,7 +122,7 @@ try {
   await page.getByLabel("Mot de passe maître", { exact: true }).fill(master);
   await page.getByLabel("Confirmer le mot de passe").fill(master + "mismatch");
   await page.getByRole("button", { name: "Créer le coffre" }).click();
-  await page.getByText("Les deux mots de passe ne correspondent pas.", { exact: true }).waitFor();
+  await page.locator("[data-sonner-toast]").filter({ hasText: "ne correspondent pas" }).waitFor();
   assert.equal(existsSync(file), false);
   await page.getByLabel("Confirmer le mot de passe").fill(master);
   await page.getByRole("button", { name: "Créer le coffre" }).click();
@@ -238,7 +240,7 @@ try {
   assert.equal(await page.getByRole("heading", { name: "Compte de test" }).count(), 0);
   await page.getByLabel("Mot de passe maître", { exact: true }).fill("wrong-password");
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).click();
-  await page.getByText("Mot de passe incorrect ou coffre endommagé.", { exact: true }).waitFor();
+  await page.locator("[data-sonner-toast]").filter({ hasText: "Mot de passe incorrect" }).waitFor();
   assert.deepEqual(app.errors, []);
   await stopApp(app);
   app = await startApp();
@@ -268,13 +270,61 @@ try {
   await page.screenshot({ path: path.join(directory, "small-dialog.png") });
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 920, height: 640 });
-  await page.clock.install();
+
+  // Editing without a reveal keeps the stored password and notes out of the form.
+  await page.getByRole("button", { name: "Modifier", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByText("Les notes restent inchangées", { exact: false }).waitFor();
+  await page.screenshot({ path: path.join(directory, "edit.png") });
+  assert.equal(await dialog.getByLabel("Notes facultatif").count(), 0);
+  assert.equal(await dialog.getByLabel(/^Mot de passe/).inputValue(), "");
+  await dialog.getByLabel("Nom", { exact: true }).fill("Compte modifié");
+  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await page.getByRole("heading", { name: "Compte modifié" }).waitFor();
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
   await page.getByText(secret, { exact: true }).waitFor();
+  await page.getByText("Note privée de test", { exact: true }).waitFor();
+
+  // After a reveal, the editor can change the notes and the password.
+  await page.getByRole("button", { name: "Modifier", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
+  assert.equal(await dialog.getByLabel("Notes facultatif").inputValue(), "Note privée de test");
+  await dialog.getByLabel(/^Mot de passe/).fill(changedSecret);
+  await dialog.getByLabel("Notes facultatif").fill("Note modifiée de test");
+  await page.screenshot({ path: path.join(directory, "edit-revealed.png") });
+  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
+  await page.getByText(changedSecret, { exact: true }).waitFor();
+  await page.getByText("Note modifiée de test", { exact: true }).waitFor();
+
+  // Deleting asks for confirmation and leaves the other entries alone.
+  await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
+  await page.getByLabel("Nom", { exact: true }).fill("Compte jetable");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("synthetic-disposable-42!");
+  await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: /Compte jetable/ }).click();
+  await page.getByRole("heading", { name: "Compte jetable" }).waitFor();
+  await page.getByRole("button", { name: "Supprimer l'identifiant" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Annuler" }).click();
+  await page.getByRole("heading", { name: "Compte jetable" }).waitFor();
+  await page.getByRole("button", { name: "Supprimer l'identifiant" }).click();
+  await page.screenshot({ path: path.join(directory, "delete.png") });
+  await page.getByRole("dialog").getByRole("button", { name: "Supprimer", exact: true }).click();
+  await page.getByRole("heading", { name: "Compte modifié" }).waitFor();
+  assert.equal(await page.getByRole("button", { name: /Compte jetable/ }).count(), 0);
+  assert.equal(await page.locator(".credential-row").count(), 1);
+
+  await page.clock.install();
+  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
+  await page.getByText(changedSecret, { exact: true }).waitFor();
   await page.clock.fastForward(31_000);
-  await page.getByText(secret, { exact: true }).waitFor({ state: "hidden" });
+  await page.getByText(changedSecret, { exact: true }).waitFor({ state: "hidden" });
   const storage = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
-  assert.ok(!storage.includes(secret) && !storage.includes(master));
+
+  for (const value of [secret, changedSecret, master]) assert.ok(!storage.includes(value));
 
   for (const filename of [file, path.join(directory, "data/backups/previous.cairn")]) {
     const disk = readFileSync(filename, "utf8");
@@ -282,9 +332,12 @@ try {
     for (const value of [
       master,
       secret,
+      changedSecret,
       "Compte de test",
+      "Compte modifié",
       "synthetic@example.com",
       "Note privée de test",
+      "Note modifiée de test",
     ])
       assert.ok(!disk.includes(value));
   }
@@ -297,16 +350,11 @@ try {
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).waitFor();
   await page.getByLabel("Mot de passe maître", { exact: true }).fill(master);
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).click();
-  await page
-    .getByText(
-      "Le fichier du coffre est endommagé ou son format est invalide. Il n'a pas été remplacé.",
-      { exact: true },
-    )
-    .waitFor();
+  await page.locator("[data-sonner-toast]").filter({ hasText: "endommagé" }).waitFor();
   assert.equal(readFileSync(file, "utf8"), "corrupted-test-vault");
   assert.deepEqual(app.errors, []);
   console.log(
-    `Native vault E2E passed: create, save, reveal, close-to-tray, second-launch restore, lock, wrong password, restart, auto-hide, encrypted storage and corruption. Artifacts: ${directory}`,
+    `Native vault E2E passed: create, save, reveal, edit, delete, close-to-tray, second-launch restore, lock, wrong password, restart, auto-hide, encrypted storage and corruption. Artifacts: ${directory}`,
   );
 } finally {
   await stopApp(app);

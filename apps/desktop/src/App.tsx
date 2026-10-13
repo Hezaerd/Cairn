@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Match, Schema } from "effect";
 import { toast } from "sonner";
-import { Eye, EyeOff, KeyRound, LockKeyhole, Plus, Search } from "lucide-react";
+import { Eye, EyeOff, KeyRound, LockKeyhole, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,12 +15,81 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { NewEntry } from "./vault/VaultClient";
+import { EntryUpdate, NewEntry, type EntrySummary } from "./vault/VaultClient";
 import { useVault } from "./vault/useVault";
 import { SiteIcon } from "./favicon/SiteIcon";
 import { ThemeToggle } from "./theme/ThemeToggle";
 
 type Vault = ReturnType<typeof useVault>;
+
+/** Without `existing`, the fields describe a new entry. */
+function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: string | null } }) {
+  const notes = existing ? existing.notes : "";
+
+  return (
+    <>
+      <div className="field">
+        <Label htmlFor="entry-name">Nom</Label>
+        <Input
+          id="entry-name"
+          name="name"
+          required
+          maxLength={256}
+          autoComplete="off"
+          placeholder="Ex. GitHub personnel"
+          defaultValue={existing?.entry.name}
+        />
+      </div>
+      <div className="field">
+        <Label htmlFor="entry-site">Site</Label>
+        <Input
+          id="entry-site"
+          name="site"
+          maxLength={2048}
+          autoComplete="off"
+          placeholder="https://exemple.com"
+          defaultValue={existing?.entry.site}
+        />
+      </div>
+      <div className="field">
+        <Label htmlFor="entry-username">Identifiant</Label>
+        <Input
+          id="entry-username"
+          name="username"
+          maxLength={1024}
+          autoComplete="off"
+          defaultValue={existing?.entry.username}
+        />
+      </div>
+      <div className="field">
+        <Label htmlFor="entry-password">
+          Mot de passe
+          {existing && <span className="optional">laisser vide pour le conserver</span>}
+        </Label>
+        <Input
+          id="entry-password"
+          name="password"
+          type="password"
+          required={!existing}
+          maxLength={4096}
+          autoComplete="new-password"
+        />
+      </div>
+      <div className="field">
+        <Label htmlFor="entry-notes">
+          Notes <span className="optional">facultatif</span>
+        </Label>
+        {notes === null ? (
+          <p className="field-hint">
+            Les notes restent inchangées. Affiche le mot de passe avant de modifier pour les éditer.
+          </p>
+        ) : (
+          <Textarea id="entry-notes" name="notes" maxLength={16384} rows={3} defaultValue={notes} />
+        )}
+      </div>
+    </>
+  );
+}
 
 function EntryDialog({ vault }: { vault: Vault }) {
   function save(event: FormEvent<HTMLFormElement>) {
@@ -51,48 +120,7 @@ function EntryDialog({ vault }: { vault: Vault }) {
           <DialogDescription>Enregistré dans le coffre de cet ordinateur.</DialogDescription>
         </DialogHeader>
         <form onSubmit={save} className="entry-form">
-          <div className="field">
-            <Label htmlFor="entry-name">Nom</Label>
-            <Input
-              id="entry-name"
-              name="name"
-              required
-              maxLength={256}
-              autoComplete="off"
-              placeholder="Ex. GitHub personnel"
-            />
-          </div>
-          <div className="field">
-            <Label htmlFor="entry-site">Site</Label>
-            <Input
-              id="entry-site"
-              name="site"
-              maxLength={2048}
-              autoComplete="off"
-              placeholder="https://exemple.com"
-            />
-          </div>
-          <div className="field">
-            <Label htmlFor="entry-username">Identifiant</Label>
-            <Input id="entry-username" name="username" maxLength={1024} autoComplete="off" />
-          </div>
-          <div className="field">
-            <Label htmlFor="entry-password">Mot de passe</Label>
-            <Input
-              id="entry-password"
-              name="password"
-              type="password"
-              required
-              maxLength={4096}
-              autoComplete="new-password"
-            />
-          </div>
-          <div className="field">
-            <Label htmlFor="entry-notes">
-              Notes <span className="optional">facultatif</span>
-            </Label>
-            <Textarea id="entry-notes" name="notes" maxLength={16384} rows={3} />
-          </div>
+          <EntryFields />
           <DialogFooter className="flex-row justify-end">
             <Button type="button" variant="outline" onClick={() => vault.setAdding(false)}>
               Annuler
@@ -102,6 +130,83 @@ function EntryDialog({ vault }: { vault: Vault }) {
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
+  const editing = vault.editing?.id === entry.id ? vault.editing : null;
+
+  function update(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const password = data.get("password");
+
+    const changes = Schema.decodeUnknownSync(EntryUpdate)({
+      name: data.get("name"),
+      site: data.get("site"),
+      username: data.get("username"),
+      password: password === "" ? null : password,
+      notes: data.get("notes"),
+    });
+
+    vault.update(entry.id, changes);
+  }
+
+  return (
+    <Dialog open={editing !== null} onOpenChange={(open) => !open && vault.stopEdit()}>
+      <DialogContent className="entry-dialog">
+        <DialogHeader>
+          <DialogTitle>Modifier l'identifiant</DialogTitle>
+          <DialogDescription>
+            La version précédente reste dans la sauvegarde du coffre.
+          </DialogDescription>
+        </DialogHeader>
+        {editing && (
+          <form onSubmit={update} className="entry-form">
+            <EntryFields existing={{ entry, notes: editing.notes }} />
+            <DialogFooter className="flex-row justify-end">
+              <Button type="button" variant="outline" onClick={vault.stopEdit}>
+                Annuler
+              </Button>
+              <Button disabled={vault.busy} type="submit">
+                Enregistrer
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
+  return (
+    <Dialog
+      open={vault.deleting === entry.id}
+      onOpenChange={(open) => vault.setDeleting(open ? entry.id : null)}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Supprimer « {entry.name} » ?</DialogTitle>
+          <DialogDescription>
+            L'identifiant disparaît du coffre. La sauvegarde de la version précédente le garde
+            jusqu'à la prochaine modification.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex-row justify-end">
+          <Button type="button" variant="outline" onClick={() => vault.setDeleting(null)}>
+            Annuler
+          </Button>
+          <Button
+            disabled={vault.busy}
+            variant="destructive"
+            onClick={() => vault.remove(entry.id)}
+          >
+            Supprimer
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -160,7 +265,7 @@ function Credentials({ vault }: { vault: Vault }) {
                     vault.hideSecret();
                   }}
                 >
-                  <SiteIcon id={entry.id} name={entry.name} />
+                  <SiteIcon key={entry.site} id={entry.id} name={entry.name} />
                   <span className="row-text">
                     <strong>{entry.name}</strong>
                     <span>{entry.username || entry.site || "Sans identifiant"}</span>
@@ -177,12 +282,43 @@ function Credentials({ vault }: { vault: Vault }) {
           {selected ? (
             <article className="credential-detail">
               <header className="detail-heading">
-                <SiteIcon key={selected.id} id={selected.id} name={selected.name} large />
-                <div>
+                <SiteIcon
+                  key={`${selected.id}:${selected.site}`}
+                  id={selected.id}
+                  name={selected.name}
+                  large
+                />
+                <div className="detail-title">
                   <h2>{selected.name}</h2>
                   <p>Identifiant</p>
                 </div>
+                <div className="detail-actions">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={vault.busy}
+                    onClick={() => vault.startEdit(selected.id)}
+                  >
+                    <Pencil />
+                    Modifier
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={vault.busy}
+                    aria-label="Supprimer l'identifiant"
+                    title="Supprimer l'identifiant"
+                    onClick={() => {
+                      vault.hideSecret();
+                      vault.setDeleting(selected.id);
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
               </header>
+              <EditDialog vault={vault} entry={selected} />
+              <DeleteDialog vault={vault} entry={selected} />
               <dl className="detail-fields">
                 <div>
                   <dt>Identifiant</dt>

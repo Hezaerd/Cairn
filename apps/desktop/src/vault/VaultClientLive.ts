@@ -35,6 +35,8 @@ export const VaultClientLive = Layer.succeed(
     lock: request("lock_vault", Schema.Null).pipe(Effect.asVoid),
     list: request("list_entries", Schema.Array(EntrySummary)),
     save: (entry) => request("save_entry", Schema.Null, { entry }).pipe(Effect.asVoid),
+    update: (id, entry) => request("update_entry", Schema.Null, { id, entry }).pipe(Effect.asVoid),
+    remove: (id) => request("delete_entry", Schema.Null, { id }).pipe(Effect.asVoid),
     reveal: (id) => request("reveal_password", EntrySecret, { id }),
   }),
 );

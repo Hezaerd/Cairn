@@ -3,11 +3,13 @@
 ## What the app does
 
 - The list shows names, sites, and usernames. Search filters them locally.
-- A password or note reaches the UI only when you reveal it, and hides again after 30 seconds, or when you select another entry, search, or open the add dialog.
+- A password or note reaches the UI only when you reveal it, and hides again after 30 seconds, or when you select another entry, search, or open a dialog.
+- The edit dialog leaves the password field empty, and an empty field keeps the stored password. Notes are editable only if you revealed them before opening the editor. Otherwise they stay unchanged.
+- Deleting an entry asks for confirmation. `backups/previous.cairn` keeps the version that still holds the entry until the next change.
 - The backend locks after five minutes without a vault operation, when closing the window to the tray, or through the tray's lock action. Typing alone doesn't reset the timer. On lock, the desktop clears the list, the revealed secret, and the entry form. The status bridge remains available while Cairn is in the tray.
 - The WebView runs in private mode with form autofill turned off. No credential goes to browser storage or logs.
 
-Editing and deleting entries, changing the master password, Windows Hello, sync, and recovery keys aren't built.
+Changing the master password, Windows Hello, sync, and recovery keys aren't built.
 
 ## Files
 
