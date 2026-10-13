@@ -20,6 +20,8 @@ pub fn run() {
             vault::lock_vault,
             vault::list_entries,
             vault::save_entry,
+            vault::update_entry,
+            vault::delete_entry,
             vault::reveal_password,
             favicon::favicon_cached,
             favicon::favicon_refresh,

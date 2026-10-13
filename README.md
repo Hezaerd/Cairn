@@ -2,7 +2,7 @@
 
 Cairn is a personal password manager for Windows. It has a desktop app and an extension for Helium and other Chromium browsers.
 
-The desktop app creates and unlocks an encrypted local vault. You can add credentials and reveal a password and its notes when you need them. The extension connects to the running app and shows whether it is available. It can't read vault entries yet, and pairing and autofill aren't built.
+The desktop app creates and unlocks an encrypted local vault. You can add, edit, and delete credentials, and reveal a password and its notes when you need them. The extension connects to the running app and shows whether it is available. It can't read vault entries yet, and pairing and autofill aren't built.
 
 ## Quick start
 
