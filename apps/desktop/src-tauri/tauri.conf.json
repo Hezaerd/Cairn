@@ -13,6 +13,8 @@
     "windows": [
       {
         "title": "Cairn",
+        "incognito": true,
+        "generalAutofillEnabled": false,
         "width": 800,
         "height": 600
       }

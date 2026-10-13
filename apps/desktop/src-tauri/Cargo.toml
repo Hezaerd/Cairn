@@ -16,3 +16,6 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 cairn-local-bridge = { path = "../../../crates/local-bridge" }
 tauri-plugin-single-instance = "2"
+cairn-vault = { path = "../../../crates/vault" }
+zeroize = "1"
+tokio = { version = "1", features = ["time"] }

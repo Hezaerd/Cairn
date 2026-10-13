@@ -7,8 +7,21 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .setup(|_| bridge::start())
+        .setup(|app| {
+            vault::setup(app)?;
+            bridge::start()
+        })
+        .invoke_handler(tauri::generate_handler![
+            vault::vault_status,
+            vault::create_vault,
+            vault::unlock_vault,
+            vault::lock_vault,
+            vault::list_entries,
+            vault::save_entry,
+            vault::reveal_password,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Cairn");
 }
 mod bridge;
+mod vault;

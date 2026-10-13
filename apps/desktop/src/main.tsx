@@ -2,6 +2,16 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { router } from "./router";
+import { ManagedRuntime } from "effect";
+import { VaultClientLive } from "./vault/VaultClientLive";
+import { VaultRuntime } from "./vault/runtime";
+
+const vaultRuntime = ManagedRuntime.make(VaultClientLive);
+
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    void vaultRuntime.dispose();
+  });
 
 const root = document.getElementById("root");
 
@@ -9,6 +19,8 @@ if (!root) throw new Error("Missing application root");
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <VaultRuntime.Provider value={vaultRuntime}>
+      <RouterProvider router={router} />
+    </VaultRuntime.Provider>
   </React.StrictMode>,
 );

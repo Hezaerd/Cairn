@@ -1,8 +1,10 @@
 # Cairn
 
 Windows desktop app and Chromium extension for a personal password manager.
-The first milestone connects Helium to the running Tauri app through a local
-`GetStatus` exchange. No vault, passwords, pairing, or autofill are implemented.
+The desktop creates and unlocks an encrypted local vault, adds credentials,
+and reveals a selected password and its notes on request. Helium connects to
+the running app through a local `GetStatus` exchange. The extension does not
+have access to vault entries; pairing and autofill are not implemented.
 
 ## Stack
 
@@ -87,6 +89,67 @@ trees are committed and excluded from lint/format; do not edit them manually.
 Run `pnpm --filter @cairn/desktop routes:generate` or the equivalent extension
 command to regenerate them explicitly.
 
+## Local vault
+
+Launch `pnpm dev:desktop` and create a vault with a master password of at least
+12 characters. Add a name, site, username, password, and optional notes. Lock
+the vault, close the app, then reopen and unlock it to retrieve the entry.
+Passwords and notes are only sent to the UI on explicit reveal and hidden
+again after 30 seconds. The list contains names, sites, and usernames only.
+The backend locks after five minutes without a vault operation; the desktop
+clears its list, secret display, and entry form when notified. Typing alone
+does not extend this deadline. Editing/deleting entries, changing the master
+password, Windows Hello, synchronization, and recovery keys are not implemented.
+
+The Rust backend uses Tauri's `app_local_data_dir()` and the current app ID:
+
+```text
+%LOCALAPPDATA%\com.hezaerd.cairn\
+  vault.cairn
+  vault.lock
+  backups\previous.cairn
+```
+
+`vault.cairn` is a versioned JSON envelope containing only public cryptographic
+parameters, a wrapped key, nonces, and ciphertext. Names, sites, usernames,
+passwords, and notes are inside the encrypted payload. The master password
+and unwrapped keys are not persisted. No credential is written to browser
+storage or logs. This directory inherits the Windows user's filesystem access
+permissions; the lock file is an OS writer lock, not an encryption key.
+The desktop WebView runs in private mode with general form autofill disabled.
+
+Version 1 uses RustCrypto Argon2id v19 with 64 MiB of memory, one lane, and 3–10
+passes calibrated at creation toward roughly 500 ms. Bounds are checked before
+processing an untrusted file. A random 16-byte salt derives the wrapping key;
+a separate random 32-byte key encrypts the vault with XChaCha20-Poly1305.
+Wrapping and payload encryption use separate random 24-byte nonces and
+domain-separated authenticated header data. Every save uses a fresh payload
+nonce. The maximum file size is 16 MiB, serialized plaintext 4 MiB, and entry
+count 10,000; individual field lengths are also checked in Rust.
+
+Writes use a same-directory temporary ciphertext file, flush it, and atomically
+replace the destination. Creation refuses to overwrite any existing vault.
+Before each replacement, `backups/previous.cairn` receives the previous complete
+encrypted version. A failed save locks the session so the next unlock reloads
+the actual disk state. External modifications are detected before saving.
+Interrupted temporary files contain ciphertext only. Filesystem/hardware
+durability after power loss is not guaranteed by the application.
+
+For recovery, close Cairn, retain a copy of the damaged file, and copy
+`backups/previous.cairn` to `vault.cairn`. This loses the latest successful
+change. A backup on the same drive does not protect against drive loss; keep
+separate copies of the encrypted vault. There is no password reset: losing the
+master password means losing access to both the vault and its backups.
+If only the backup survives, Cairn presents recovery instructions and refuses
+to create a new vault over it.
+
+Keys, entries, secret command results, the serialization buffer, and the Argon2
+work area use zeroization when released. JavaScript, IPC, allocator/library
+copies, the pagefile, and crash dumps prevent a guarantee that every plaintext
+copy is erased. Encryption at rest does not protect an unlocked app from
+malware running as the same Windows user. This implementation has not received
+an independent security audit.
+
 ## Verification and builds
 
 Oxlint and Oxfmt are configured once at the workspace root for both TypeScript
@@ -118,6 +181,21 @@ pnpm check:rust
 pnpm test
 pnpm build:desktop
 ```
+
+The isolated native vault test uses the real Tauri app, WebView2, Rust commands,
+and filesystem. Close Cairn first, then run:
+
+```sh
+pnpm --filter @cairn/desktop tauri build --debug --no-bundle
+pnpm test:vault
+```
+
+It creates synthetic credentials and a WebView2 profile under `.local`, checks
+creation, reveal/hide, lock, incorrect passwords, process restart, encrypted
+disk contents, and corrupted-file handling. Only debug builds honor its
+`CAIRN_TEST_DATA_DIR` environment override; release builds always use the normal
+application directory. The test's CDP debugging flag applies only to its child
+process. Neither the personal vault nor browser profiles are opened.
 
 `pnpm build` builds the frontend and extension. `pnpm build:desktop` also compiles
 the native app and creates Windows bundles under `target/release/bundle`.
@@ -155,6 +233,8 @@ Set `CAIRN_HELIUM_PATH` if Helium is installed in a nonstandard location.
 - `crates/protocol`: Serde contracts, request validation, bounded binary framing.
 - `crates/local-bridge`: Windows named pipe server/client and access control.
 - `crates/native-host`: standard input/output Native Messaging relay.
+- `crates/vault`: encrypted format, key derivation, session state, atomic storage,
+  and persistence/security tests, independent of Tauri.
 - `scripts`: reversible development registration.
 - `tests`: shared fixtures, TypeScript tests, and Helium integration test.
 

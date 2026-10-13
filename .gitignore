@@ -10,6 +10,8 @@ target/
 *.tsbuildinfo
 .DS_Store
 *.kdbx
+*.cairn
+vault.lock
 *.csv
 .local/
 .tanstack/

@@ -82,7 +82,16 @@ try {
   await page.getByText("Ouvre Cairn sur Windows, puis réessaie.").waitFor();
   console.log("Application absent through Helium Native Messaging: OK");
 
-  desktop = spawn(desktopPath, [], { cwd: root, windowsHide: true, stdio: "ignore" });
+  desktop = spawn(desktopPath, [], {
+    cwd: root,
+    windowsHide: true,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      CAIRN_TEST_DATA_DIR: mkdtempSync(path.join(local, "helium-vault-")),
+      WEBVIEW2_USER_DATA_FOLDER: mkdtempSync(path.join(local, "helium-webview-")),
+    },
+  });
   let connected = false;
 
   for (let attempt = 0; attempt < 15; attempt++) {

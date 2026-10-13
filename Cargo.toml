@@ -1,5 +1,5 @@
 [workspace]
-members = ["apps/desktop/src-tauri", "crates/protocol", "crates/local-bridge", "crates/native-host"]
+members = ["apps/desktop/src-tauri", "crates/protocol", "crates/local-bridge", "crates/native-host", "crates/vault"]
 resolver = "3"
 
 [profile.release]
