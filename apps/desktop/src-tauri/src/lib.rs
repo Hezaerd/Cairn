@@ -3,15 +3,21 @@ pub fn run() {
     use tauri::Manager;
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            use tauri::Manager;
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_focus();
-            }
+            tray::restore(app);
         }))
         .setup(|app| {
             vault::setup(app)?;
             app.manage(favicon::Downloads::default());
+            tray::setup(app)?;
             bridge::start()
+        })
+        .on_window_event(|window, event| {
+            if window.label() == "main"
+                && let tauri::WindowEvent::CloseRequested { api, .. } = event
+            {
+                api.prevent_close();
+                tray::hide(window.app_handle());
+            }
         })
         .invoke_handler(tauri::generate_handler![
             vault::vault_status,
@@ -31,4 +37,5 @@ pub fn run() {
 }
 mod bridge;
 mod favicon;
+mod tray;
 mod vault;

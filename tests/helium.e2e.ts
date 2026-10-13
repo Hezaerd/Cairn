@@ -161,6 +161,20 @@ try {
   console.log("Request after service worker termination: OK");
   await cdp.detach();
 
+  execFileSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-Command",
+      `if (!(Get-Process -Id ${desktop.pid}).CloseMainWindow()) { throw 'No Cairn window to close' }`,
+    ],
+    { windowsHide: true, stdio: "pipe" },
+  );
+  await page.getByRole("button", { name: "Actualiser" }).click();
+  await page.getByRole("status").filter({ hasText: "Cairn connecté" }).waitFor();
+  assert.equal(desktop.exitCode, null);
+  console.log("Status bridge remains connected after close-to-tray: OK");
+
   desktop.kill();
   await new Promise<void>((resolve) =>
     desktop!.exitCode !== null ? resolve() : desktop!.once("exit", () => resolve()),
