@@ -17,6 +17,7 @@ import {
 import { NewEntry } from "./vault/VaultClient";
 import { useVault } from "./vault/useVault";
 import { SiteIcon } from "./favicon/SiteIcon";
+import { ThemeToggle } from "./theme/ThemeToggle";
 
 type Vault = ReturnType<typeof useVault>;
 
@@ -342,8 +343,11 @@ export default function App() {
           <LockKeyhole size={12} />
           Coffre local
         </span>
-        <span role="status">
-          {vault.busy ? "Traitement en cours…" : "Verrouillage automatique après 5 min"}
+        <span className="statusbar-end">
+          <span role="status">
+            {vault.busy ? "Traitement en cours…" : "Verrouillage automatique après 5 min"}
+          </span>
+          <ThemeToggle />
         </span>
       </footer>
     </main>

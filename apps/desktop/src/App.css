@@ -1,9 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
   --background: #fafafa;
   --foreground: #202020;
   --popover: #fff;
@@ -23,26 +25,25 @@
   --radius: 0.25rem;
   --selection: #e5eff9;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #202020;
-    --foreground: #f0f0f0;
-    --popover: #282828;
-    --popover-foreground: #f0f0f0;
-    --primary: #80c4ff;
-    --primary-foreground: #002d51;
-    --secondary: #303030;
-    --secondary-foreground: #f0f0f0;
-    --muted: #272727;
-    --muted-foreground: #aaa;
-    --accent: #353535;
-    --accent-foreground: #f0f0f0;
-    --destructive: #ffaaa4;
-    --border: #383838;
-    --input: #515151;
-    --ring: #80c4ff;
-    --selection: #293e50;
-  }
+.dark {
+  color-scheme: dark;
+  --background: #202020;
+  --foreground: #f0f0f0;
+  --popover: #282828;
+  --popover-foreground: #f0f0f0;
+  --primary: #80c4ff;
+  --primary-foreground: #002d51;
+  --secondary: #303030;
+  --secondary-foreground: #f0f0f0;
+  --muted: #272727;
+  --muted-foreground: #aaa;
+  --accent: #353535;
+  --accent-foreground: #f0f0f0;
+  --destructive: #ffaaa4;
+  --border: #383838;
+  --input: #515151;
+  --ring: #80c4ff;
+  --selection: #293e50;
 }
 @theme inline {
   --font-sans: "Segoe UI Variable", "Segoe UI", sans-serif;
@@ -332,6 +333,15 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+.statusbar-end {
+  margin-right: -8px;
+}
+.theme-toggle {
+  height: 22px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted-foreground);
 }
 .auth-view {
   flex: 1;
