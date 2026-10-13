@@ -18,6 +18,8 @@
     ".opencode/**",
     ".pi/**",
     ".roo/**",
-    ".windsurf/**"
+    ".windsurf/**",
+    "**/routeTree.gen.ts",
+    "**/.tanstack/**"
   ]
 }

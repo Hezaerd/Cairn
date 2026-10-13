@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Effect } from "effect";
 import { decodePopupResult, type PopupResult } from "@cairn/contracts";
-import "./style.css";
 
 type State = { type: "Loading" } | PopupResult;
 

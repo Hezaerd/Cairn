@@ -5,21 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit",
+    "build": "pnpm routes:generate && tsc --noEmit && vite build",
+    "typecheck": "pnpm routes:generate && tsc --noEmit",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "lint:fix": "oxlint --config ../../.oxlintrc.json --fix .",
     "format": "oxfmt --config ../../.oxfmtrc.json --write .",
-    "format:check": "oxfmt --config ../../.oxfmtrc.json --check ."
+    "format:check": "oxfmt --config ../../.oxfmtrc.json --check .",
+    "routes:generate": "tsr generate"
   },
   "dependencies": {
     "@cairn/client": "workspace:*",
     "@cairn/contracts": "workspace:*",
+    "@tanstack/react-router": "1.170.44",
     "effect": "^4.0.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@tanstack/router-cli": "1.167.43",
+    "@tanstack/router-plugin": "1.168.45",
     "@types/chrome": "^0.1.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./popup/App";
+import { RouterProvider } from "@tanstack/react-router";
+import { router } from "./router";
 
 const root = document.getElementById("root");
 
@@ -8,6 +9,6 @@ if (!root) throw new Error("Missing application root");
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <App />
+    <RouterProvider router={router} />
   </React.StrictMode>,
 );

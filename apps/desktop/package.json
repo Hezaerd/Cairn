@@ -5,22 +5,26 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "pnpm routes:generate && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typecheck": "tsc --noEmit && tsc --project tsconfig.node.json --noEmit",
+    "typecheck": "pnpm routes:generate && tsc --noEmit && tsc --project tsconfig.node.json --noEmit",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "lint:fix": "oxlint --config ../../.oxlintrc.json --fix .",
     "format": "oxfmt --config ../../.oxfmtrc.json --write .",
-    "format:check": "oxfmt --config ../../.oxfmtrc.json --check ."
+    "format:check": "oxfmt --config ../../.oxfmtrc.json --check .",
+    "routes:generate": "tsr generate"
   },
   "dependencies": {
+    "@tanstack/react-router": "1.170.44",
     "@tauri-apps/api": "^2",
     "effect": "^4.0.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@tanstack/router-cli": "1.167.43",
+    "@tanstack/router-plugin": "1.168.45",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

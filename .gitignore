@@ -12,3 +12,4 @@ target/
 *.kdbx
 *.csv
 .local/
+.tanstack/

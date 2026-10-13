@@ -46,3 +46,8 @@ minimumReleaseAgeExclude:
   - "@oxlint/plugins@1.88.0"
   - oxfmt@0.73.0
   - oxlint@1.88.0
+  - "@tanstack/react-router@1.170.44"
+  - "@tanstack/router-core@1.171.37"
+  - "@tanstack/router-cli@1.167.43"
+  - "@tanstack/router-generator@1.167.43"
+  - "@tanstack/router-plugin@1.168.45"

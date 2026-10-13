@@ -49,7 +49,9 @@
     "tools/oxlint/anti-slop/**",
     "**/dist/**",
     "target/**",
-    "**/gen/**"
+    "**/gen/**",
+    "**/routeTree.gen.ts",
+    "**/.tanstack/**"
   ],
   "jsPlugins": [
     {

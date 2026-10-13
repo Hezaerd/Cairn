@@ -10,6 +10,7 @@ The first milestone connects Helium to the running Tauri app through a local
 - Desktop: Tauri 2, Rust, React, TypeScript, Vite
 - Extension: Chromium Manifest V3, React, TypeScript, Vite
 - Effect 4 services, scoped native connections, typed errors, and Schema validation
+- TanStack Router with typed file routes in both apps
 - Cargo workspace for the app, protocol, Windows pipe transport, and native host
 
 ## Prerequisites
@@ -66,6 +67,25 @@ Remove this checkout's registration with:
 
 After moving the repository, unregister it from its old location first, then
 register it at the new location. The registration contains absolute paths.
+
+## Routing
+
+Each app owns its router in `src/router.ts` and its pages in `src/routes`.
+`__root.tsx` provides the shared outlet and not-found page; `index.tsx` renders
+the existing home screen. Add new route files here and use TanStack's `Link`
+or `useNavigate` for typed navigation.
+
+The desktop uses hash history, so URLs such as `/#/settings` keep navigation
+inside the Tauri document, including on reload. The popup uses memory history:
+opening it starts at `/`, without changing `index.html` or the service worker's
+sender URL check. Navigation state is not persisted when the popup closes.
+
+The Vite plugin generates `src/routeTree.gen.ts` and splits route components
+into lazy-loaded chunks. Build and typecheck scripts also run `tsr generate`
+before TypeScript, so they work without a running dev server. The generated
+trees are committed and excluded from lint/format; do not edit them manually.
+Run `pnpm --filter @cairn/desktop routes:generate` or the equivalent extension
+command to regenerate them explicitly.
 
 ## Verification and builds
 
