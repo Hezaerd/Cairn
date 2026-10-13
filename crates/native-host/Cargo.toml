@@ -1,0 +1,10 @@
+[package]
+name = "cairn-native-host"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cairn-protocol = { path = "../protocol" }
+cairn-local-bridge = { path = "../local-bridge" }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "net", "time"] }

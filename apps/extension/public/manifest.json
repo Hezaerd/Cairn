@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Cairn",
   "version": "0.1.0",
-  "description": "Cairn browser companion. Initial scaffold.",
+  "description": "Cairn browser companion",
   "action": {
     "default_title": "Cairn",
     "default_popup": "index.html"
@@ -10,5 +10,8 @@
   "background": {
     "service_worker": "background.js",
     "type": "module"
-  }
+  },
+  "permissions": [
+    "nativeMessaging"
+  ]
 }

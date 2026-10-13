@@ -1,0 +1,19 @@
+{
+  "name": "@cairn/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/protocol.ts",
+    "./errors": "./src/errors.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "^4.0.4"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}

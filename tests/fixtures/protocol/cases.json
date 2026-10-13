@@ -1,0 +1,151 @@
+[
+  {
+    "name": "get status",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetStatus"
+    }
+  },
+  {
+    "name": "status",
+    "kind": "response",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Status",
+      "appVersion": "0.1.0"
+    }
+  },
+  {
+    "name": "app unavailable",
+    "kind": "response",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Error",
+      "code": "AppUnavailable"
+    }
+  },
+  {
+    "name": "unknown operation",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Unlock"
+    }
+  },
+  {
+    "name": "unknown version",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 2,
+      "requestId": "test-1",
+      "type": "GetStatus"
+    }
+  },
+  {
+    "name": "invalid id",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "bad id",
+      "type": "GetStatus"
+    }
+  },
+  {
+    "name": "empty id",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "",
+      "type": "GetStatus"
+    }
+  },
+  {
+    "name": "extra field",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "GetStatus",
+      "password": "not-allowed"
+    }
+  },
+  {
+    "name": "unknown response version",
+    "kind": "response",
+    "valid": false,
+    "message": {
+      "version": 2,
+      "requestId": "test-1",
+      "type": "Status",
+      "appVersion": "0.1.0"
+    }
+  },
+  {
+    "name": "unknown response type",
+    "kind": "response",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Vault",
+      "appVersion": "0.1.0"
+    }
+  },
+  {
+    "name": "extra response field",
+    "kind": "response",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Status",
+      "appVersion": "0.1.0",
+      "secret": "not-allowed"
+    }
+  },
+  {
+    "name": "bad app version",
+    "kind": "response",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Status",
+      "appVersion": "bad"
+    }
+  },
+  {
+    "name": "id with trailing newline",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1\n",
+      "type": "GetStatus"
+    }
+  },
+  {
+    "name": "app version with trailing newline",
+    "kind": "response",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Status",
+      "appVersion": "0.1.0\n"
+    }
+  }
+]

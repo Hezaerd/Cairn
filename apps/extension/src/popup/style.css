@@ -6,3 +6,7 @@ p { color: #b8c0b4; margin: 0; }
 
 body { width: 320px; }
 .welcome { min-height: 200px; }
+.detail { margin-top: 12px; font-size: 13px; text-align: center; line-height: 1.5; }
+button { margin-top: 20px; padding: 9px 16px; border: 1px solid #899481; border-radius: 6px; background: #e8e5de; color: #202520; font: inherit; cursor: pointer; }
+button:disabled { opacity: .5; cursor: wait; }
+button:focus-visible { outline: 2px solid #b8c0b4; outline-offset: 3px; }

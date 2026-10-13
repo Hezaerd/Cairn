@@ -14,6 +14,20 @@
     "build:extension": "pnpm --filter @cairn/extension build",
     "typecheck": "pnpm -r typecheck",
     "check:rust": "cargo check --workspace",
-    "check": "pnpm typecheck && pnpm check:rust"
-  }
+    "check": "pnpm typecheck && pnpm check:rust",
+    "build:host": "cargo build -p cairn-native-host",
+    "test:ts": "tsx --test tests/*.test.ts",
+    "test:rust": "cargo test --workspace",
+    "test": "pnpm test:ts && pnpm test:rust",
+    "test:helium": "tsx tests/helium.e2e.ts"
+  },
+  "devDependencies": {
+    "@cairn/client": "workspace:*",
+    "@cairn/contracts": "workspace:*",
+    "@types/node": "^24.0.0",
+    "effect": "^4.0.4",
+    "playwright": "^1.64.0",
+    "tsx": "^4.20.0"
+  },
+  "type": "module"
 }
