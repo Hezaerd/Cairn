@@ -106,7 +106,12 @@ pub async fn list_entries(
     window: WebviewWindow,
     store: State<'_, Store>,
 ) -> Result<Vec<EntrySummary>, VaultError> {
-    run(window, &store, Vault::list).await
+    // Window commands come from a person using Cairn, so they count as activity.
+    run(window, &store, |vault| {
+        vault.touch()?;
+        vault.list()
+    })
+    .await
 }
 
 #[tauri::command]
@@ -164,5 +169,9 @@ pub async fn reveal_password(
     store: State<'_, Store>,
     id: String,
 ) -> Result<EntrySecret, VaultError> {
-    run(window, &store, move |vault| vault.reveal(&id)).await
+    run(window, &store, move |vault| {
+        vault.touch()?;
+        vault.reveal(&id)
+    })
+    .await
 }

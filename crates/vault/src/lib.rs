@@ -345,16 +345,27 @@ impl Vault {
         }
     }
 
+    /// Restarts the idle timer. Reads don't, so background queries such as the
+    /// browser's suggestions can't keep the vault open; callers mark the reads
+    /// a person asked for. Changes always count.
+    pub fn touch(&mut self) -> Result<()> {
+        self.active().map(|_| ())
+    }
+
     fn active(&mut self) -> Result<&mut Session> {
-        self.expire();
-        let session = self.session.as_mut().ok_or(VaultError::Locked)?;
+        let session = self.unlocked()?;
         session.last_used = Instant::now();
         Ok(session)
     }
 
+    fn unlocked(&mut self) -> Result<&mut Session> {
+        self.expire();
+        self.session.as_mut().ok_or(VaultError::Locked)
+    }
+
     pub fn list(&mut self) -> Result<Vec<EntrySummary>> {
         Ok(self
-            .active()?
+            .unlocked()?
             .entries
             .iter()
             .map(|entry| EntrySummary {
@@ -367,7 +378,7 @@ impl Vault {
     }
 
     pub fn reveal(&mut self, id: &str) -> Result<EntrySecret> {
-        self.active()?
+        self.unlocked()?
             .entries
             .iter()
             .find(|entry| entry.id == id)
@@ -379,7 +390,7 @@ impl Vault {
     }
 
     pub fn login(&mut self, id: &str) -> Result<Login> {
-        self.active()?
+        self.unlocked()?
             .entries
             .iter()
             .find(|entry| entry.id == id)
