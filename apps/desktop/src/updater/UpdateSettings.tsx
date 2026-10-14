@@ -138,9 +138,10 @@ export function UpdateSettings({ labelledBy }: { labelledBy: string }) {
                 disabled={!status || busy}
                 className={cn(
                   "grid content-start gap-1 rounded-xl border p-3 text-left transition-colors disabled:cursor-default",
-                  active ? "border-ring bg-selection/60" : "hover:bg-accent/60",
+                  active
+                    ? "border-ring bg-selection/60 inset-ring inset-ring-ring"
+                    : "hover:bg-accent/60",
                 )}
-                style={active ? { boxShadow: "inset 0 0 0 1px var(--ring)" } : undefined}
                 onClick={() => choose(channel)}
               >
                 <span

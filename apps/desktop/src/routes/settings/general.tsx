@@ -25,7 +25,7 @@ function General() {
   return (
     <>
       <section aria-labelledby="general" className="grid gap-3">
-        <h2 id="general" className="text-[11px] text-muted-foreground">
+        <h2 id="general" className="text-2xs text-muted-foreground">
           {t.settings.general}
         </h2>
         <div className="flex items-center justify-between gap-6 rounded-lg border bg-muted/50 p-4 max-[680px]:flex-col max-[680px]:items-stretch max-[680px]:gap-3">
@@ -64,7 +64,7 @@ function General() {
         </div>
       </section>
       <section aria-labelledby="updates" className="grid gap-3">
-        <h2 id="updates" className="text-[11px] text-muted-foreground">
+        <h2 id="updates" className="text-2xs text-muted-foreground">
           {t.settings.updates}
         </h2>
         <div className="rounded-lg border bg-muted/50 p-4">

@@ -41,7 +41,7 @@ function Credentials({ vault }: { vault: Vault }) {
         <BrowsersDialog />
         <EntryDialog vault={vault} />
       </Toolbar>
-      <div className="grid min-h-0 flex-1 grid-cols-[270px_minmax(0,1fr)] max-[680px]:grid-cols-[210px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-sidebar max-[680px]:grid-cols-sidebar-narrow">
         <EntryList
           label={t.credentials.list}
           searchLabel={t.credentials.search}
@@ -70,7 +70,7 @@ function Credentials({ vault }: { vault: Vault }) {
         />
         <section className="flex overflow-y-auto" aria-label={t.credentials.details}>
           {selected ? (
-            <article className="w-full max-w-[720px] p-8 max-[680px]:p-5.5">
+            <article className="w-full max-w-180 p-8 max-[680px]:p-5.5">
               <header className="flex items-center gap-3.5 pb-7">
                 <SiteIcon
                   key={`${selected.id}:${selected.site}`}
@@ -180,7 +180,7 @@ function AuthPanel({
   return (
     <div className="w-80 max-w-full">
       {icon}
-      <h1 className="mb-2 text-[22px] font-semibold">{title}</h1>
+      <h1 className="mb-2 text-title font-semibold">{title}</h1>
       {children}
     </div>
   );

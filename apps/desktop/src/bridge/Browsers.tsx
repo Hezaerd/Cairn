@@ -102,7 +102,7 @@ export function PairingDialog() {
             {request && t.browsers.requestDescription(request.name)}
           </DialogDescription>
         </DialogHeader>
-        <p className="py-2 text-center font-mono text-[28px] font-semibold tracking-widest">
+        <p className="py-2 text-center font-mono text-display font-semibold tracking-widest">
           {request?.code}
         </p>
         <p className="text-xs text-muted-foreground">{t.browsers.requestHint}</p>
@@ -166,7 +166,7 @@ export function BrowsersDialog() {
                 <Globe size={16} className="shrink-0 text-muted-foreground" />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <strong className="truncate text-xs font-semibold">{browser.name}</strong>
-                  <span className="text-[11px] text-muted-foreground">
+                  <span className="text-2xs text-muted-foreground">
                     {t.browsers.pairedOn(new Date(browser.pairedAt * 1000))}
                   </span>
                 </span>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import mark from "../../../../brand/cairn.svg";
 import { useT } from "../i18n/I18nProvider";
 
 // Glyphs from Segoe Fluent Icons, the font Windows 11 draws its own caption buttons with.
@@ -8,8 +7,7 @@ const glyphs = { minimize: "\uE921", maximize: "\uE922", restore: "\uE923", clos
 
 const appWindow = getCurrentWindow();
 
-const captionButton =
-  "flex h-full w-[46px] items-center justify-center font-[Segoe_Fluent_Icons,Segoe_MDL2_Assets] text-[10px]";
+const captionButton = "flex h-full w-11.5 items-center justify-center font-icons text-glyph";
 
 /** Replaces the system title bar, which the window turns off with `decorations: false`. */
 export function TitleBar() {
@@ -43,8 +41,7 @@ export function TitleBar() {
       {/* A mask paints the mark in the text color, so it follows the theme. */}
       <span
         aria-hidden
-        className="mr-2 ml-3 size-4 bg-current mask-contain mask-center mask-no-repeat"
-        style={{ maskImage: `url("${mark}")` }}
+        className="mr-2 ml-3 size-4 bg-current mask-mark mask-contain mask-center mask-no-repeat"
       />
       <span className="mr-auto truncate">Cairn</span>
       <div className="flex h-full" data-tauri-drag-region="false">
@@ -71,7 +68,7 @@ export function TitleBar() {
         <button
           type="button"
           tabIndex={-1}
-          className={`${captionButton} hover:bg-[#c42b1c] hover:text-white active:bg-[#c42b1c]/90 active:text-white/80`}
+          className={`${captionButton} hover:bg-caption-close hover:text-white active:bg-caption-close/90 active:text-white/80`}
           aria-label={t.window.close}
           title={t.window.close}
           onClick={() => void appWindow.close()}

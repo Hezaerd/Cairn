@@ -25,9 +25,10 @@ export function ColorSchemePicker({ labelledBy }: { labelledBy: string }) {
             title={t.theme[labels[option]]}
             className={cn(
               "flex flex-col gap-2 rounded-xl border p-2 transition-colors",
-              active ? "border-ring bg-selection/60" : "hover:bg-accent/60",
+              active
+                ? "border-ring bg-selection/60 inset-ring inset-ring-ring"
+                : "hover:bg-accent/60",
             )}
-            style={active ? { boxShadow: "inset 0 0 0 1px var(--ring)" } : undefined}
             onClick={() => setTheme(option)}
           >
             <ThemeWireframe theme={option} />
