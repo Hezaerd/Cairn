@@ -148,3 +148,25 @@ button.login span {
   font-size: 11px;
   color: #899481;
 }
+
+.toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: start;
+  padding-top: 12px;
+  border-top: 1px solid #2b322b;
+  font-size: 13px;
+  cursor: pointer;
+}
+.toggle input {
+  margin: 2px 0 0;
+  accent-color: #899481;
+}
+.toggle small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b8c0b4;
+}

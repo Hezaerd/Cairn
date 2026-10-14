@@ -35,5 +35,10 @@
     "placeholders": { "host": { "content": "$1" } }
   },
   "noUsername": { "message": "Sans nom d’utilisateur" },
-  "noForm": { "message": "Aucun formulaire de connexion trouvé sur cette page." }
+  "noForm": { "message": "Aucun formulaire de connexion trouvé sur cette page." },
+  "suggestions": { "message": "Proposer les identifiants dans les champs de connexion" },
+  "suggestionsDetail": {
+    "message": "Affiche tes identifiants quand tu cliques dans un champ de connexion. Demande l’accès aux sites que tu visites."
+  },
+  "pickerIcon": { "message": "Remplir avec Cairn" }
 }
