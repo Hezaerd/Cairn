@@ -99,12 +99,20 @@ export const frFR: Messages = {
     refuse: "Refuser",
     paired: (name: string) => `${name} est associé.`,
   },
+  settings: {
+    open: "Paramètres",
+    title: "Paramètres",
+    back: "Retour aux identifiants",
+    appearance: "Apparence",
+    colorScheme: "Jeu de couleurs",
+  },
   theme: {
-    label: "Thème",
-    current: (theme) => `Thème : ${theme}`,
     light: "Clair",
     dark: "Sombre",
     system: "Système",
+    useLight: "Utiliser le thème clair",
+    useDark: "Utiliser le thème sombre",
+    useSystem: "Suivre le thème de Windows",
   },
   update: {
     available: (version) => `Cairn ${version} est disponible`,
