@@ -64,6 +64,9 @@ export const closePicker = (tabId: number) => pickers.delete(tabId);
 
 export const pickerOrigin = (tabId: number) => pickers.get(tabId);
 
+/** Drops the tab's cached logins, after one was saved from it. */
+export const forgetLogins = (tabId: number) => cache.delete(tabId);
+
 const setBadge = (tabId: number, count: number) =>
   chrome.action.setBadgeText({ tabId, text: count > 0 ? String(count) : "" }).catch(() => {});
 
