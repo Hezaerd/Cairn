@@ -25,6 +25,8 @@ The UI uses shadcn/ui components in `apps/desktop/src/components/ui`, with Tailw
 pnpm dlx shadcn@latest add <component> -c apps/desktop
 ```
 
+UI state that outlives a component lives in the Zustand stores in `apps/desktop/src/store`. `preferences.ts` holds the theme and the password generator options. `navigation.ts` holds the current view, each view's selected entry and each view's search. Components read a store with a selector, such as `usePreferences((state) => state.theme)`. Anything else, React or not, changes it through the exported actions or `setState`, and code outside React can `subscribe`, as `theme/follow.ts` does. Both stores persist to local storage with a version and decode what they read with Schema, so a bad field falls back to its default. Persist only settings and entry IDs there: never a credential or anything typed into a search, which is why `navigation.ts` leaves the searches out of storage.
+
 ## Browser extension
 
 An installed Cairn ships the extension and its native host, and **Settings → Browser extension** shows the folder to load. This section sets up a dev copy from the checkout instead.

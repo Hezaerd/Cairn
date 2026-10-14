@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { VaultClient, type ErrorCode, type PasswordOptions } from "../vault/VaultClient";
 import { useRuntime } from "../vault/useVault";
 import { useT } from "../i18n/I18nProvider";
-import { storedOptions, storeOptions } from "./options";
+import { setPasswordOptions, usePreferences } from "../store/preferences";
 
 type CharacterSet = "lowercase" | "uppercase" | "digits" | "symbols";
 
@@ -20,7 +20,7 @@ export function PasswordGenerator({ onUse }: { onUse: (password: string) => void
   const t = useT();
   const runtime = useRuntime();
   const [open, setOpen] = useState(false);
-  const [options, setOptions] = useState(storedOptions);
+  const options = usePreferences((state) => state.passwordOptions);
   const [password, setPassword] = useState<string | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
   const request = useRef(0);
@@ -56,8 +56,7 @@ export function PasswordGenerator({ onUse }: { onUse: (password: string) => void
   }
 
   function change(next: PasswordOptions) {
-    setOptions(next);
-    storeOptions(next);
+    setPasswordOptions(next);
     generate(next);
   }
 

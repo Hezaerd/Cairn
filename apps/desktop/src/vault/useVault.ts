@@ -13,6 +13,7 @@ import {
 } from "./VaultClient";
 import { VaultRuntime } from "./runtime";
 import { useT } from "../i18n/I18nProvider";
+import { clearSearches } from "../store/navigation";
 
 interface Snapshot {
   status: VaultStatus | "loading";
@@ -68,6 +69,7 @@ export function useVault() {
   function clearSession() {
     epoch.current++;
     setSnapshot({ status: "locked", entries: [] });
+    clearSearches();
     setRevealed(null);
     setAdding(false);
     setEditing(null);

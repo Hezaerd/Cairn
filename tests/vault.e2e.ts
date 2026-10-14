@@ -165,7 +165,7 @@ try {
   assert.equal(existsSync(language), false);
   await page.getByRole("link", { name: "Apparence" }).click();
   await page.getByRole("heading", { name: "Jeu de couleurs" }).waitFor();
-  await page.getByRole("link", { name: "Retour aux identifiants" }).click();
+  await page.getByRole("link", { name: "Retour au coffre" }).click();
   await page.getByRole("heading", { name: "Aucun identifiant" }).waitFor();
   await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
   await page.getByRole("dialog").waitFor();
@@ -286,7 +286,7 @@ try {
   await nightly.click();
   await page.getByRole("button", { name: /^Nightly/, pressed: true }).waitFor();
   assert.equal(readFileSync(path.join(directory, "data/update-channel"), "utf8"), "nightly");
-  await page.getByRole("link", { name: "Retour aux identifiants" }).click();
+  await page.getByRole("link", { name: "Retour au coffre" }).click();
   await page.getByRole("button", { name: "Verrouiller", exact: true }).click();
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).waitFor();
   assert.equal(await page.locator("[data-slot=site-icon] img").count(), 0);
@@ -317,7 +317,7 @@ try {
   await page.getByRole("link", { name: "Paramètres" }).click();
   await page.getByRole("button", { name: /^Nightly/, pressed: true }).waitFor();
   await page.screenshot({ path: path.join(directory, "settings.png") });
-  await page.getByRole("link", { name: "Retour aux identifiants" }).click();
+  await page.getByRole("link", { name: "Retour au coffre" }).click();
   await page.getByRole("heading", { name: "Compte de test" }).waitFor();
   await page.screenshot({ path: path.join(directory, "saved.png") });
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
@@ -409,8 +409,8 @@ try {
   await page.getByRole("heading", { name: "Compte jetable" }).waitFor();
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
   await page.getByText(used, { exact: true }).waitFor();
-  const remembered = await page.evaluate(() => localStorage.getItem("cairn-password-generator"));
-  assert.deepEqual(JSON.parse(remembered ?? "null"), {
+  const remembered = await page.evaluate(() => localStorage.getItem("cairn-preferences"));
+  assert.deepEqual(JSON.parse(remembered ?? "null").state.passwordOptions, {
     length: 32,
     lowercase: true,
     uppercase: true,
@@ -463,9 +463,13 @@ try {
   // An entry without a password isn't a login, so only the authenticator view lists it.
   const logins = page.getByRole("complementary", { name: "Liste des identifiants" });
   assert.equal(await logins.getByRole("button", { name: /Code seul/ }).count(), 0);
-  await page.getByRole("link", { name: /^Authentificateur/ }).click();
+  await page.getByRole("button", { name: /^Authentificateur/ }).click();
   const codes = page.getByRole("complementary", { name: "Liste des codes" });
   await codes.getByRole("button", { name: /Code seul/ }).click();
+  await page.getByRole("heading", { name: "Code seul" }).waitFor();
+  // The view and its selection survive a trip to the settings.
+  await page.getByRole("link", { name: "Paramètres" }).click();
+  await page.getByRole("link", { name: "Retour au coffre" }).click();
   await page.getByRole("heading", { name: "Code seul" }).waitFor();
   await page.getByText("Code d'authentification", { exact: true }).waitFor();
   const code = page.locator("code").filter({ hasText: /^\d{3} \d{3}$/ });
@@ -547,7 +551,7 @@ try {
   assert.equal(await codes.getByRole("listitem").count(), 2);
 
   // The login keeps its password next to its new key, and shows the code too.
-  await page.getByRole("link", { name: /^Identifiants/ }).click();
+  await page.getByRole("button", { name: /^Identifiants/ }).click();
   await page.getByRole("heading", { name: "Compte modifié" }).waitFor();
   await code.waitFor();
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
