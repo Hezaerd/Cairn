@@ -14,6 +14,7 @@ fn entry(name: &str) -> NewEntry {
         username: "test@example.com".into(),
         password: SECRET.into(),
         notes: "private note".into(),
+        totp: String::new(),
     }
 }
 fn fixture() -> (tempfile::TempDir, Vault) {
@@ -327,6 +328,7 @@ fn update(name: &str, password: Option<&str>, notes: Option<&str>) -> EntryUpdat
         username: "renamed@example.org".into(),
         password: password.map(Into::into),
         notes: notes.map(Into::into),
+        totp: None,
     }
 }
 
@@ -615,4 +617,186 @@ fn version_1_vaults_upgrade_and_keep_their_entries_and_browsers() {
     vault.lock();
     vault.unlock(password()).unwrap();
     assert!(vault.browsers().unwrap().is_empty());
+}
+
+// "12345678901234567890", the RFC 6238 SHA-1 test seed, in Base32.
+const TOTP_KEY: &str = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+
+#[test]
+fn entries_keep_an_authenticator_key_with_or_without_a_password() {
+    let (dir, mut vault) = fixture();
+    vault.unlock(password()).unwrap();
+    // Neither a password nor a key.
+    let mut empty = entry("Empty");
+    empty.password = String::new();
+    assert_eq!(vault.save(empty), Err(VaultError::InvalidInput));
+    let mut invalid = entry("Invalid key");
+    invalid.totp = "not a key!".into();
+    assert_eq!(vault.save(invalid), Err(VaultError::InvalidInput));
+
+    let mut both = entry("Both");
+    both.totp = TOTP_KEY.to_lowercase();
+    vault.save(both).unwrap();
+    let mut code_only = entry("Code only");
+    code_only.password = String::new();
+    code_only.totp = format!("otpauth://totp/Example:me?secret={TOTP_KEY}&digits=8");
+    vault.save(code_only).unwrap();
+    vault.save(entry("Password only")).unwrap();
+
+    let summaries = vault.list().unwrap();
+    let flags: Vec<_> = summaries
+        .iter()
+        .map(|entry| (entry.name.as_str(), entry.has_password, entry.has_totp))
+        .collect();
+    assert_eq!(
+        flags,
+        [
+            ("Both", true, true),
+            ("Code only", false, true),
+            ("Password only", true, false)
+        ]
+    );
+    let json = serde_json::to_string(&summaries).unwrap();
+    assert!(json.contains("hasTotp") && !json.contains(TOTP_KEY));
+    let (both, code_only, plain) = (&summaries[0].id, &summaries[1].id, &summaries[2].id);
+    let code = vault.totp_code(both).unwrap();
+    assert_eq!((code.code.len(), code.period), (6, 30));
+    assert!((1..=30).contains(&code.remaining));
+    assert_eq!(vault.totp_code(code_only).unwrap().code.len(), 8);
+    assert_eq!(vault.totp_code(plain).err(), Some(VaultError::InvalidInput));
+    assert_eq!(vault.reveal(code_only).unwrap().password, "");
+
+    // Editing keeps the key unless the form replaces or removes it.
+    let mut keep = update("Code only", None, None);
+    keep.site = String::new();
+    vault.update(code_only, keep).unwrap();
+    assert_eq!(vault.totp_code(code_only).unwrap().code.len(), 8);
+    let mut remove = update("Code only", None, None);
+    remove.totp = Some(String::new());
+    assert_eq!(
+        vault.update(code_only, remove),
+        Err(VaultError::InvalidInput)
+    );
+    let mut remove = update("Both", None, None);
+    remove.totp = Some(String::new());
+    vault.update(both, remove).unwrap();
+    let mut add = update("Password only", None, None);
+    add.totp = Some(TOTP_KEY.into());
+    vault.update(plain, add).unwrap();
+
+    // The key survives a restart and is encrypted at rest.
+    drop(vault);
+    let bytes = fs::read_to_string(dir.path().join("vault.cairn")).unwrap();
+    assert!(!bytes.contains(TOTP_KEY) && !bytes.contains("totp"));
+    let mut reopened = Vault::open(dir.path()).unwrap();
+    reopened.unlock(password()).unwrap();
+    let flags: Vec<_> = reopened
+        .list()
+        .unwrap()
+        .iter()
+        .map(|entry| entry.has_totp)
+        .collect();
+    assert_eq!(flags, [false, true, true]);
+    // Reading a code isn't activity, so a selected entry can't keep the vault open.
+    reopened.session.as_mut().unwrap().last_used = Instant::now() - IDLE_TIMEOUT;
+    assert_eq!(reopened.totp_code(plain).err(), Some(VaultError::Locked));
+}
+
+#[test]
+fn imports_add_keys_to_logins_or_new_entries_in_one_write() {
+    let (dir, mut vault) = fixture();
+    vault.unlock(password()).unwrap();
+    vault.save(entry("GitHub")).unwrap();
+    let github = vault.list().unwrap()[0].id.clone();
+    let links = format!(
+        "otpauth://totp/GitHub:octocat?secret={TOTP_KEY}\notpauth://totp/Example%20Co:me%40example.com?secret={TOTP_KEY}"
+    );
+    let accounts = parse_accounts(&links).unwrap();
+    let previews: Vec<_> = accounts
+        .iter()
+        .map(|account| serde_json::to_string(&account.preview()).unwrap())
+        .collect();
+    assert!(previews.iter().all(|preview| !preview.contains(TOTP_KEY)));
+
+    let mut accounts = accounts.into_iter();
+    let missing = vec![(accounts.next().unwrap(), Some("missing".to_owned()))];
+    let before = fs::read(dir.path().join("vault.cairn")).unwrap();
+    assert_eq!(vault.import_totp(missing), Err(VaultError::InvalidInput));
+    assert_eq!(fs::read(dir.path().join("vault.cairn")).unwrap(), before);
+
+    let mut accounts = parse_accounts(&links).unwrap().into_iter();
+    vault
+        .import_totp(vec![
+            (accounts.next().unwrap(), Some(github.clone())),
+            (accounts.next().unwrap(), None),
+        ])
+        .unwrap();
+    let summaries = vault.list().unwrap();
+    assert_eq!(summaries.len(), 2);
+    assert!(summaries[0].has_totp && summaries[0].has_password);
+    assert_eq!(vault.reveal(&github).unwrap().password, SECRET);
+    let added = &summaries[1];
+    assert_eq!(
+        (
+            added.name.as_str(),
+            added.username.as_str(),
+            added.site.as_str()
+        ),
+        ("Example Co", "me@example.com", "")
+    );
+    assert!(added.has_totp && !added.has_password);
+    assert_eq!(
+        vault.totp_code(&github).unwrap().code,
+        vault.totp_code(&added.id).unwrap().code
+    );
+    assert_eq!(
+        fs::read(dir.path().join("backups/previous.cairn")).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn version_2_vaults_upgrade_and_keep_their_paired_browsers() {
+    let dir = tempfile::tempdir().unwrap();
+    legacy_vault(dir.path());
+    let mut vault = Vault::open(dir.path()).unwrap();
+    vault.unlock(password()).unwrap();
+    // Write a version 2 vault, as the previous release did after upgrading.
+    {
+        let session = vault.session.as_mut().unwrap();
+        let wrapping_key = derive(PASSWORD, &session.envelope.header).unwrap();
+        session.envelope.header.version = 2;
+        session.envelope.wrapped_key = encrypt(
+            &wrapping_key,
+            &session.envelope.key_nonce,
+            session.key.as_ref(),
+            &session.envelope.header.aad(b"cairn-key-v1").unwrap(),
+        )
+        .unwrap();
+        let browsers = session.browsers.clone().unwrap_or_default();
+        browsers::bind(&dir.path().join("browsers.cairn"), session, browsers).unwrap();
+        let bytes = seal(session).unwrap();
+        fs::write(dir.path().join("vault.cairn"), &bytes).unwrap();
+    }
+    vault.lock();
+    let original = fs::read(dir.path().join("vault.cairn")).unwrap();
+    let header: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    assert_eq!(header["header"]["version"], 2);
+
+    vault.unlock(password()).unwrap();
+    let upgraded: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join("vault.cairn")).unwrap()).unwrap();
+    assert_eq!(upgraded["header"]["version"], VERSION);
+    assert_eq!(
+        fs::read(dir.path().join("backups/previous.cairn")).unwrap(),
+        original
+    );
+    assert_eq!(vault.reveal("legacy").unwrap().password, SECRET);
+    assert_eq!(
+        vault.browser_key("client-a").unwrap().as_deref(),
+        Some("public-key-a")
+    );
+    vault.lock();
+    vault.unlock(password()).unwrap();
+    assert_eq!(vault.browsers().unwrap().len(), 1);
 }

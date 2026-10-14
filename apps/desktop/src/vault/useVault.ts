@@ -97,7 +97,12 @@ export function useVault() {
               if (epoch.current !== current) return;
               setBusy(false);
 
-              if (clearOnFailure || failure.code === "Locked" || failure.code === "Storage")
+              // Invalid input is refused before anything is written, so the session stays.
+              if (
+                (clearOnFailure && failure.code !== "InvalidInput") ||
+                failure.code === "Locked" ||
+                failure.code === "Storage"
+              )
                 clearSession();
               onError(failure.code);
             },
@@ -197,8 +202,13 @@ export function useVault() {
     );
   }
 
+  /** A refused field keeps the dialog open, so nothing typed is lost. */
+  function refused(code: ErrorCode) {
+    if (code === "InvalidInput") toast.error(t.entry.invalid, { id: "entry-error" });
+    else setError(code);
+  }
+
   function save(entry: NewEntry) {
-    setAdding(false);
     execute(
       Effect.gen(function* () {
         const vault = yield* VaultClient;
@@ -206,7 +216,28 @@ export function useVault() {
 
         return yield* loadSnapshot;
       }),
-      setSnapshot,
+      (next) => {
+        setAdding(false);
+        setSnapshot(next);
+      },
+      true,
+      refused,
+    );
+  }
+
+  /** Adds the accounts in `text`, then confirms how many. */
+  function importOtp(text: string, targets: ReadonlyArray<string | null>, count: number) {
+    execute(
+      Effect.gen(function* () {
+        const vault = yield* VaultClient;
+        yield* vault.importOtp(text, targets);
+
+        return yield* loadSnapshot;
+      }),
+      (next) => {
+        setSnapshot(next);
+        toast.success(t.authenticator.added(count));
+      },
       true,
     );
   }
@@ -217,7 +248,6 @@ export function useVault() {
   }
 
   function update(id: string, entry: EntryUpdate) {
-    setEditing(null);
     execute(
       Effect.gen(function* () {
         const vault = yield* VaultClient;
@@ -225,8 +255,12 @@ export function useVault() {
 
         return yield* loadSnapshot;
       }),
-      setSnapshot,
+      (next) => {
+        setEditing(null);
+        setSnapshot(next);
+      },
       true,
+      refused,
     );
   }
 
@@ -289,6 +323,7 @@ export function useVault() {
     revealed,
     authenticate,
     save,
+    importOtp,
     startEdit,
     stopEdit: () => setEditing(null),
     update,

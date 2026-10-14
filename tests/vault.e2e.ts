@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { once } from "node:events";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -36,6 +37,24 @@ const master = "synthetic-master-password-only";
 const secret = "synthetic-credential-79!";
 
 const changedSecret = "synthetic-credential-changed-80!";
+
+// The RFC 6238 SHA-1 test seed, "12345678901234567890", in Base32.
+const totpKey = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+
+/** The six-digit codes of the RFC 6238 test seed around now, as Cairn groups them. */
+function expectedCodes() {
+  const step = Math.floor(Date.now() / 30_000);
+
+  return [step - 1, step, step + 1].map((counter) => {
+    const message = Buffer.alloc(8);
+    message.writeBigUInt64BE(BigInt(counter));
+    const digest = createHmac("sha1", "12345678901234567890").update(message).digest();
+    const offset = (digest.at(-1) ?? 0) & 0x0f;
+    const code = String((digest.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+
+    return `${code.slice(0, 3)} ${code.slice(3)}`;
+  });
+}
 
 // Optional live smoke test. Normal runs never contact an external website.
 const faviconSite = process.env.CAIRN_TEST_FAVICON_SITE;
@@ -425,6 +444,116 @@ try {
     1,
   );
 
+  // An entry can hold only an authenticator key. Rust keeps the key and the
+  // window shows the current code.
+  await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Nom", { exact: true }).fill("Code seul");
+  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await page.locator("[data-sonner-toast]").filter({ hasText: "Saisis un mot de passe" }).waitFor();
+  await dialog.getByLabel(/^Clé d'authentification/).fill("pas une clé !");
+  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await page.locator("[data-sonner-toast]").filter({ hasText: "Vérifie les champs" }).waitFor();
+  // A refused key keeps the vault unlocked and the form filled.
+  assert.equal(await dialog.getByLabel("Nom", { exact: true }).inputValue(), "Code seul");
+  await dialog.getByLabel(/^Clé d'authentification/).fill(totpKey.toLowerCase());
+  await page.screenshot({ path: path.join(directory, "add-totp.png") });
+  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  // An entry without a password isn't a login, so only the authenticator view lists it.
+  const logins = page.getByRole("complementary", { name: "Liste des identifiants" });
+  assert.equal(await logins.getByRole("button", { name: /Code seul/ }).count(), 0);
+  await page.getByRole("link", { name: /^Authentificateur/ }).click();
+  const codes = page.getByRole("complementary", { name: "Liste des codes" });
+  await codes.getByRole("button", { name: /Code seul/ }).click();
+  await page.getByRole("heading", { name: "Code seul" }).waitFor();
+  await page.getByText("Code d'authentification", { exact: true }).waitFor();
+  const code = page.locator("code").filter({ hasText: /^\d{3} \d{3}$/ });
+  await code.waitFor();
+  assert.ok(expectedCodes().includes((await code.textContent()) ?? ""));
+  await page.screenshot({ path: path.join(directory, "totp.png") });
+  await page.getByRole("button", { name: "Copier le code" }).click();
+  await page
+    .locator("[data-sonner-toast]")
+    .filter({ hasText: /Code copié|Impossible de copier/ })
+    .waitFor();
+
+  // Removing the only key of an entry without a password is refused in the form.
+  await page.getByRole("button", { name: "Modifier", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByRole("checkbox", { name: "Supprimer la clé d'authentification" }).click();
+  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+  await page.locator("[data-sonner-toast]").filter({ hasText: "Saisis un mot de passe" }).waitFor();
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden" });
+
+  // Links add a key to the login named after their issuer, or a new entry.
+  await page.getByRole("button", { name: "Ajouter des codes", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Liens")
+    .fill(
+      [
+        `otpauth://totp/Compte%20modifi%C3%A9:synthetic%40example.com?secret=${totpKey}`,
+        `otpauth://totp/Service%20de%20test:synthetic?secret=${totpKey}&issuer=Service%20de%20test`,
+      ].join("\n"),
+    );
+  await dialog.getByRole("button", { name: "Lire les liens" }).click();
+  await dialog.getByText("2 comptes trouvés.").waitFor();
+  assert.equal(
+    await dialog.getByRole("combobox", { name: /Compte modifié$/ }).textContent(),
+    "Compte modifié",
+  );
+  assert.equal(
+    await dialog.getByRole("combobox", { name: /Service de test$/ }).textContent(),
+    "Nouvelle entrée",
+  );
+  assert.equal(await dialog.getByText(totpKey).count(), 0);
+  await page.screenshot({ path: path.join(directory, "import-totp.png") });
+  await dialog.getByRole("button", { name: "Ajouter 2 codes" }).click();
+  await page.locator("[data-sonner-toast]").filter({ hasText: "2 codes ajoutés." }).waitFor();
+  assert.equal(await codes.getByRole("listitem").count(), 3);
+  await codes.getByRole("button", { name: /Compte modifié/ }).click();
+  await page.getByRole("heading", { name: "Compte modifié" }).waitFor();
+  await page.getByText("Code d'authentification d'un identifiant", { exact: true }).waitFor();
+  await code.waitFor();
+  assert.ok(expectedCodes().includes((await code.textContent()) ?? ""));
+  await page.screenshot({ path: path.join(directory, "authenticator.png") });
+
+  // A picture without a QR code is refused.
+  await page.getByRole("button", { name: "Ajouter des codes", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.locator("input[type=file]").setInputFiles({
+    name: "blank.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGP4DwABAQEAG7buVgAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  });
+  await dialog.getByText("Aucun QR code d'authentification dans cette image.").waitFor();
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden" });
+
+  // Removing the code of an entry that holds only the code deletes the entry.
+  await codes.getByRole("button", { name: /Service de test/ }).click();
+  await page.getByRole("heading", { name: "Service de test" }).waitFor();
+  await page.getByRole("button", { name: "Retirer le code" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByText("ne contient que le code", { exact: false }).waitFor();
+  await dialog.getByRole("button", { name: "Retirer", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await page.waitForFunction(() => !document.body.textContent?.includes("Service de test"));
+  assert.equal(await codes.getByRole("listitem").count(), 2);
+
+  // The login keeps its password next to its new key, and shows the code too.
+  await page.getByRole("link", { name: /^Identifiants/ }).click();
+  await page.getByRole("heading", { name: "Compte modifié" }).waitFor();
+  await code.waitFor();
+  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
+  await page.getByText(changedSecret, { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Masquer le mot de passe" }).click();
+
   await page.clock.install();
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
   await page.getByText(changedSecret, { exact: true }).waitFor();
@@ -432,7 +561,8 @@ try {
   await page.getByText(changedSecret, { exact: true }).waitFor({ state: "hidden" });
   const storage = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
 
-  for (const value of [secret, changedSecret, master, used]) assert.ok(!storage.includes(value));
+  for (const value of [secret, changedSecret, master, used, totpKey])
+    assert.ok(!storage.includes(value));
 
   for (const filename of [file, path.join(directory, "data/backups/previous.cairn")]) {
     const disk = readFileSync(filename, "utf8");
@@ -446,6 +576,8 @@ try {
       "synthetic@example.com",
       "Note privée de test",
       "Note modifiée de test",
+      "Code seul",
+      totpKey,
     ])
       assert.ok(!disk.includes(value));
   }
@@ -462,7 +594,7 @@ try {
   assert.equal(readFileSync(file, "utf8"), "corrupted-test-vault");
   assert.deepEqual(app.errors, []);
   console.log(
-    `Native vault E2E passed: create, save, reveal, edit, password generator, delete, close-to-tray, second-launch restore, lock, wrong password, restart, auto-hide, encrypted storage and corruption. Artifacts: ${directory}`,
+    `Native vault E2E passed: create, save, reveal, edit, password generator, delete, authenticator codes and import, close-to-tray, second-launch restore, lock, wrong password, restart, auto-hide, encrypted storage and corruption. Artifacts: ${directory}`,
   );
 } finally {
   await stopApp(app);

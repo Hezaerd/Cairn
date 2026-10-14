@@ -41,6 +41,10 @@ pub fn run() {
             vault::delete_entry,
             vault::reveal_password,
             vault::generate_password,
+            authenticator::totp_code,
+            authenticator::read_otp,
+            authenticator::import_otp,
+            authenticator::scan_qr,
             bridge::pairing_request,
             bridge::answer_pairing,
             bridge::list_browsers,
@@ -59,6 +63,7 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running Cairn");
 }
+mod authenticator;
 mod bridge;
 mod connector;
 mod favicon;

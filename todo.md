@@ -7,7 +7,9 @@
 - [x] Autofill from the extension.
 - [ ] Import logins from another password manager's CSV export.
 - [ ] Copy a username or password to the clipboard, and clear it automatically.
-- [ ] Password generator.
+- [x] Password generator.
+- [x] Authenticator codes in the desktop app, with Google Authenticator import.
+- [ ] Fill authenticator codes from the extension.
 - [ ] Windows Hello unlock.
 - [ ] Recovery keys.
 - [ ] Sync.
