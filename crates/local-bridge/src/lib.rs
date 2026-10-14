@@ -5,6 +5,7 @@ use std::{
     convert::Infallible,
     future::{Future, poll_fn},
     io,
+    pin::pin,
     task::Poll,
     time::Duration,
 };
@@ -79,16 +80,56 @@ impl BridgeServer {
     }
 }
 
+/// How long a reused instance waits for its previous client's last read.
+const STALE_READ: Duration = Duration::from_millis(500);
+
+/// Waits for the next client on `instance`.
+///
+/// mio keeps a read going in the background and holds its result until it's
+/// read. After a client leaves, that result is the error from its closed pipe,
+/// or arrives once `disconnect` fails a read still in flight, and `disconnect`
+/// doesn't clear it. A reused instance would hand it to the next client as an
+/// immediate end of file. Taking it once the instance listens again makes mio
+/// start a fresh read for the new client. mio starts that read only after the
+/// stale result is taken, so this can't consume the new client's data.
+async fn accept(instance: &NamedPipeServer, reused: bool) -> io::Result<()> {
+    let mut connect = pin!(instance.connect());
+    // The first poll issues ConnectNamedPipe.
+    let connected = poll_fn(|cx| Poll::Ready(connect.as_mut().poll(cx))).await;
+
+    if reused {
+        let _ = timeout(STALE_READ, async {
+            loop {
+                instance.readable().await?;
+                // mio's read buffers are 4 KiB, so one read takes all of a result.
+                match instance.try_read(&mut [0; 4096]) {
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
+                    _ => return io::Result::Ok(()),
+                }
+            }
+        })
+        .await;
+    }
+
+    match connected {
+        Poll::Ready(result) => result,
+        Poll::Pending => connect.await,
+    }
+}
+
 /// Answers connections on one instance, one at a time. Cairn can't create
-/// another instance once the pool is locked, so a failing instance retries
-/// instead of taking the bridge down until restart.
+/// another instance once the pool is locked, so it reuses this one, and a
+/// failing instance retries instead of taking the bridge down until restart.
 async fn serve<H, F>(mut instance: NamedPipeServer, handler: H) -> Infallible
 where
     H: Fn(Request) -> F,
     F: Future<Output = Response>,
 {
+    let mut reused = false;
     loop {
-        match instance.connect().await {
+        let accepted = accept(&instance, reused).await;
+        reused = true;
+        match accepted {
             Ok(()) => {
                 let _ = timeout(Duration::from_millis(1500), async {
                     let bytes = read_frame(&mut instance).await?;
@@ -153,20 +194,32 @@ mod tests {
     use super::*;
     use cairn_protocol::VERSION;
 
-    // Uses the real per-user pipe name, so run it with Cairn closed.
+    // Uses the real per-user pipe name, so run it with Cairn closed. One test,
+    // so parallel tests don't race for the name.
     #[tokio::test]
-    async fn survives_a_client_that_leaves_before_the_accept() {
+    async fn serves_clients_on_every_instance_again_and_again() {
         let server = BridgeServer::bind().expect("bind the pipe; is Cairn running?");
         // ConnectNamedPipe reports ERROR_NO_DATA for this client, which mio
         // treats as connected. The read then fails and the instance is reset.
         drop(security::open_client(&pipe_name().unwrap()).unwrap());
         tokio::spawn(server.run(|request| async move { Response::status(&request, "1.0.0") }));
+        // A client that never asks holds its instance until the server gives up.
+        let silent = security::open_client(&pipe_name().unwrap()).unwrap();
+        tokio::time::sleep(Duration::from_millis(1700)).await;
+        drop(silent);
 
-        let request = Request::GetStatus {
-            version: VERSION,
-            request_id: "test-1".into(),
-        };
-        let response = send(&request).await;
-        assert_eq!(response, Response::status(&request, "1.0.0"));
+        // Each instance answers one client at a time, so this reuses every
+        // instance several times, with clients that leave without asking.
+        for attempt in 0..INSTANCES * 4 {
+            if attempt % 5 == 4 {
+                drop(security::open_client(&pipe_name().unwrap()).unwrap());
+            }
+            let request = Request::GetStatus {
+                version: VERSION,
+                request_id: format!("test-{attempt}"),
+            };
+            let response = send(&request).await;
+            assert_eq!(response, Response::status(&request, "1.0.0"), "request {attempt}");
+        }
     }
 }
