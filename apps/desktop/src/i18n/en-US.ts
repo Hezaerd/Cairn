@@ -115,7 +115,7 @@ export const enUS = {
     colorScheme: "Color scheme",
   },
   language: {
-    system: "Windows language",
+    system: "Computer language",
   },
   theme: {
     light: "Light",
