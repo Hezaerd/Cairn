@@ -14,7 +14,6 @@ import {
 } from "./vault/EntryDialogs";
 import { EntryList, NoSelection, Toolbar, matches } from "./vault/Workspace";
 import { SiteIcon } from "./favicon/SiteIcon";
-import { BrowsersDialog } from "./bridge/Browsers";
 import { Authenticator } from "./authenticator/Authenticator";
 import { OneTimeCode } from "./authenticator/OneTimeCode";
 import { useT } from "./i18n/I18nProvider";
@@ -38,7 +37,6 @@ function Credentials({ vault }: { vault: Vault }) {
   return (
     <>
       <Toolbar vault={vault}>
-        <BrowsersDialog />
         <EntryDialog vault={vault} />
       </Toolbar>
       <div className="grid min-h-0 flex-1 grid-cols-sidebar max-compact:grid-cols-sidebar-narrow">
