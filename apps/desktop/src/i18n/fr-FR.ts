@@ -116,6 +116,7 @@ export const frFR: Messages = {
     languageFailed: "Impossible d'enregistrer la langue.",
     appearance: "Apparence",
     colorScheme: "Jeu de couleurs",
+    updates: "Mises à jour",
   },
   language: {
     system: "Langue de l'ordinateur",
@@ -134,6 +135,21 @@ export const frFR: Messages = {
     install: "Installer",
     downloading: "Téléchargement de la mise à jour…",
     failed: "La mise à jour a échoué.",
+    channel: "Canal de mise à jour",
+    stable: "Stable",
+    nightly: "Nightly",
+    hints: {
+      stable: "Les versions publiées.",
+      nightly: "Une version des derniers changements chaque nuit. Moins testée.",
+    },
+    leaveNightly: "Cette version nightly passera en stable à la prochaine version stable.",
+    current: (version) => `Cairn ${version}`,
+    check: "Rechercher des mises à jour",
+    checking: "Recherche de mises à jour…",
+    upToDate: "Cairn est à jour.",
+    unreachable: "Impossible de joindre le serveur de mises à jour.",
+    notSaved: "Impossible d'enregistrer le canal de mise à jour.",
+    disabled: "Les versions de développement ne se mettent pas à jour.",
   },
   errors: {
     Storage:

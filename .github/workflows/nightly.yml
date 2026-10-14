@@ -1,0 +1,101 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+
+jobs:
+  changes:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.compare.outputs.build }}
+    steps:
+      - name: Compare main with the published nightly
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          published=$(gh api "repos/$GITHUB_REPOSITORY/commits/nightly" --jq .sha 2>/dev/null || true)
+          # A manual run always rebuilds; the schedule skips when main hasn't moved.
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || [ "$published" != "$GITHUB_SHA" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  windows:
+    needs: changes
+    if: needs.changes.outputs.build == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The next patch version keeps a nightly ahead of the stable release it
+      # was built after, and behind the next one.
+      - name: Choose the nightly version
+        id: version
+        shell: pwsh
+        run: |
+          $current = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $core = [version]($current -replace '[-+].*$', '')
+          $stamp = Get-Date -AsUTC -Format yyyyMMddHHmm
+          $version = "$($core.Major).$($core.Minor).$($core.Build + 1)-nightly.$stamp"
+          @{ version = $version; bundle = @{ createUpdaterArtifacts = $true } } |
+            ConvertTo-Json -Depth 3 |
+            Set-Content apps/desktop/src-tauri/tauri.nightly.conf.json
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the signed installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.nightly.conf.json
+
+      # The rolling `nightly` prerelease is replaced on each build. GitHub's
+      # `latest` release skips prereleases, so stable installs never see it.
+      - name: Replace the nightly release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # The Rust cache can bring back older bundles, so pick this version's installer.
+          $installer = Get-Item "target/release/bundle/nsis/*_$($env:VERSION)_*-setup.exe"
+          if (@($installer).Count -ne 1) { throw "Expected one NSIS installer, found $(@($installer).Count)" }
+          $signature = Get-Item "$($installer.FullName).sig"
+          $platform = @{
+            signature = (Get-Content $signature -Raw).Trim()
+            url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/nightly/$($installer.Name)"
+          }
+          @{
+            version = $env:VERSION
+            notes = "Nightly build of $env:GITHUB_SHA."
+            pub_date = Get-Date -AsUTC -Format "yyyy-MM-ddTHH:mm:ssZ"
+            platforms = @{ "windows-x86_64" = $platform; "windows-x86_64-nsis" = $platform }
+          } | ConvertTo-Json -Depth 4 | Set-Content latest.json
+
+          # The first run has no release to delete.
+          gh release delete nightly --cleanup-tag --yes 2>$null
+          gh release create nightly $installer.FullName $signature.FullName latest.json `
+            --prerelease --latest=false --target $env:GITHUB_SHA `
+            --title "Cairn nightly $env:VERSION" `
+            --notes "Built from $env:GITHUB_SHA. Nightly builds aren't tested by hand."

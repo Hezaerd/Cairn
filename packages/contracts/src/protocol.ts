@@ -72,12 +72,64 @@ export const GetLoginRequest = Schema.Struct({
   ...auth,
 });
 
+/** C0 and C1 control characters and DEL, as Rust's `char::is_control` defines them. */
+const isControl = (char: string) => {
+  const code = char.codePointAt(0) ?? 0;
+
+  return code < 0x20 || (code >= 0x7f && code <= 0x9f);
+};
+
+/** Text without control characters, so it can't break a signed message's lines. */
+const Line = Schema.String.check(Schema.makeFilter((value: string) => ![...value].some(isControl)));
+
+/** May be empty, on a page that asks for the password alone. */
+export const Username = Line.check(Schema.isMaxLength(1024));
+
+export const Password = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096));
+
+/** HMAC-SHA256 of a password, keyed with the request's challenge. */
+export const Proof = base64url(32);
+
+export const CheckLoginRequest = Schema.Struct({
+  ...header,
+  type: Schema.Literal("CheckLogin"),
+  origin: Origin,
+  username: Username,
+  proof: Proof,
+  ...auth,
+});
+
+export const SaveLoginRequest = Schema.Struct({
+  ...header,
+  type: Schema.Literal("SaveLogin"),
+  origin: Origin,
+  name: Line.check(
+    Schema.isMaxLength(256),
+    Schema.makeFilter((name: string) => name.trim().length > 0),
+  ),
+  username: Username,
+  password: Password,
+  ...auth,
+});
+
+export const UpdateLoginRequest = Schema.Struct({
+  ...header,
+  type: Schema.Literal("UpdateLogin"),
+  origin: Origin,
+  entryId: EntryId,
+  password: Password,
+  ...auth,
+});
+
 export const Request = Schema.Union([
   StatusRequest,
   ChallengeRequest,
   PairRequest,
   ListLoginsRequest,
   GetLoginRequest,
+  CheckLoginRequest,
+  SaveLoginRequest,
+  UpdateLoginRequest,
 ]);
 
 export type Request = typeof Request.Type;
@@ -122,6 +174,18 @@ export const LoginResponse = Schema.Struct({
   password: Schema.String,
 });
 
+const checkHeader = { ...header, type: Schema.Literal("LoginCheck") };
+
+/** `entry` is the login whose password changed, sent only with `Changed`. */
+export const LoginCheckResponse = Schema.Union([
+  Schema.Struct({ ...checkHeader, result: Schema.Literals(["New", "Known"]) }),
+  Schema.Struct({ ...checkHeader, result: Schema.Literal("Changed"), entry: LoginSummary }),
+]);
+
+export type LoginCheck = typeof LoginCheckResponse.Type;
+
+export const SavedResponse = Schema.Struct({ ...header, type: Schema.Literal("Saved") });
+
 export const ErrorCode = Schema.Literals([
   "InvalidRequest",
   "UnsupportedVersion",
@@ -147,6 +211,8 @@ export const Response = Schema.Union([
   PairingRequestedResponse,
   LoginsResponse,
   LoginResponse,
+  LoginCheckResponse,
+  SavedResponse,
   ErrorResponse,
 ]);
 
@@ -159,6 +225,9 @@ export const replyTypes = {
   Pair: "PairingRequested",
   ListLogins: "Logins",
   GetLogin: "Login",
+  CheckLogin: "LoginCheck",
+  SaveLogin: "Saved",
+  UpdateLogin: "Saved",
 } as const satisfies Record<Request["type"], Response["type"]>;
 
 // Never silently strip unrecognized fields at a process boundary.
@@ -166,15 +235,35 @@ export const decodeRequest = Schema.decodeUnknownSync(Request, { onExcessPropert
 
 export const decodeResponse = Schema.decodeUnknownSync(Response, { onExcessProperty: "error" });
 
-/** The bytes a paired extension signs. Must match `signed_message` in `crates/protocol`. */
-export const signedMessage = (
+type Unsigned<T extends { readonly signature: string }> = Omit<T, "signature">;
+
+/**
+ * The bytes a paired extension signs. Must match `signed_message` in
+ * `crates/protocol`. Only the last field can contain a newline.
+ */
+export function signedMessage(
   request:
-    | Omit<typeof ListLoginsRequest.Type, "signature">
-    | Omit<typeof GetLoginRequest.Type, "signature">,
-) =>
-  request.type === "ListLogins"
-    ? `cairn-bridge-v1\n${request.challenge}\nListLogins\n${request.origin}\n`
-    : `cairn-bridge-v1\n${request.challenge}\nGetLogin\n${request.origin}\n${request.entryId}`;
+    | Unsigned<typeof ListLoginsRequest.Type>
+    | Unsigned<typeof GetLoginRequest.Type>
+    | Unsigned<typeof CheckLoginRequest.Type>
+    | Unsigned<typeof SaveLoginRequest.Type>
+    | Unsigned<typeof UpdateLoginRequest.Type>,
+) {
+  const start = `cairn-bridge-v1\n${request.challenge}\n${request.type}\n${request.origin}\n`;
+
+  switch (request.type) {
+    case "ListLogins":
+      return start;
+    case "GetLogin":
+      return `${start}${request.entryId}`;
+    case "CheckLogin":
+      return `${start}${request.proof}\n${request.username}`;
+    case "SaveLogin":
+      return `${start}${request.name}\n${request.username}\n${request.password}`;
+    case "UpdateLogin":
+      return `${start}${request.entryId}\n${request.password}`;
+  }
+}
 
 export const ClientErrorCode = Schema.Literals([
   ...ErrorCode.literals,
@@ -231,6 +320,10 @@ export const PageRequest = Schema.Union([
   /** The user focused a login field or clicked its icon, so the picker may open. */
   Schema.Struct({ type: Schema.Literal("OpenPicker") }),
   Schema.Struct({ type: Schema.Literal("ClosePicker") }),
+  /** The user submitted a login or sign-up form with these values. */
+  Schema.Struct({ type: Schema.Literal("Submitted"), username: Username, password: Password }),
+  /** The submitted form went away, or a new page shows no login form. */
+  Schema.Struct({ type: Schema.Literal("FormGone") }),
 ]);
 
 export type PageRequest = typeof PageRequest.Type;
@@ -241,12 +334,13 @@ export const decodePageRequest = Schema.decodeUnknownResult(PageRequest, {
 
 /**
  * What the content script may know about the site: whether Cairn has logins
- * for it, never which ones.
+ * for it, never which ones. `Offer` asks it to open the save banner.
  */
 export const PageResult = Schema.Union([
   Schema.Struct({ type: Schema.Literal("Matches") }),
   Schema.Struct({ type: Schema.Literal("Locked") }),
   Schema.Struct({ type: Schema.Literal("None") }),
+  Schema.Struct({ type: Schema.Literal("Offer") }),
 ]);
 
 export type PageResult = typeof PageResult.Type;
@@ -284,5 +378,48 @@ export const PickerResult = Schema.Union([
 export type PickerResult = typeof PickerResult.Type;
 
 export const decodePickerResult = Schema.decodeUnknownSync(PickerResult, {
+  onExcessProperty: "error",
+});
+
+/** Messages from the save banner to the service worker. */
+export const SaveRequest = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("GetOffer") }),
+  Schema.Struct({ type: Schema.Literal("Save"), name: SaveLoginRequest.fields.name }),
+  Schema.Struct({ type: Schema.Literal("Update") }),
+  Schema.Struct({ type: Schema.Literal("Dismiss") }),
+  Schema.Struct({
+    type: Schema.Literal("Resize"),
+    height: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: MAX_PICKER_HEIGHT })),
+  }),
+]);
+
+export type SaveRequest = typeof SaveRequest.Type;
+
+export const decodeSaveRequest = Schema.decodeUnknownResult(SaveRequest, {
+  onExcessProperty: "error",
+});
+
+/**
+ * `New` offers to save a login, `Changed` to update the password of the
+ * login named `name`. `Known` means there's nothing to save.
+ */
+export const SaveResult = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("New"), host: Schema.String, username: Schema.String }),
+  Schema.Struct({
+    type: Schema.Literal("Changed"),
+    host: Schema.String,
+    username: Schema.String,
+    name: Schema.String,
+  }),
+  Schema.Struct({ type: Schema.Literal("Known") }),
+  Schema.Struct({ type: Schema.Literal("Locked") }),
+  Schema.Struct({ type: Schema.Literal("Unavailable"), code: ClientErrorCode }),
+  Schema.Struct({ type: Schema.Literal("Saved") }),
+  Schema.Struct({ type: Schema.Literal("Done") }),
+]);
+
+export type SaveResult = typeof SaveResult.Type;
+
+export const decodeSaveResult = Schema.decodeUnknownSync(SaveResult, {
   onExcessProperty: "error",
 });

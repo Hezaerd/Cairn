@@ -113,6 +113,7 @@ export const enUS = {
     languageFailed: "Couldn't save the language.",
     appearance: "Appearance",
     colorScheme: "Color scheme",
+    updates: "Updates",
   },
   language: {
     system: "Computer language",
@@ -131,6 +132,21 @@ export const enUS = {
     install: "Install",
     downloading: "Downloading the update…",
     failed: "The update failed.",
+    channel: "Release channel",
+    stable: "Stable",
+    nightly: "Nightly",
+    hints: {
+      stable: "Published releases.",
+      nightly: "A build of the latest changes every night. Less tested.",
+    },
+    leaveNightly: "This nightly build moves to stable at the next stable release.",
+    current: (version: string) => `Cairn ${version}`,
+    check: "Check for updates",
+    checking: "Checking for updates…",
+    upToDate: "Cairn is up to date.",
+    unreachable: "Couldn't reach the update server.",
+    notSaved: "Couldn't save the release channel.",
+    disabled: "Development builds don't update.",
   },
   errors: {
     Storage:

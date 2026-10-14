@@ -29,6 +29,34 @@ export const base64url = (bytes: Uint8Array) =>
     .replaceAll("/", "_")
     .replace(/=+$/, "");
 
+const fromBase64url = (value: string) =>
+  Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), (char) =>
+    char.charCodeAt(0),
+  );
+
+/**
+ * HMAC-SHA256 of a password, keyed with a challenge. Lets Cairn tell whether
+ * it holds the password without receiving it. Must match `proves` in the
+ * desktop app.
+ */
+export const passwordProof = (challenge: string, password: string) =>
+  Effect.tryPromise({
+    try: async () => {
+      const key = await crypto.subtle.importKey(
+        "raw",
+        fromBase64url(challenge),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"],
+      );
+
+      return base64url(
+        new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(password))),
+      );
+    },
+    catch: keyError,
+  });
+
 /** Eight digits from the key's SHA-256. Must match `pairing_code` in the desktop app. */
 export function pairingCode(digest: Uint8Array) {
   const value = new DataView(digest.buffer, digest.byteOffset, 4).getUint32(0) % 100_000_000;

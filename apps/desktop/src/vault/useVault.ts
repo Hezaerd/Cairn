@@ -111,6 +111,42 @@ export function useVault() {
       });
   }
 
+  // The browser saved a login. Reload the list without touching what the
+  // window is doing; a lock or another operation since then wins.
+  useEffect(() => {
+    let disposed = false;
+
+    const subscription = listen("vault-changed", () => {
+      const current = epoch.current;
+
+      void runtime
+        .runPromise(
+          Effect.gen(function* () {
+            const vault = yield* VaultClient;
+
+            return yield* vault.list;
+          }),
+        )
+        .then(
+          (entries) => {
+            if (!disposed && epoch.current === current)
+              setSnapshot((snapshot) =>
+                snapshot.status === "unlocked" ? { ...snapshot, entries } : snapshot,
+              );
+          },
+          () => {},
+        );
+    });
+
+    return () => {
+      disposed = true;
+      void subscription.then(
+        (unlisten) => unlisten(),
+        () => {},
+      );
+    };
+  }, [runtime]);
+
   useEffect(() => {
     let disposed = false;
 
