@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "pnpm routes:generate && tsc --noEmit && vite build",
+    "build:release": "pnpm routes:generate && tsc --noEmit && vite build --mode release",
     "typecheck": "pnpm routes:generate && tsc --noEmit",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "lint:fix": "oxlint --config ../../.oxlintrc.json --fix .",

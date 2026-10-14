@@ -98,8 +98,10 @@ jobs:
             throw "TAURI_CLI_VERSION is $env:TAURI_CLI_VERSION but pnpm-lock.yaml has @tauri-apps/cli $installed"
           }
 
+      # The release config bundles the extension and native host; the nightly
+      # config only sets the version.
       - name: Build the unsigned installer
-        run: pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.nightly.conf.json
+        run: pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.release.conf.json --config src-tauri/tauri.nightly.conf.json
 
       # The Rust cache can bring back older bundles, so pick this version's installer.
       - name: Find the installer
