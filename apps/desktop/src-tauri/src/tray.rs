@@ -1,4 +1,4 @@
-use crate::locale::Locale;
+use crate::locale::{Languages, Locale};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -8,6 +8,24 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+
+/// The menu items whose labels follow the language chosen in the settings.
+struct Items([MenuItem<tauri::Wry>; 3]);
+
+fn labels(locale: Locale) -> [&'static str; 3] {
+    match locale {
+        Locale::EnUs => ["Open Cairn", "Lock vault", "Quit"],
+        Locale::FrFr => ["Ouvrir Cairn", "Verrouiller le coffre", "Quitter"],
+    }
+}
+
+pub fn translate(app: &tauri::AppHandle, locale: Locale) {
+    if let Some(items) = app.try_state::<Items>() {
+        for (item, label) in items.0.iter().zip(labels(locale)) {
+            let _ = item.set_text(label);
+        }
+    }
+}
 
 #[derive(Default, Clone)]
 pub(crate) struct Hidden(Arc<AtomicBool>);
@@ -54,14 +72,12 @@ pub fn hide(app: &tauri::AppHandle) {
 
 pub fn setup(app: &tauri::App) -> tauri::Result<()> {
     app.manage(Hidden::default());
-    let (open, lock, quit) = match *app.state::<Locale>() {
-        Locale::EnUs => ("Open Cairn", "Lock vault", "Quit"),
-        Locale::FrFr => ("Ouvrir Cairn", "Verrouiller le coffre", "Quitter"),
-    };
+    let [open, lock, quit] = labels(app.state::<Languages>().language().locale);
     let open = MenuItem::with_id(app, "open", open, true, None::<&str>)?;
     let lock = MenuItem::with_id(app, "lock", lock, true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", quit, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &lock, &quit])?;
+    app.manage(Items([open, lock, quit]));
     let mut tray = TrayIconBuilder::with_id("cairn")
         .tooltip("Cairn")
         .menu(&menu)
