@@ -426,5 +426,411 @@
       "type": "Error",
       "code": "NotPaired"
     }
+  },
+  {
+    "name": "check login",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "check login without a username",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "check login with a plain password",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "password": "synthetic-password"
+    }
+  },
+  {
+    "name": "check login with a short proof",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "check login with a newline in the username",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me\n@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "save login",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "SaveLogin",
+      "origin": "https://example.com",
+      "name": "example.com",
+      "username": "me@example.com",
+      "password": "synthetic\npassword",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "save login without a name",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "SaveLogin",
+      "origin": "https://example.com",
+      "name": "  ",
+      "username": "me@example.com",
+      "password": "synthetic\npassword",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "save login with a newline in the name",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "SaveLogin",
+      "origin": "https://example.com",
+      "name": "a\nb",
+      "username": "me@example.com",
+      "password": "synthetic\npassword",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "save login without a password",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "SaveLogin",
+      "origin": "https://example.com",
+      "name": "example.com",
+      "username": "me@example.com",
+      "password": "",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "save login with notes",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "SaveLogin",
+      "origin": "https://example.com",
+      "name": "example.com",
+      "username": "me@example.com",
+      "password": "synthetic\npassword",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "notes": "not on the bridge"
+    }
+  },
+  {
+    "name": "update login",
+    "kind": "request",
+    "valid": true,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "UpdateLogin",
+      "origin": "https://example.com",
+      "entryId": "0123456789abcdef0123456789abcdef",
+      "password": "synthetic-password",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "update login with a bad entry id",
+    "kind": "request",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "UpdateLogin",
+      "origin": "https://example.com",
+      "entryId": "../vault",
+      "password": "synthetic-password",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "new login",
+    "kind": "response",
+    "valid": true,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "LoginCheck",
+      "result": "New"
+    }
+  },
+  {
+    "name": "known login",
+    "kind": "response",
+    "valid": true,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "LoginCheck",
+      "result": "Known"
+    }
+  },
+  {
+    "name": "changed login",
+    "kind": "response",
+    "valid": true,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "LoginCheck",
+      "result": "Changed",
+      "entry": {
+        "id": "0123456789abcdef0123456789abcdef",
+        "name": "Example",
+        "username": "me@example.com"
+      }
+    }
+  },
+  {
+    "name": "changed login without its entry",
+    "kind": "response",
+    "valid": false,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "LoginCheck",
+      "result": "Changed"
+    }
+  },
+  {
+    "name": "new login with an entry",
+    "kind": "response",
+    "valid": false,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "LoginCheck",
+      "result": "New",
+      "entry": {
+        "id": "0123456789abcdef0123456789abcdef",
+        "name": "Example",
+        "username": "me@example.com"
+      }
+    }
+  },
+  {
+    "name": "check with a password",
+    "kind": "response",
+    "valid": false,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "LoginCheck",
+      "result": "Known",
+      "password": "x"
+    }
+  },
+  {
+    "name": "saved",
+    "kind": "response",
+    "valid": true,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "SaveLogin",
+      "origin": "https://example.com",
+      "name": "example.com",
+      "username": "me@example.com",
+      "password": "synthetic\npassword",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Saved"
+    }
+  },
+  {
+    "name": "updated",
+    "kind": "response",
+    "valid": true,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "UpdateLogin",
+      "origin": "https://example.com",
+      "entryId": "0123456789abcdef0123456789abcdef",
+      "password": "synthetic-password",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Saved"
+    }
+  },
+  {
+    "name": "saved for another request",
+    "kind": "response",
+    "valid": false,
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "CheckLogin",
+      "origin": "https://example.com",
+      "username": "me@example.com",
+      "proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "clientId": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Saved"
+    }
   }
 ]

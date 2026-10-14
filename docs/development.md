@@ -119,7 +119,7 @@ pnpm --filter @cairn/desktop tauri build --debug --no-bundle
 pnpm test:autofill
 ```
 
-It covers pairing and its code, refusal before approval, listing only the logins for the tab's site, filling, refusing another site's login, a page without a form, a locked vault, and removing a paired browser. For suggestions, it covers the picker opening on focus, the badge, refusing clicks on a transparent picker, filling from the picker, reopening and Escape, sign-up forms, and a site without logins. A browser under automation can't click the toolbar button that grants `activeTab` or accept a permission prompt, so the test loads a copy of the extension with host access to `127.0.0.1` instead, which stands in for both. It saves screenshots of the popup, the picker, and the app next to its data under `.local`.
+It covers pairing and its code, refusal before approval, listing only the logins for the tab's site, filling, refusing another site's login, a page without a form, a locked vault, and removing a paired browser. For suggestions, it covers the picker opening on focus, the badge, refusing clicks on a transparent picker, filling from the picker, reopening and Escape, sign-up forms, and a site without logins. For saving, it covers the banner after a login on a new site, refusing clicks on a transparent banner, saving under a chosen name and the app showing it, no offer for a known login, a filled login, or a failed login, updating a changed password, a sign-up form, and Not now. A browser under automation can't click the toolbar button that grants `activeTab` or accept a permission prompt, so the test loads a copy of the extension with host access to `127.0.0.1` instead, which stands in for both. It saves screenshots of the popup, the picker, the save banner, and the app next to its data under `.local`.
 
 ### Helium end-to-end
 
@@ -160,9 +160,26 @@ Pushing a `v*` tag runs `.github/workflows/release.yml` on a Windows runner. It 
 
 3. Install the draft's installer, check it, then publish the release.
 
-At launch, release builds check for an update and offer it in a notification. Debug builds skip the check, so the end-to-end tests stay offline.
+### Nightly builds
 
-Installed copies only see a release once it's published and marked latest: the updater reads `https://github.com/Hezaerd/Cairn/releases/latest/download/latest.json`, which needs the repository to be public.
+`.github/workflows/nightly.yml` builds `main` every day at 03:00 UTC, and skips the build when `main` hasn't changed since the last nightly. Run it by hand from the Actions tab to build right away. It replaces a single prerelease tagged `nightly` with the new installer, its `.sig`, and a `latest.json` it writes itself.
+
+A nightly takes the next patch version with a timestamp, such as `0.1.1-nightly.202610130300` after `0.1.0`. That keeps it newer than the stable release it was built after and older than the next one.
+
+### Update channels
+
+Settings → General → Updates picks the channel and checks on demand. At launch, release builds also check and offer an update in a notification. Debug builds never check, so the end-to-end tests stay offline.
+
+| Channel | Manifest                                                                 |
+| ------- | ------------------------------------------------------------------------ |
+| Stable  | `https://github.com/Hezaerd/Cairn/releases/latest/download/latest.json`  |
+| Nightly | `https://github.com/Hezaerd/Cairn/releases/download/nightly/latest.json` |
+
+The URLs are fixed in `src-tauri/src/updater.rs`; the UI only sends a channel name. The choice is saved in `update-channel` next to the vault. Without it, a stable build starts on stable and a nightly build on nightly.
+
+Stable installs only see a release once it's published and marked latest. GitHub never marks a prerelease as latest, so the nightly never reaches them. Both manifests need the repository to be public.
+
+Updates never go back in version. Switching from nightly to stable keeps the nightly until a newer stable release comes out, so a vault a nightly touched isn't opened by an older Cairn.
 
 The installer isn't Authenticode-signed. SmartScreen warns on the first manual install (More info → Run anyway). Updates are protected by the updater signature instead: the app only installs an update whose `.sig` matches the public key in `tauri.conf.json`.
 

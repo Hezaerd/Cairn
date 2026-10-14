@@ -6,17 +6,22 @@ import {
   decodePageRequest,
   decodePickerRequest,
   decodePopupRequest,
+  decodeSaveRequest,
   type PageRequest,
   type PageResult,
   type PickerRequest,
   type PickerResult,
   type PopupRequest,
   type PopupResult,
+  type SaveRequest,
+  type SaveResult,
 } from "@cairn/contracts";
 import { CairnClientError } from "@cairn/contracts/errors";
 import { fillTab, tellPage } from "./fill";
+import { forget, forgetSaved, offer, offered, save, shouldOffer, submitted } from "./saving";
 import {
   closePicker,
+  forgetLogins,
   injectOpenTabs,
   openPicker,
   pickerOrigin,
@@ -24,6 +29,9 @@ import {
   suggestionsAllowed,
   syncContentScript,
 } from "./suggestions";
+
+/** How long the banner shows that a login was saved. */
+const SAVED_NOTICE_MS = 1_500;
 
 // Each request owns a short-lived native connection. Only the pairing key
 // persists, in IndexedDB; credentials never leave this worker except into the
@@ -154,6 +162,24 @@ const handlePage = (request: PageRequest, tabId: number, url: URL) =>
         return { type: "None" };
       }),
     ),
+    // Saving is part of suggestions: without them, the page's typing stays there.
+    Match.when({ type: "Submitted" }, ({ username, password }) =>
+      Effect.promise(async (): Promise<PageResult> => {
+        if (await suggestionsAllowed(url)) submitted(tabId, url.origin, { username, password });
+
+        return { type: "None" };
+      }),
+    ),
+    Match.when({ type: "FormGone" }, () =>
+      Effect.gen(function* () {
+        if (!(yield* Effect.promise(() => suggestionsAllowed(url))))
+          return { type: "None" } satisfies PageResult;
+
+        const offering = yield* shouldOffer(tabId, url.origin);
+
+        return { type: offering ? "Offer" : "None" } satisfies PageResult;
+      }),
+    ),
     Match.exhaustive,
   );
 
@@ -195,6 +221,52 @@ const handlePicker = (request: PickerRequest, tabId: number, origin: string) =>
     Match.when({ type: "Resize" }, ({ height }) =>
       Effect.promise(async (): Promise<PickerResult> => {
         await tellPage(tabId, { type: "ResizePicker", height });
+
+        return { type: "Done" };
+      }),
+    ),
+    Match.exhaustive,
+  );
+
+const lockedOr = <A>(program: Effect.Effect<A, CairnClientError, CairnClient>) =>
+  program.pipe(
+    Effect.catchIf(
+      (error) => error.code === "VaultLocked",
+      (): Effect.Effect<SaveResult> => Effect.succeed({ type: "Locked" }),
+    ),
+  );
+
+/** Closes the banner, after a moment to read that the login was saved. */
+const saved = (tabId: number) =>
+  Effect.sync((): SaveResult => {
+    forgetLogins(tabId);
+
+    setTimeout(() => {
+      forgetSaved(tabId);
+      void tellPage(tabId, { type: "CloseSave" });
+    }, SAVED_NOTICE_MS);
+
+    return { type: "Saved" };
+  });
+
+const handleSave = (request: SaveRequest, tabId: number) =>
+  Match.value(request).pipe(
+    Match.when({ type: "GetOffer" }, () => lockedOr(offer(tabId))),
+    Match.when({ type: "Save" }, ({ name }) =>
+      lockedOr(save(tabId, name.trim()).pipe(Effect.andThen(saved(tabId)))),
+    ),
+    Match.when({ type: "Update" }, () => lockedOr(save(tabId).pipe(Effect.andThen(saved(tabId))))),
+    Match.when({ type: "Dismiss" }, () =>
+      Effect.promise(async (): Promise<SaveResult> => {
+        forget(tabId);
+        await tellPage(tabId, { type: "CloseSave" });
+
+        return { type: "Done" };
+      }),
+    ),
+    Match.when({ type: "Resize" }, ({ height }) =>
+      Effect.promise(async (): Promise<SaveResult> => {
+        await tellPage(tabId, { type: "ResizeSave", height });
 
         return { type: "Done" };
       }),
@@ -270,6 +342,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return reply(
       handlePicker(request.success, site.tabId, site.origin),
       (code): PickerResult => ({ type: "Unavailable", code }),
+      sendResponse,
+    );
+  }
+
+  // The save banner gets an answer only on the page it was offered on. A page
+  // can frame the banner itself, but then it gets nothing.
+  if (extensionPage.pathname === "/save.html") {
+    const request = decodeSaveRequest(message);
+    const tabId = sender.tab?.id;
+
+    if (Result.isFailure(request)) return false;
+
+    if (tabId === undefined || !offered(tabId, website(sender.tab?.url)?.origin)) {
+      // A banner whose offer expired can still close.
+      if (tabId !== undefined && request.success.type === "Dismiss")
+        void tellPage(tabId, { type: "CloseSave" });
+
+      sendResponse({ type: "Unavailable", code: "Unauthorized" } satisfies SaveResult);
+
+      return false;
+    }
+
+    return reply(
+      handleSave(request.success, tabId),
+      (code): SaveResult => ({ type: "Unavailable", code }),
       sendResponse,
     );
   }

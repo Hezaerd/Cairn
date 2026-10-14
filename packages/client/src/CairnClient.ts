@@ -2,13 +2,14 @@ import { Context, Effect, Layer, Option } from "effect";
 import {
   PROTOCOL_VERSION,
   signedMessage,
+  type LoginCheck,
   type LoginSummary,
   type Request,
   type Response,
   type StatusResponse,
 } from "@cairn/contracts";
 import { CairnClientError } from "@cairn/contracts/errors";
-import { BrowserKey, type KeyPair } from "./BrowserKey";
+import { BrowserKey, passwordProof, type KeyPair } from "./BrowserKey";
 import { NativeTransport } from "./NativeTransport";
 
 export interface Credential {
@@ -31,6 +32,21 @@ export class CairnClient extends Context.Service<
       origin: string,
       entryId: string,
     ) => Effect.Effect<Credential, CairnClientError>;
+    /** Whether Cairn holds a login typed into a page. The password doesn't leave the browser. */
+    readonly checkLogin: (
+      origin: string,
+      login: Credential,
+    ) => Effect.Effect<LoginCheck, CairnClientError>;
+    readonly saveLogin: (
+      origin: string,
+      name: string,
+      login: Credential,
+    ) => Effect.Effect<void, CairnClientError>;
+    readonly updateLogin: (
+      origin: string,
+      entryId: string,
+      password: string,
+    ) => Effect.Effect<void, CairnClientError>;
   }
 >()("cairn/CairnClient") {}
 
@@ -118,6 +134,57 @@ export const CairnClientLive = Layer.effect(
           const reply = yield* send({ ...unsigned, signature }, "Login");
 
           return { username: reply.username, password: reply.password };
+        }),
+      checkLogin: (origin, login) =>
+        Effect.gen(function* () {
+          const key = yield* requireKey;
+          const challenge = yield* auth(key);
+
+          const unsigned = {
+            ...header(),
+            type: "CheckLogin" as const,
+            origin,
+            username: login.username,
+            proof: yield* passwordProof(challenge.challenge, login.password),
+            ...challenge,
+          };
+
+          const signature = yield* key.sign(signedMessage(unsigned));
+
+          return yield* send({ ...unsigned, signature }, "LoginCheck");
+        }),
+      saveLogin: (origin, name, login) =>
+        Effect.gen(function* () {
+          const key = yield* requireKey;
+
+          const unsigned = {
+            ...header(),
+            type: "SaveLogin" as const,
+            origin,
+            name,
+            username: login.username,
+            password: login.password,
+            ...(yield* auth(key)),
+          };
+
+          const signature = yield* key.sign(signedMessage(unsigned));
+          yield* send({ ...unsigned, signature }, "Saved");
+        }),
+      updateLogin: (origin, entryId, password) =>
+        Effect.gen(function* () {
+          const key = yield* requireKey;
+
+          const unsigned = {
+            ...header(),
+            type: "UpdateLogin" as const,
+            origin,
+            entryId,
+            password,
+            ...(yield* auth(key)),
+          };
+
+          const signature = yield* key.sign(signedMessage(unsigned));
+          yield* send({ ...unsigned, signature }, "Saved");
         }),
     });
   }),
