@@ -13,6 +13,7 @@ export const enUS = {
     namePlaceholder: "e.g. Personal GitHub",
     site: "Site",
     sitePlaceholder: "https://example.com",
+    siteHint: "Filled on this exact site. Write *.example.com to include its subdomains.",
     username: "Username",
     password: "Password",
     keepPassword: "leave empty to keep it",
