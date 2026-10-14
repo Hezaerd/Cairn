@@ -1,5 +1,11 @@
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
-import { ArrowLeft, Palette, Settings as SettingsIcon, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  Palette,
+  Puzzle,
+  Settings as SettingsIcon,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -31,6 +37,10 @@ function Settings() {
           <Link to="/settings/appearance" className={sectionLink}>
             <Palette size={16} />
             {t.settings.appearance}
+          </Link>
+          <Link to="/settings/extension" className={sectionLink}>
+            <Puzzle size={16} />
+            {t.settings.extension}
           </Link>
         </nav>
         <div className="min-h-0 overflow-y-auto">

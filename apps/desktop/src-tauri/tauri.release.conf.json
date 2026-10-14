@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBuildCommand": "pnpm build && pnpm -w build:connector"
+  },
+  "bundle": {
+    "resources": {
+      "../../../target/release/cairn-native-host.exe": "cairn-native-host.exe",
+      "../../../target/connector/cairn-native-host.json": "cairn-native-host.json",
+      "../../../target/connector/extension/": "extension/"
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/connector.nsh"
+      }
+    }
+  }
+}
