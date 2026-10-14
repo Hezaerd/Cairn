@@ -69,6 +69,34 @@ const pages = new Map([
       <input type="password" id="confirm" autocomplete="new-password">
     </form>`,
   ],
+  // Submitting these loads a page without a form, as a successful login does.
+  [
+    "/account",
+    `<!doctype html><title>Account</title><form method="post" action="/welcome">
+      <input type="text" id="user" autocomplete="username">
+      <input type="password" id="pass" autocomplete="current-password">
+      <button id="go">Log in</button>
+    </form>`,
+  ],
+  [
+    "/register",
+    `<!doctype html><title>Register</title><form method="post" action="/welcome">
+      <input type="text" id="name" autocomplete="name">
+      <input type="email" id="user" autocomplete="email">
+      <input type="password" id="pass" autocomplete="new-password">
+      <input type="password" id="confirm" autocomplete="new-password">
+      <button id="go">Sign up</button>
+    </form>`,
+  ],
+  // A failed login shows the form again.
+  [
+    "/retry",
+    `<!doctype html><title>Retry</title><form method="post" action="/retry">
+      <input type="text" id="user" autocomplete="username">
+      <input type="password" id="pass" autocomplete="current-password">
+      <button id="go">Log in</button>
+    </form>`,
+  ],
 ]);
 
 /** Login pages on 127.0.0.1. The extension sees one as `http://127.0.0.1:<port>`. */
@@ -216,6 +244,55 @@ async function picker(page: Page): Promise<Frame> {
 async function assertNoPicker(page: Page, message: string) {
   await page.waitForTimeout(1_500);
   assert.equal(pickerOf(page), undefined, message);
+}
+
+interface Entry {
+  readonly id: string;
+  readonly name: string;
+  readonly site: string;
+  readonly username: string;
+}
+
+const bannerOf = (page: Page) => page.frames().find((frame) => frame.url().endsWith("/save.html"));
+
+/** The save banner in `page`, once it opens. */
+async function banner(page: Page): Promise<Frame> {
+  for (let poll = 0; poll < 60; poll++) {
+    const frame = bannerOf(page);
+
+    if (frame) return frame;
+
+    await page.waitForTimeout(100);
+  }
+
+  throw new Error("The save banner didn't open");
+}
+
+/** Waits long enough for the banner to have opened, then checks it didn't. */
+async function assertNoBanner(page: Page, message: string) {
+  await page.waitForTimeout(2_500);
+  assert.equal(bannerOf(page), undefined, message);
+}
+
+/** Waits for the banner to close by itself. */
+async function bannerClosed(page: Page) {
+  for (let poll = 0; poll < 50 && bannerOf(page); poll++) await page.waitForTimeout(100);
+
+  assert.equal(bannerOf(page), undefined, "The banner closes");
+}
+
+/** Types a login into `path` on the other site and submits it with the button. */
+async function submitLogin(path: string, username: string, password: string) {
+  const page = await open(`http://127.0.0.1:${otherPort}${path}`);
+  await page.fill("#user", username);
+  await page.fill("#pass", password);
+
+  if (await page.locator("#confirm").count()) await page.fill("#confirm", password);
+
+  await page.click("#go");
+  await page.waitForLoadState();
+
+  return page;
 }
 
 /** Styles the overlay's host element, which a page can reach. */
@@ -403,6 +480,90 @@ try {
   await assertNoPicker(other, "No picker on a site without logins");
   assert.equal(await badge(popup, await tabId(popup, `http://127.0.0.1:${otherPort}/login`)), "");
   console.log("Site without logins shows nothing: OK");
+
+  // Saving: a login typed on a site Cairn doesn't know is offered once the
+  // form goes away.
+  const otherOrigin = `http://127.0.0.1:${otherPort}`;
+  const typed = "synthetic-typed-81!";
+  const changed = "synthetic-changed-81!";
+
+  const listEntries = (): Promise<ReadonlyArray<Entry>> =>
+    // SAFETY: Tauri injects its IPC bridge into the app's own WebView.
+    app.evaluate(() => (window as any).__TAURI_INTERNALS__.invoke("list_entries"));
+
+  let welcome = await submitLogin("/account", "new@example.com", typed);
+  let offer = await banner(welcome);
+  await offer.getByText("Enregistrer cet identifiant dans Cairn ?").waitFor();
+  await offer.getByText("new@example.com").waitFor();
+  const name = offer.getByLabel("Nom");
+  assert.equal(await name.inputValue(), `127.0.0.1:${otherPort}`);
+  assert.ok(
+    !(await offer.locator("body").innerText()).includes(typed),
+    "The banner hides the password",
+  );
+  await welcome.screenshot({ path: path.join(directory, "page-save.png") });
+
+  // A banner the page made transparent ignores clicks.
+  await styleOverlay(welcome, "0.2");
+  await welcome.waitForTimeout(600);
+  await offer.getByRole("button", { name: "Enregistrer" }).click();
+  await welcome.waitForTimeout(800);
+  assert.equal((await listEntries()).length, 2, "A transparent banner must not save");
+  await styleOverlay(welcome, null);
+  await welcome.waitForTimeout(600);
+
+  await name.fill("Site enregistré");
+  await offer.getByRole("button", { name: "Enregistrer" }).click();
+  await offer.getByText("Enregistré dans Cairn.").waitFor();
+  await bannerClosed(welcome);
+  await app.getByRole("complementary").getByText("Site enregistré", { exact: true }).waitFor();
+  const savedEntry = (await listEntries()).find((entry) => entry.name === "Site enregistré");
+  assert.deepEqual(
+    { site: savedEntry?.site, username: savedEntry?.username },
+    { site: otherOrigin, username: "new@example.com" },
+  );
+  console.log("New login saved from the banner, and the app's list shows it: OK");
+
+  welcome = await submitLogin("/account", "new@example.com", typed);
+  await assertNoBanner(welcome, "A login Cairn holds isn't offered");
+  console.log("Known login isn't offered: OK");
+
+  welcome = await submitLogin("/account", " New@Example.com ", changed);
+  offer = await banner(welcome);
+  await offer.getByText("Mettre à jour ce mot de passe dans Cairn ?").waitFor();
+  await offer.getByText("Site enregistré").waitFor();
+  await welcome.waitForTimeout(600);
+  await offer.getByRole("button", { name: "Mettre à jour" }).click();
+  await offer.getByText("Enregistré dans Cairn.").waitFor();
+  await bannerClosed(welcome);
+  assert.equal((await listEntries()).length, 3, "Updating doesn't add a login");
+
+  const account = await open(`${otherOrigin}/account`);
+  const accountTab = await tabId(popup, `${otherOrigin}/account`);
+  assert.deepEqual(
+    await popupMessage(popup, { type: "Fill", tabId: accountTab, entryId: savedEntry!.id }),
+    { type: "Filled" },
+  );
+  assert.equal(await account.inputValue("#pass"), changed);
+  console.log("Changed password offered as an update, and saved: OK");
+
+  // Submitting what Cairn filled offers nothing.
+  await account.click("#go");
+  await account.waitForLoadState();
+  await assertNoBanner(account, "A login Cairn filled isn't offered");
+  console.log("Filled login isn't offered: OK");
+
+  welcome = await submitLogin("/retry", "retry@example.com", typed);
+  await assertNoBanner(welcome, "A login whose form comes back isn't offered");
+  console.log("Failed login isn't offered: OK");
+
+  welcome = await submitLogin("/register", "signup@example.com", typed);
+  offer = await banner(welcome);
+  await offer.getByText("signup@example.com").waitFor();
+  await offer.getByRole("button", { name: "Plus tard" }).click();
+  await bannerClosed(welcome);
+  assert.equal((await listEntries()).length, 3, "Not now saves nothing");
+  console.log("Sign-up offered, Not now closes it: OK");
 
   // Locking the vault stops the extension.
   await app.getByRole("button", { name: "Verrouiller", exact: true }).click();

@@ -12,4 +12,6 @@ export type PageCommand =
       readonly password: string;
     }
   | { readonly type: "ClosePicker"; readonly refocus: boolean }
-  | { readonly type: "ResizePicker"; readonly height: number };
+  | { readonly type: "ResizePicker"; readonly height: number }
+  | { readonly type: "CloseSave" }
+  | { readonly type: "ResizeSave"; readonly height: number };

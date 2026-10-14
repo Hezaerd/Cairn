@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Result } from "effect";
-import { decodeRequest, decodeResponse, decodePopupRequest } from "@cairn/contracts";
+import { decodeRequest, decodeResponse, decodePopupRequest, replyTypes } from "@cairn/contracts";
 
 const cases = JSON.parse(
   readFileSync(new URL("./fixtures/protocol/cases.json", import.meta.url), "utf8"),
@@ -37,7 +37,18 @@ for (const fixture of cases) {
   test(`protocol: ${fixture.name}`, () => {
     const decode = fixture.kind === "request" ? decodeRequest : decodeResponse;
 
-    if (fixture.valid) assert.deepEqual(decode(fixture.message), fixture.message);
-    else assert.throws(() => decode(fixture.message));
+    // A reply must also have a type its request accepts.
+    const answers = () => {
+      const decoded = decode(fixture.message);
+      const request = fixture.request ? decodeRequest(fixture.request) : undefined;
+
+      if (request && decoded.type !== "Error" && decoded.type !== replyTypes[request.type])
+        throw new Error(`${decoded.type} doesn't answer ${request.type}`);
+
+      return decoded;
+    };
+
+    if (fixture.valid) assert.deepEqual(answers(), fixture.message);
+    else assert.throws(answers);
   });
 }

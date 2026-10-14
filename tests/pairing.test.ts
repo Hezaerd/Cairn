@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Effect } from "effect";
-import { base64url, generateKeys, keyPair, pairingCode } from "@cairn/client/BrowserKey";
+import {
+  base64url,
+  generateKeys,
+  keyPair,
+  pairingCode,
+  passwordProof,
+} from "@cairn/client/BrowserKey";
 import { signedMessage } from "@cairn/contracts";
 
 // Made by WebCrypto; the desktop app's auth tests verify the same file in Rust.
@@ -49,6 +55,51 @@ test("signed messages match the bytes the app checks", async () => {
       decode(fixture.signature),
       new TextEncoder().encode(fixture.message),
     ),
+  );
+});
+
+test("password proofs match the HMAC the app checks", async () => {
+  // The desktop app's saving tests verify the same file in Rust.
+  const proof = JSON.parse(
+    readFileSync(new URL("./fixtures/protocol/proof.json", import.meta.url), "utf8"),
+  );
+
+  assert.equal(
+    await Effect.runPromise(passwordProof(proof.challenge, proof.password)),
+    proof.proof,
+  );
+  assert.notEqual(
+    await Effect.runPromise(passwordProof(proof.challenge, `${proof.password}!`)),
+    proof.proof,
+  );
+});
+
+test("save requests sign every field", () => {
+  const auth = { version: 1 as const, requestId: "test-1", clientId: fixture.clientId };
+  const challenge = "A".repeat(43);
+
+  assert.equal(
+    signedMessage({
+      ...auth,
+      challenge,
+      type: "SaveLogin",
+      origin: "https://example.com",
+      name: "Example",
+      username: "me",
+      password: "pass\nword",
+    }),
+    `cairn-bridge-v1\n${challenge}\nSaveLogin\nhttps://example.com\nExample\nme\npass\nword`,
+  );
+  assert.equal(
+    signedMessage({
+      ...auth,
+      challenge,
+      type: "CheckLogin",
+      origin: "https://example.com",
+      username: "me",
+      proof: "B".repeat(43),
+    }),
+    `cairn-bridge-v1\n${challenge}\nCheckLogin\nhttps://example.com\n${"B".repeat(43)}\nme`,
   );
 });
 

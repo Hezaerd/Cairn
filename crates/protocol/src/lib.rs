@@ -42,6 +42,43 @@ pub enum Request {
         challenge: String,
         signature: String,
     },
+    /// Asks whether the vault already holds a login typed into a page.
+    /// `proof` is an HMAC-SHA256 of the password keyed with the challenge, so
+    /// the password itself doesn't cross the bridge before the user agrees to
+    /// save it.
+    CheckLogin {
+        version: u8,
+        request_id: String,
+        origin: String,
+        username: String,
+        proof: String,
+        client_id: String,
+        challenge: String,
+        signature: String,
+    },
+    /// Saves a new login for `origin`, after the user agreed in the browser.
+    SaveLogin {
+        version: u8,
+        request_id: String,
+        origin: String,
+        name: String,
+        username: String,
+        password: Zeroizing<String>,
+        client_id: String,
+        challenge: String,
+        signature: String,
+    },
+    /// Replaces the password of a login for `origin`.
+    UpdateLogin {
+        version: u8,
+        request_id: String,
+        origin: String,
+        entry_id: String,
+        password: Zeroizing<String>,
+        client_id: String,
+        challenge: String,
+        signature: String,
+    },
 }
 
 /// The proof attached to an authenticated request.
@@ -73,6 +110,17 @@ pub struct LoginSummary {
     pub username: String,
 }
 
+/// What the vault knows about a login typed into a page.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+pub enum CheckResult {
+    /// No login for the site has this username.
+    New,
+    /// A login for the site has this username and password.
+    Known,
+    /// A login for the site has this username with another password.
+    Changed,
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type", deny_unknown_fields, rename_all_fields = "camelCase")]
 pub enum Response {
@@ -98,6 +146,18 @@ pub enum Response {
         request_id: String,
         username: String,
         password: Zeroizing<String>,
+    },
+    /// `entry` is the login whose password changed, sent only with `Changed`.
+    LoginCheck {
+        version: u8,
+        request_id: String,
+        result: CheckResult,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        entry: Option<LoginSummary>,
+    },
+    Saved {
+        version: u8,
+        request_id: String,
     },
     Error {
         version: u8,
@@ -127,6 +187,7 @@ pub const PUBLIC_KEY_BYTES: usize = 65;
 pub const CLIENT_ID_BYTES: usize = 32;
 pub const CHALLENGE_BYTES: usize = 32;
 pub const SIGNATURE_BYTES: usize = 64;
+pub const PROOF_BYTES: usize = 32;
 
 impl Request {
     pub fn version(&self) -> u8 {
@@ -135,7 +196,10 @@ impl Request {
             | Self::GetChallenge { version, .. }
             | Self::Pair { version, .. }
             | Self::ListLogins { version, .. }
-            | Self::GetLogin { version, .. } => *version,
+            | Self::GetLogin { version, .. }
+            | Self::CheckLogin { version, .. }
+            | Self::SaveLogin { version, .. }
+            | Self::UpdateLogin { version, .. } => *version,
         }
     }
 
@@ -145,7 +209,10 @@ impl Request {
             | Self::GetChallenge { request_id, .. }
             | Self::Pair { request_id, .. }
             | Self::ListLogins { request_id, .. }
-            | Self::GetLogin { request_id, .. } => request_id,
+            | Self::GetLogin { request_id, .. }
+            | Self::CheckLogin { request_id, .. }
+            | Self::SaveLogin { request_id, .. }
+            | Self::UpdateLogin { request_id, .. } => request_id,
         }
     }
 
@@ -163,11 +230,37 @@ impl Request {
             Self::ListLogins { origin, .. } => valid_origin(origin),
             Self::GetLogin {
                 origin, entry_id, ..
+            } => valid_origin(origin) && valid_entry_id(entry_id),
+            Self::CheckLogin {
+                origin,
+                username,
+                proof,
+                ..
             } => {
                 valid_origin(origin)
-                    && entry_id.len() == 32
-                    && entry_id.bytes().all(|b| b.is_ascii_hexdigit())
+                    && valid_username(username)
+                    && valid_base64url(proof, PROOF_BYTES)
             }
+            Self::SaveLogin {
+                origin,
+                name,
+                username,
+                password,
+                ..
+            } => {
+                valid_origin(origin)
+                    && !name.trim().is_empty()
+                    && name.len() <= 256
+                    && !name.chars().any(char::is_control)
+                    && valid_username(username)
+                    && valid_password(password)
+            }
+            Self::UpdateLogin {
+                origin,
+                entry_id,
+                password,
+                ..
+            } => valid_origin(origin) && valid_entry_id(entry_id) && valid_password(password),
         };
         let auth = self.auth().is_none_or(|auth| {
             valid_base64url(auth.client_id, CLIENT_ID_BYTES)
@@ -190,6 +283,24 @@ impl Request {
                 challenge,
                 signature,
                 ..
+            }
+            | Self::CheckLogin {
+                client_id,
+                challenge,
+                signature,
+                ..
+            }
+            | Self::SaveLogin {
+                client_id,
+                challenge,
+                signature,
+                ..
+            }
+            | Self::UpdateLogin {
+                client_id,
+                challenge,
+                signature,
+                ..
             } => Some(Auth {
                 client_id,
                 challenge,
@@ -208,8 +319,21 @@ fn valid_origin(origin: &str) -> bool {
         && origin.bytes().all(|b| b.is_ascii_graphic())
 }
 
-/// The exact bytes a client signs for an authenticated operation. Fields
-/// can't contain newlines, so the encoding is unambiguous.
+fn valid_entry_id(entry_id: &str) -> bool {
+    entry_id.len() == 32 && entry_id.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// A username may be empty, on a page that asks for the password alone.
+fn valid_username(username: &str) -> bool {
+    username.len() <= 1024 && !username.chars().any(char::is_control)
+}
+
+fn valid_password(password: &str) -> bool {
+    !password.is_empty() && password.len() <= 4096
+}
+
+/// The exact bytes a client signs for an authenticated operation. Only the
+/// last field can contain a newline, so the encoding is unambiguous.
 pub fn signed_message(request: &Request) -> Option<String> {
     match request {
         Request::ListLogins {
@@ -224,6 +348,36 @@ pub fn signed_message(request: &Request) -> Option<String> {
             ..
         } => Some(format!(
             "cairn-bridge-v1\n{challenge}\nGetLogin\n{origin}\n{entry_id}"
+        )),
+        Request::CheckLogin {
+            origin,
+            username,
+            proof,
+            challenge,
+            ..
+        } => Some(format!(
+            "cairn-bridge-v1\n{challenge}\nCheckLogin\n{origin}\n{proof}\n{username}"
+        )),
+        Request::SaveLogin {
+            origin,
+            name,
+            username,
+            password,
+            challenge,
+            ..
+        } => Some(format!(
+            "cairn-bridge-v1\n{challenge}\nSaveLogin\n{origin}\n{name}\n{username}\n{}",
+            password.as_str()
+        )),
+        Request::UpdateLogin {
+            origin,
+            entry_id,
+            password,
+            challenge,
+            ..
+        } => Some(format!(
+            "cairn-bridge-v1\n{challenge}\nUpdateLogin\n{origin}\n{entry_id}\n{}",
+            password.as_str()
         )),
         _ => None,
     }
@@ -292,7 +446,27 @@ impl Response {
                     ..
                 },
                 Request::GetLogin { .. },
+            )
+            | (
+                Self::Saved {
+                    version,
+                    request_id,
+                },
+                Request::SaveLogin { .. } | Request::UpdateLogin { .. },
             ) => *version == VERSION && request_id == id,
+            (
+                Self::LoginCheck {
+                    version,
+                    request_id,
+                    result,
+                    entry,
+                },
+                Request::CheckLogin { .. },
+            ) => {
+                *version == VERSION
+                    && request_id == id
+                    && (*result == CheckResult::Changed) == entry.is_some()
+            }
             (
                 Self::Error {
                     version,
@@ -398,6 +572,27 @@ mod tests {
             message.ends_with("\nGetLogin\nhttps://example.com\n0123456789abcdef0123456789abcdef")
         );
     }
+    #[test]
+    fn saving_signs_every_field() {
+        let auth = r#""clientId":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","challenge":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","signature":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA""#;
+        let message = |fields: &str| {
+            let bytes = format!(r#"{{"version":1,"requestId":"r-1",{fields},{auth}}}"#);
+            signed_message(&parse_request(bytes.as_bytes()).unwrap()).unwrap()
+        };
+        assert!(
+            message(r#""type":"CheckLogin","origin":"https://example.com","username":"me","proof":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA""#)
+                .ends_with("\nCheckLogin\nhttps://example.com\nBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBA\nme")
+        );
+        assert!(
+            message(r#""type":"SaveLogin","origin":"https://example.com","name":"Example","username":"me","password":"pass\nword""#)
+                .ends_with("\nSaveLogin\nhttps://example.com\nExample\nme\npass\nword")
+        );
+        assert!(
+            message(r#""type":"UpdateLogin","origin":"https://example.com","entryId":"0123456789abcdef0123456789abcdef","password":"new""#)
+                .ends_with("\nUpdateLogin\nhttps://example.com\n0123456789abcdef0123456789abcdef\nnew")
+        );
+    }
+
     #[test]
     fn shared_fixtures() {
         let fixtures: serde_json::Value =

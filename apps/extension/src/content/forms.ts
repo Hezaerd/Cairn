@@ -12,6 +12,24 @@ const isUsernameType = (input: HTMLInputElement) =>
   usernameTypes.includes(input.getAttribute("type")?.toLowerCase() ?? "");
 
 /**
+ * The username field for `password` among `inputs`: one before it that says
+ * it wants a username, or else the last text field before it. Without a
+ * password field, only a field that says it wants a username counts.
+ */
+function usernameIn(inputs: ReadonlyArray<HTMLInputElement>, password?: HTMLInputElement) {
+  const candidates = inputs.filter(
+    (input) =>
+      isUsernameType(input) &&
+      (!password || input.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING),
+  );
+
+  return (
+    candidates.find((input) => /username|email/i.test(input.autocomplete)) ??
+    (password ? candidates.at(-1) : candidates.find((input) => input.type === "email"))
+  );
+}
+
+/**
  * The login fields among the inputs of one form, or of the inputs outside any
  * form. Null when there are none, or when the form looks like a sign-up or a
  * password change: two password fields, or one that asks for a new password.
@@ -22,17 +40,7 @@ function loginIn(inputs: ReadonlyArray<HTMLInputElement>): LoginFields | null {
   if (passwords.length > 1 || passwords[0]?.autocomplete === "new-password") return null;
 
   const password = passwords[0];
-
-  const candidates = inputs.filter(
-    (input) =>
-      isUsernameType(input) &&
-      (!password || input.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING),
-  );
-
-  // Without a password field, only a field that says it wants a username counts.
-  const username =
-    candidates.find((input) => /username|email/i.test(input.autocomplete)) ??
-    (password ? candidates.at(-1) : candidates.find((input) => input.type === "email"));
+  const username = usernameIn(inputs, password);
 
   return password || username ? { username, password } : null;
 }
@@ -69,6 +77,34 @@ export function loginFields(anchor?: HTMLInputElement): LoginFields | null {
   const found = groups().flatMap((group) => loginIn(group) ?? []);
 
   return found.find((fields) => fields.password) ?? found[0] ?? null;
+}
+
+export interface Submission {
+  readonly username: HTMLInputElement | undefined;
+  readonly password: HTMLInputElement;
+}
+
+/**
+ * The credentials in the form that `target` submits: a login form, or a
+ * sign-up form whose two password fields match. Null for a password change,
+ * where they differ, and for a form without a filled password field.
+ */
+export function submission(target: Element): Submission | null {
+  const form =
+    target instanceof HTMLFormElement
+      ? target
+      : target instanceof HTMLInputElement || target instanceof HTMLButtonElement
+        ? target.form
+        : target.closest("form");
+
+  const inputs = groups().find((group) => group[0]?.form === form) ?? [];
+  const passwords = inputs.filter((input) => input.type === "password" && input.value);
+  const [password, confirm] = passwords;
+
+  if (!password || passwords.length > 2 || (confirm && confirm.value !== password.value))
+    return null;
+
+  return { username: usernameIn(inputs, password), password };
 }
 
 // Assigning through the prototype setter, then dispatching events, lets

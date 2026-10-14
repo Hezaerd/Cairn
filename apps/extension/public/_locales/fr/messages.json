@@ -38,7 +38,16 @@
   "noForm": { "message": "Aucun formulaire de connexion trouvé sur cette page." },
   "suggestions": { "message": "Proposer les identifiants dans les champs de connexion" },
   "suggestionsDetail": {
-    "message": "Affiche tes identifiants quand tu cliques dans un champ de connexion. Demande l’accès aux sites que tu visites."
+    "message": "Affiche tes identifiants quand tu cliques dans un champ de connexion, et propose d’enregistrer ceux que tu saisis. Demande l’accès aux sites que tu visites."
   },
-  "pickerIcon": { "message": "Remplir avec Cairn" }
+  "pickerIcon": { "message": "Remplir avec Cairn" },
+  "saveTitle": { "message": "Enregistrer cet identifiant dans Cairn ?" },
+  "updateTitle": { "message": "Mettre à jour ce mot de passe dans Cairn ?" },
+  "saveName": { "message": "Nom" },
+  "save": { "message": "Enregistrer" },
+  "update": { "message": "Mettre à jour" },
+  "notNow": { "message": "Plus tard" },
+  "saved": { "message": "Enregistré dans Cairn." },
+  "saveLocked": { "message": "Déverrouille Cairn pour enregistrer cet identifiant." },
+  "saveExpired": { "message": "Cet identifiant n’attend plus d’être enregistré." }
 }
