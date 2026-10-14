@@ -8,6 +8,12 @@ popup -> service worker -> native host (stdio) -> desktop app (named pipe)
 
 The service worker accepts messages from its popup, its picker and save frames, and its content script in a page's top frame. Each request opens its own native connection. Credentials go from the app to the service worker and into the page being filled, or from a page's form to the service worker and, once you choose to save them, to the app. Nothing else in the extension sees them, and nothing is saved in browser storage except the pairing key.
 
+## Installation
+
+The installer puts the native host, its manifest, and the release extension in `%LOCALAPPDATA%\Cairn`, and registers the host as `com.hezaerd.cairn` under `HKCU\Software\Chromium\NativeMessagingHosts`. Load the `extension` folder there once per Helium profile: **Settings → Browser extension** in Cairn shows the folder and the steps. The release extension's manifest carries a public key, so its ID is always `kidgkbpjficoclfmfidbipkjdkiikklb`, and the host's manifest allows only that origin.
+
+Dev builds of the extension connect to `com.hezaerd.cairn.dev` instead, which the dev scripts register for the folder-derived ID ([development](development.md#browser-extension)). Either host reaches whichever Cairn is running, because the pipe belongs to the Windows user.
+
 ## Using it
 
 1. Open the popup and choose **Pair with Cairn**. The popup shows an eight-digit code, and Cairn comes to the front with the same code. Approve it there if the codes match.
