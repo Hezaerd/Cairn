@@ -6,13 +6,14 @@ The extension reaches the desktop app in two hops:
 popup -> service worker -> native host (stdio) -> desktop app (named pipe)
 ```
 
-The service worker only accepts messages from its own popup. Each popup request opens its own native connection. Credentials go from the app to the service worker and into the page being filled; nothing else in the extension sees them, and nothing is saved in browser storage except the pairing key.
+The service worker accepts messages from its popup, its picker frame, and its content script in a page's top frame. Each request opens its own native connection. Credentials go from the app to the service worker and into the page being filled; nothing else in the extension sees them, and nothing is saved in browser storage except the pairing key.
 
 ## Using it
 
 1. Open the popup and choose **Pair with Cairn**. The popup shows an eight-digit code, and Cairn comes to the front with the same code. Approve it there if the codes match.
 2. On a website, open the popup. It lists the logins whose site matches the tab. Click one to fill the username and password into the page.
-3. **Paired browsers** (the globe button in Cairn's header) lists the paired browsers. Removing one revokes it; the extension then shows the pairing code again.
+3. To get suggestions in login fields, turn on **Suggest logins in login fields** in the popup and allow access to websites. Focusing a login field on a site with saved logins then opens a list under it; click one to fill it. A Cairn icon in the field opens the list too, and the toolbar badge shows how many logins the site has.
+4. **Paired browsers** (the globe button in Cairn's header) lists the paired browsers. Removing one revokes it; the extension then shows the pairing code again.
 
 The popup needs Cairn running with the vault unlocked. The vault locks when Cairn goes to the tray, so the popup asks you to unlock Cairn instead. Pairing needs the vault unlocked too, because the list of paired browsers is encrypted with the vault key.
 
@@ -20,7 +21,17 @@ The popup needs Cairn running with the vault unlocked. The vault locks when Cair
 
 A login matches a tab when they share the scheme and port, and the tab's host is the login's host or one of its subdomains. A leading `www.` on the stored site is ignored. A site saved without a scheme means `https`, so a login is offered to a plain `http` page only if its site says `http://`. IP addresses must match exactly.
 
-The fill script checks that the tab is still on the origin it was asked for, then fills the first visible password field and the username field before it in the same form. On a page that asks for the username alone, it fills a field marked `autocomplete="username"` or `type="email"`. It doesn't submit the form.
+The content script fills the login, after checking that the tab is still on the origin it was asked for. It fills the form whose field opened the picker, or else the first form with a visible password field: that password field and the username field before it in the same form. On a page that asks for the username alone, it fills a field marked `autocomplete="username"` or `type="email"`. It skips sign-up and password-change forms, with two password fields or one marked `new-password`. It doesn't submit the form.
+
+## Suggestions
+
+Suggestions need the optional `https://*/*` and `http://*/*` permissions. Once they're granted, the service worker registers the content script for every site and injects it into tabs already open; it unregisters the script when they're removed. The script runs in the top frame only.
+
+- The content script looks for a login form at load and when the page changes. When it finds one, it asks the service worker whether Cairn has logins for the page. The answer is only yes, locked, or no; the address comes from Chromium, not from the page.
+- The service worker keeps the names and usernames of each tab's logins in memory for a minute, never in browser storage, and sets the badge to their count. A tab that leaves the site loses them.
+- With logins, the field gets a Cairn icon and focusing it opens the picker. With a locked vault, the icon opens the picker, which asks you to unlock Cairn. Otherwise nothing shows.
+- The icon and the picker live in a closed shadow root. The picker is `picker.html`, a frame the page can't read. Only trusted focus, click, and key events open it, and the service worker answers a picker only after the tab's content script opened it for that site.
+- Escape, a click elsewhere, or a fill closes the picker. Focusing the same field doesn't reopen it; clicking it does.
 
 ## Pairing and authorization
 
@@ -63,11 +74,13 @@ The desktop app is the only pipe server.
 
 ## Extension permissions
 
-The extension asks for `nativeMessaging`, `activeTab`, and `scripting`, and no website permissions. `activeTab` lets it read the address of the tab you opened the popup on, and inject the fill script there, only after you click its toolbar button.
+The extension asks for `nativeMessaging`, `activeTab`, and `scripting`. `activeTab` lets it read the address of the tab you opened the popup on, and inject the content script there, only after you click its toolbar button. Access to websites is optional and only needed for suggestions. `picker.html` is the only web-accessible resource, behind a per-session dynamic URL.
 
 ## Limits
 
 - Software running as your Windows user can reach the pipe. Without the pairing key, it gets only the status and challenges. With the vault unlocked, it can also ask for a pairing, which you have to approve in Cairn.
 - The pairing key is in the browser profile on disk. Software that can read that profile and drive WebCrypto in the extension's context, or that reads the browser's memory, can use the key while the vault is unlocked. Nothing on a desktop protects an unlocked vault from malware running as you.
-- A popup click is the only approval for a fill. Cairn doesn't ask again.
+- A click in the popup or the picker is the only approval for a fill. Cairn doesn't ask again.
+- The page owns the picker's host element, so it can cover the picker, make it transparent, or move it under the pointer. The picker ignores clicks unless Chromium reports it fully visible for 400 ms. A script running on the login's own site, through XSS for example, can still read a filled password field.
+- A page sees the icon in its own DOM, so it learns that you have a login for it.
 - The password crosses the native host and the service worker in memory, and the page receives it in its input field. Strings in JavaScript can't be wiped.

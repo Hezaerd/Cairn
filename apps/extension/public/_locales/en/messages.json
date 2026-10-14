@@ -35,5 +35,10 @@
     "placeholders": { "host": { "content": "$1" } }
   },
   "noUsername": { "message": "No username" },
-  "noForm": { "message": "No login form found on this page." }
+  "noForm": { "message": "No login form found on this page." },
+  "suggestions": { "message": "Suggest logins in login fields" },
+  "suggestionsDetail": {
+    "message": "Shows your logins when you click a login field. Needs access to the websites you visit."
+  },
+  "pickerIcon": { "message": "Fill with Cairn" }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Effect } from "effect";
 import { decodePopupResult, type PopupRequest, type PopupResult } from "@cairn/contracts";
+import { SITES } from "../sites";
 import { t } from "./i18n";
 
 type State = { type: "Loading" } | PopupResult;
@@ -134,10 +135,51 @@ export default function App() {
           )}
         </section>
       )}
+      {(state.type === "Logins" || state.type === "NoSite" || state.type === "Locked") && (
+        <SuggestionsToggle />
+      )}
       {state.type !== "Filled" && state.type !== "NoForm" && (
         <footer>{t("appVersion", state.appVersion)}</footer>
       )}
     </main>
+  );
+}
+
+/**
+ * Turns suggestions in login fields on or off. They need access to every
+ * website, which Chromium asks the user for.
+ */
+function SuggestionsToggle() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void chrome.permissions.contains({ origins: SITES }).then(setEnabled);
+  }, []);
+
+  async function toggle(on: boolean) {
+    const changed = await (
+      on
+        ? chrome.permissions.request({ origins: SITES })
+        : chrome.permissions.remove({ origins: SITES })
+    ).catch(() => false);
+
+    if (changed) setEnabled(on);
+  }
+
+  if (enabled === null) return null;
+
+  return (
+    <label className="toggle">
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(event) => void toggle(event.target.checked)}
+      />
+      <span>
+        {t("suggestions")}
+        <small>{t("suggestionsDetail")}</small>
+      </span>
+    </label>
   );
 }
 
