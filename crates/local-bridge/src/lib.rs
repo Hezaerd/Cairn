@@ -66,9 +66,14 @@ impl BridgeServer {
                 .acquire_owned()
                 .await
                 .map_err(io::Error::other)?;
-            self.listener.connect().await?;
-            // Keep an instance alive while creating the next listener.
-            let next = create_server(&self.name, false)?;
+            if let Err(error) = self.listener.connect().await {
+                // A failed accept breaks only this instance. Replace it and keep
+                // serving instead of taking the bridge down until restart.
+                eprintln!("Cairn bridge: connection failed: {error}");
+                self.listener = self.next_listener().await;
+                continue;
+            }
+            let next = self.next_listener().await;
             let mut connection = std::mem::replace(&mut self.listener, next);
             let handler = handler.clone();
             tokio::spawn(async move {
@@ -83,6 +88,21 @@ impl BridgeServer {
                 })
                 .await;
             });
+        }
+    }
+
+    /// Creates another instance of the pipe, retrying until Windows allows it.
+    /// The caller still holds the current instance, so no other process can
+    /// claim the pipe name in between.
+    async fn next_listener(&self) -> NamedPipeServer {
+        loop {
+            match create_server(&self.name, false) {
+                Ok(listener) => return listener,
+                Err(error) => {
+                    eprintln!("Cairn bridge: cannot create pipe instance: {error}");
+                    tokio::time::sleep(Duration::from_millis(250)).await;
+                }
+            }
         }
     }
 }
@@ -119,5 +139,28 @@ pub async fn send(request: &Request) -> Response {
         Ok(Ok(response)) => response,
         Ok(Err(code)) => Response::error(Some(request.id().into()), code),
         Err(_) => Response::error(Some(request.id().into()), ErrorCode::RequestTimeout),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cairn_protocol::VERSION;
+
+    // Uses the real per-user pipe name, so run it with Cairn closed.
+    #[tokio::test]
+    async fn survives_a_client_that_leaves_before_the_accept() {
+        let server = BridgeServer::bind().expect("bind the pipe; is Cairn running?");
+        // ConnectNamedPipe reports ERROR_NO_DATA for this client, which mio
+        // treats as connected. The read then fails inside the connection task.
+        drop(ClientOptions::new().open(pipe_name().unwrap()).unwrap());
+        tokio::spawn(server.run(|request| async move { Response::status(&request, "1.0.0") }));
+
+        let request = Request::GetStatus {
+            version: VERSION,
+            request_id: "test-1".into(),
+        };
+        let response = send(&request).await;
+        assert_eq!(response, Response::status(&request, "1.0.0"));
     }
 }
