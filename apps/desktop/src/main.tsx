@@ -7,14 +7,13 @@ import { FaviconServiceLive } from "./favicon/FaviconService";
 import { BrowserServiceLive } from "./bridge/BrowserService";
 import { VaultClientLive } from "./vault/VaultClientLive";
 import { VaultRuntime } from "./vault/runtime";
-import { ThemeProvider } from "./theme/ThemeProvider";
-import { applyTheme, storedTheme } from "./theme/theme";
+import { followTheme } from "./theme/follow";
 import { I18nProvider } from "./i18n/I18nProvider";
 import { loadLanguage, messages } from "./i18n/locale";
 import { checkForUpdateOnLaunch } from "./updater/updates";
 
 // Set the theme class before the first render so the window never flashes the wrong palette.
-applyTheme(storedTheme());
+const stopTheme = followTheme();
 
 const vaultRuntime = ManagedRuntime.make(
   Layer.mergeAll(VaultClientLive, FaviconServiceLive, BrowserServiceLive),
@@ -22,6 +21,7 @@ const vaultRuntime = ManagedRuntime.make(
 
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
+    stopTheme();
     void vaultRuntime.dispose();
   });
 
@@ -36,11 +36,9 @@ void Effect.runPromise(loadLanguage).then((language) => {
   ReactDOM.createRoot(root).render(
     <React.StrictMode>
       <I18nProvider initial={language}>
-        <ThemeProvider>
-          <VaultRuntime.Provider value={vaultRuntime}>
-            <RouterProvider router={router} />
-          </VaultRuntime.Provider>
-        </ThemeProvider>
+        <VaultRuntime.Provider value={vaultRuntime}>
+          <RouterProvider router={router} />
+        </VaultRuntime.Provider>
       </I18nProvider>
     </React.StrictMode>,
   );

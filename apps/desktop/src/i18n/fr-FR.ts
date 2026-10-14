@@ -180,7 +180,7 @@ export const frFR: Messages = {
   settings: {
     open: "Paramètres",
     title: "Paramètres",
-    back: "Retour aux identifiants",
+    back: "Retour au coffre",
     sections: "Sections des paramètres",
     general: "Général",
     language: "Langue",
