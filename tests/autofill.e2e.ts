@@ -692,7 +692,20 @@ try {
   const browsers = app.getByRole("dialog", { name: "Navigateurs associés" });
   await browsers.waitFor();
   await app.screenshot({ path: path.join(directory, "desktop-browsers.png") });
-  await browsers.getByRole("button", { name: /^Retirer / }).click();
+
+  // A name you give shows instead of the browser's own, and Escape only leaves the field.
+  await browsers.getByRole("button", { name: /^Renommer / }).click();
+  await browsers.getByLabel("Nom du navigateur").fill("Profil de test");
+  await app.keyboard.press("Escape");
+  await browsers.getByRole("button", { name: /^Renommer / }).waitFor();
+  await browsers.getByRole("button", { name: /^Renommer / }).click();
+  await browsers.getByLabel("Nom du navigateur").fill("Profil de test");
+  await browsers.getByLabel("Nom du navigateur").press("Enter");
+  await browsers.getByText("Profil de test", { exact: true }).waitFor();
+  await app.screenshot({ path: path.join(directory, "desktop-browsers-renamed.png") });
+  console.log("Renaming a browser: OK");
+
+  await browsers.getByRole("button", { name: "Retirer Profil de test" }).click();
   await browsers.getByText("Aucun navigateur associé.", { exact: false }).waitFor();
   await app.keyboard.press("Escape");
   assert.equal((await popupMessage(popup, { type: "GetState", tabId: loginTab })).type, "Pairing");

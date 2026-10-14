@@ -1,8 +1,8 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, type FormEvent } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Effect, Option, Schema } from "effect";
 import { toast } from "sonner";
-import { Globe, Trash2 } from "lucide-react";
+import { Check, Globe, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,10 +13,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useT } from "../i18n/I18nProvider";
 import { VaultRuntime } from "../vault/runtime";
 import type { VaultError } from "../vault/VaultClient";
-import { BrowserService, PairingRequest, type PairedBrowser } from "./BrowserService";
+import { BrowserService, PairingRequest, browserName, type PairedBrowser } from "./BrowserService";
 
 function useBrowsers() {
   const runtime = useContext(VaultRuntime);
@@ -117,15 +118,41 @@ export function PairingDialog() {
   );
 }
 
-/** Lists paired browsers so you can remove one. */
+/** Lists paired browsers so you can name or remove one. */
 export function BrowsersDialog() {
   const t = useT();
   const run = useBrowsers();
   const [browsers, setBrowsers] = useState<ReadonlyArray<PairedBrowser> | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
 
   const load = Effect.gen(function* () {
     return yield* (yield* BrowserService).list;
   });
+
+  function rename(event: FormEvent<HTMLFormElement>, browser: PairedBrowser) {
+    event.preventDefault();
+
+    const label = Schema.decodeUnknownSync(Schema.String)(
+      new FormData(event.currentTarget).get("label"),
+    );
+
+    setEditing(null);
+
+    if (label.trim() === browserName(browser)) return;
+
+    run(
+      Effect.gen(function* () {
+        const service = yield* BrowserService;
+        yield* service.rename(browser.id, label);
+
+        return yield* service.list;
+      }),
+      (list) => {
+        setBrowsers(list);
+        toast.success(t.browsers.renamed);
+      },
+    );
+  }
 
   function remove(browser: PairedBrowser) {
     run(
@@ -137,7 +164,7 @@ export function BrowsersDialog() {
       }),
       (list) => {
         setBrowsers(list);
-        toast.success(t.browsers.removed(browser.name));
+        toast.success(t.browsers.removed(browserName(browser)));
       },
     );
   }
@@ -145,14 +172,26 @@ export function BrowsersDialog() {
   return (
     <Dialog
       open={browsers !== null}
-      onOpenChange={(open) => (open ? run(load, setBrowsers) : setBrowsers(null))}
+      onOpenChange={(open) => {
+        setEditing(null);
+
+        if (open) run(load, setBrowsers);
+        else setBrowsers(null);
+      }}
     >
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon-sm" aria-label={t.browsers.open} title={t.browsers.open}>
           <Globe />
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        onEscapeKeyDown={(event) => {
+          // Escape leaves the name field before it closes the dialog.
+          if (editing === null) return;
+          event.preventDefault();
+          setEditing(null);
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t.browsers.title}</DialogTitle>
           <DialogDescription>{t.browsers.description}</DialogDescription>
@@ -161,26 +200,82 @@ export function BrowsersDialog() {
           <p className="text-xs text-muted-foreground">{t.browsers.empty}</p>
         ) : (
           <ul className="grid gap-1">
-            {browsers?.map((browser) => (
-              <li key={browser.id} className="flex items-center gap-3 rounded-md border px-3 py-2">
-                <Globe size={16} className="shrink-0 text-muted-foreground" />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <strong className="truncate text-xs font-semibold">{browser.name}</strong>
-                  <span className="text-[11px] text-muted-foreground">
-                    {t.browsers.pairedOn(new Date(browser.pairedAt * 1000))}
-                  </span>
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t.browsers.remove(browser.name)}
-                  title={t.browsers.remove(browser.name)}
-                  onClick={() => remove(browser)}
+            {browsers?.map((browser) => {
+              const name = browserName(browser);
+
+              return (
+                <li
+                  key={browser.id}
+                  className="flex items-center gap-3 rounded-md border px-3 py-2"
                 >
-                  <Trash2 />
-                </Button>
-              </li>
-            ))}
+                  <Globe size={16} className="shrink-0 text-muted-foreground" />
+                  {editing === browser.id ? (
+                    <form
+                      className="flex min-w-0 flex-1 items-center gap-1"
+                      onSubmit={(event) => rename(event, browser)}
+                    >
+                      <Input
+                        name="label"
+                        aria-label={t.browsers.renameLabel}
+                        defaultValue={name}
+                        placeholder={browser.name}
+                        maxLength={256}
+                        autoFocus
+                        onFocus={(event) => event.currentTarget.select()}
+                        className="h-8 text-xs md:text-xs"
+                      />
+                      <Button
+                        type="submit"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t.browsers.saveName}
+                        title={t.browsers.saveName}
+                      >
+                        <Check />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t.browsers.cancelRename}
+                        title={t.browsers.cancelRename}
+                        onClick={() => setEditing(null)}
+                      >
+                        <X />
+                      </Button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <strong className="truncate text-xs font-semibold">{name}</strong>
+                        <span className="truncate text-[11px] text-muted-foreground">
+                          {browser.label !== null && `${browser.name} · `}
+                          {t.browsers.pairedOn(new Date(browser.pairedAt * 1000))}
+                        </span>
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t.browsers.rename(name)}
+                        title={t.browsers.rename(name)}
+                        onClick={() => setEditing(browser.id)}
+                      >
+                        <Pencil />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t.browsers.remove(name)}
+                        title={t.browsers.remove(name)}
+                        onClick={() => remove(browser)}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </DialogContent>

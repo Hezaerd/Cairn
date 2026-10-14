@@ -14,6 +14,9 @@ const PREFIX: &[u8] = b"CAIRN-BROWSERS-1";
 pub(super) struct PairedBrowser {
     id: String,
     name: String,
+    /// The name you gave it in Cairn, shown instead of `name`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
     public_key: String,
     paired_at: u64,
 }
@@ -23,6 +26,7 @@ pub(super) struct PairedBrowser {
 pub struct BrowserSummary {
     pub id: String,
     pub name: String,
+    pub label: Option<String>,
     pub paired_at: u64,
 }
 
@@ -103,6 +107,7 @@ impl Vault {
             .map(|browser| BrowserSummary {
                 id: browser.id.clone(),
                 name: browser.name.clone(),
+                label: browser.label.clone(),
                 paired_at: browser.paired_at,
             })
             .collect())
@@ -117,7 +122,8 @@ impl Vault {
             .map(|browser| browser.public_key.clone()))
     }
 
-    /// Pairs a browser, replacing an earlier pairing with the same ID.
+    /// Pairs a browser, replacing an earlier pairing with the same ID but
+    /// keeping the name you gave it.
     pub fn add_browser(&mut self, id: &str, name: &str, public_key: &str) -> Result<()> {
         if id.is_empty() || id.len() > 64 || name.is_empty() || name.len() > 256 {
             return Err(VaultError::InvalidInput);
@@ -130,6 +136,10 @@ impl Vault {
             .unwrap_or_default()
             .as_secs();
         let mut browsers = self.browser_list()?.clone();
+        let label = browsers
+            .iter()
+            .find(|browser| browser.id == id)
+            .and_then(|browser| browser.label.clone());
         browsers.retain(|browser| browser.id != id);
         if browsers.len() >= MAX_BROWSERS {
             return Err(VaultError::InvalidInput);
@@ -137,9 +147,26 @@ impl Vault {
         browsers.push(PairedBrowser {
             id: id.into(),
             name: name.into(),
+            label,
             public_key: public_key.into(),
             paired_at,
         });
+        self.store_browsers(browsers)
+    }
+
+    /// Names a paired browser. An empty name, or the one the browser reported,
+    /// goes back to that one.
+    pub fn rename_browser(&mut self, id: &str, label: &str) -> Result<()> {
+        let label = label.trim();
+        if label.len() > 256 {
+            return Err(VaultError::InvalidInput);
+        }
+        let mut browsers = self.browser_list()?.clone();
+        let browser = browsers
+            .iter_mut()
+            .find(|browser| browser.id == id)
+            .ok_or(VaultError::InvalidInput)?;
+        browser.label = (!label.is_empty() && label != browser.name).then(|| label.into());
         self.store_browsers(browsers)
     }
 
