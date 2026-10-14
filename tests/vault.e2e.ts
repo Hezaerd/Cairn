@@ -129,6 +129,25 @@ try {
   await page.getByRole("button", { name: "Créer le coffre" }).click();
   await page.getByRole("heading", { name: "Aucun identifiant" }).waitFor();
   assert.ok(existsSync(file));
+  // Settings open on General, where the language follows Windows until one is picked.
+  const language = path.join(directory, "data/language.json");
+  await page.getByRole("link", { name: "Paramètres" }).click();
+  await page.getByRole("heading", { name: "Général" }).waitFor();
+  await page.getByRole("combobox", { name: "Langue" }).click();
+  await page.getByRole("option", { name: "English (United States)" }).click();
+  await page.getByRole("heading", { name: "General" }).waitFor();
+  assert.equal(readFileSync(language, "utf8"), '"en-US"');
+  assert.equal(await page.evaluate(() => document.documentElement.lang), "en-US");
+  await page.screenshot({ path: path.join(directory, "language-setting.png") });
+  await page.getByRole("combobox", { name: "Language" }).click();
+  await page.screenshot({ path: path.join(directory, "language.png") });
+  await page.getByRole("option", { name: "Computer language" }).click();
+  await page.getByRole("heading", { name: "Général" }).waitFor();
+  assert.equal(existsSync(language), false);
+  await page.getByRole("link", { name: "Apparence" }).click();
+  await page.getByRole("heading", { name: "Jeu de couleurs" }).waitFor();
+  await page.getByRole("link", { name: "Retour aux identifiants" }).click();
+  await page.getByRole("heading", { name: "Aucun identifiant" }).waitFor();
   await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
   await page.getByRole("dialog").waitFor();
   assert.equal(
