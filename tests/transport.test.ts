@@ -4,7 +4,7 @@ import { Effect, Layer, Match, Option } from "effect";
 import { BrowserKey, generateKeys, keyPair } from "@cairn/client/BrowserKey";
 import { CairnClient, CairnClientLive } from "@cairn/client/CairnClient";
 import { chromiumTransport, type NativeRuntime } from "@cairn/client/ChromiumTransport";
-import { signedMessage } from "@cairn/contracts";
+import { DEV_HOST_NAME, signedMessage } from "@cairn/contracts";
 
 function event() {
   const listeners = new Set<(...args: any[]) => void>();
@@ -33,7 +33,8 @@ function fakeRuntime(
     get lastError() {
       return lastError;
     },
-    connectNative: () => {
+    connectNative: (hostName: string) => {
+      assert.equal(hostName, DEV_HOST_NAME);
       connections++;
 
       const port = {
@@ -114,7 +115,7 @@ function memoryKey() {
 }
 
 const client = (runtime: NativeRuntime, key = memoryKey()) =>
-  CairnClientLive.pipe(Layer.provide(Layer.merge(chromiumTransport(runtime), key)));
+  CairnClientLive.pipe(Layer.provide(Layer.merge(chromiumTransport(runtime, DEV_HOST_NAME), key)));
 
 const program = (runtime: NativeRuntime) =>
   Effect.gen(function* () {

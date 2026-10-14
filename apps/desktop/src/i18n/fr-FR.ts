@@ -112,6 +112,7 @@ export const frFR: Messages = {
     appearance: "Apparence",
     colorScheme: "Jeu de couleurs",
     updates: "Mises à jour",
+    extension: "Extension de navigateur",
   },
   theme: {
     light: "Clair",
@@ -120,6 +121,19 @@ export const frFR: Messages = {
     useLight: "Utiliser le thème clair",
     useDark: "Utiliser le thème sombre",
     useSystem: "Suivre le thème de Windows",
+  },
+  extension: {
+    folder: "Dossier de l'extension",
+    open: "Ouvrir le dossier",
+    notOpened: "Impossible d'ouvrir le dossier.",
+    steps: [
+      "Ouvre chrome://extensions dans Helium.",
+      "Active le mode développeur.",
+      "Choisis Charger l'extension non empaquetée et sélectionne ce dossier.",
+    ],
+    once: "À faire une fois par profil Helium. Les mises à jour remplacent les fichiers sur place ; recharge ensuite l'extension dans chrome://extensions.",
+    dev: "Les versions de développement n'incluent pas l'extension. Installe-la avec les scripts de développement décrits dans docs/development.md.",
+    missing: "Le dossier de l'extension est introuvable. Réinstalle Cairn pour le restaurer.",
   },
   update: {
     available: (version) => `Cairn ${version} est disponible`,
