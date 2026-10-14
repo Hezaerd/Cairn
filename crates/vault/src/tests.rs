@@ -209,6 +209,29 @@ fn refuses_external_changes_and_expires_idle_session() {
 }
 
 #[test]
+fn only_touches_and_changes_restart_the_idle_timer() {
+    let (_dir, mut vault) = fixture();
+    vault.unlock(password()).unwrap();
+    vault.save(entry("First")).unwrap();
+    let id = vault.list().unwrap()[0].id.clone();
+    let almost = IDLE_TIMEOUT - std::time::Duration::from_secs(1);
+    vault.session.as_mut().unwrap().last_used = Instant::now() - almost;
+    // Background reads, such as the browser's suggestions, leave the timer alone.
+    vault.list().unwrap();
+    vault.login(&id).unwrap();
+    vault.reveal(&id).unwrap();
+    vault.browser_key("unknown").unwrap();
+    assert!(vault.session.as_ref().unwrap().last_used.elapsed() >= almost);
+    vault.touch().unwrap();
+    assert!(vault.session.as_ref().unwrap().last_used.elapsed() < almost);
+    vault.session.as_mut().unwrap().last_used = Instant::now() - almost;
+    vault.save(entry("Second")).unwrap();
+    assert!(vault.session.as_ref().unwrap().last_used.elapsed() < almost);
+    vault.session.as_mut().unwrap().last_used = Instant::now() - IDLE_TIMEOUT;
+    assert_eq!(vault.touch(), Err(VaultError::Locked));
+}
+
+#[test]
 fn favicon_cache_is_encrypted_persistent_shared_and_session_bound() {
     let (dir, mut vault) = fixture();
     vault.unlock(password()).unwrap();

@@ -52,6 +52,7 @@ Saving is part of suggestions and needs the same permissions.
 - **Pair** sends the public key. Cairn shows a code made from the key's SHA-256 and keeps one pending request for two minutes. Approving stores the key in `browsers.cairn`, encrypted with the vault key. Its client ID is the SHA-256 of the key.
 - Every vault request first asks for a challenge: 32 random bytes, valid once, for 30 seconds. The extension signs the challenge with the operation, origin, and entry ID. Cairn checks the challenge, the paired key, and the signature before it answers.
 - **ListLogins** returns the ID, name, and username of matching logins, at most 20. **GetLogin** returns the username and password of one login, and only if its site matches the origin in the signed request.
+- `GetLogin`, `SaveLogin`, and `UpdateLogin` follow something you chose, so they restart the vault's idle timer. `ListLogins` and `CheckLogin` run as you browse and don't, so a paired browser can't keep the vault unlocked.
 
 ## Protocol
 

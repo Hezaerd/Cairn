@@ -207,6 +207,9 @@ fn authenticated(
                 if !sites::matches(&login.site, &origin) {
                     return Err(ErrorCode::NotFound);
                 }
+                // Someone picked this login, so it counts as activity. Listing
+                // and checking logins run in the background and don't.
+                vault.touch().map_err(|_| ErrorCode::VaultLocked)?;
                 Ok(Response::Login {
                     version: VERSION,
                     request_id: request_id.clone(),
