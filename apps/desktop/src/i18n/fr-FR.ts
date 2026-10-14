@@ -88,8 +88,28 @@ export const frFR: Messages = {
     copyFailed: "Impossible de copier le code.",
     codeChanges: (seconds) => `Change dans ${seconds} s`,
   },
+  views: {
+    label: "Vues",
+    authenticator: "Authentificateur",
+  },
   authenticator: {
-    open: "Ajouter des codes d'authentification",
+    open: "Ajouter des codes",
+    list: "Liste des codes",
+    search: "Rechercher les codes",
+    all: "Tous les codes",
+    empty: "Aucun code",
+    emptyHint:
+      "Ajoute des codes depuis un QR code, des liens otpauth:// ou un export Google Authenticator.",
+    notFound: "Aucun code trouvé",
+    details: "Détails du code",
+    withLogin: "Code d'authentification d'un identifiant",
+    remove: "Retirer le code",
+    removeTitle: (name) => `Retirer le code de « ${name} » ?`,
+    removeKeepsLogin:
+      "L'identifiant garde son mot de passe. La sauvegarde de la version précédente garde la clé jusqu'à la prochaine modification.",
+    removeDeletesEntry:
+      "Cette entrée ne contient que le code, elle disparaît donc du coffre. La sauvegarde de la version précédente la garde jusqu'à la prochaine modification.",
+    removeConfirm: "Retirer",
     title: "Ajouter des codes d'authentification",
     description:
       "Colle une capture d'un QR code avec Ctrl+V, dépose une image ici, ou colle des liens otpauth://. L'export « Transférer des comptes » de Google Authenticator fonctionne aussi.",

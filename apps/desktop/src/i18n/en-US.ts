@@ -86,8 +86,27 @@ export const enUS = {
     copyFailed: "Couldn't copy the code.",
     codeChanges: (seconds: number) => `Changes in ${seconds} s`,
   },
+  views: {
+    label: "Views",
+    authenticator: "Authenticator",
+  },
   authenticator: {
-    open: "Add authenticator codes",
+    open: "Add codes",
+    list: "Code list",
+    search: "Search codes",
+    all: "All codes",
+    empty: "No codes",
+    emptyHint: "Add codes from a QR code, otpauth:// links, or a Google Authenticator export.",
+    notFound: "No codes found",
+    details: "Code details",
+    withLogin: "Authenticator code of a login",
+    remove: "Remove code",
+    removeTitle: (name: string) => `Remove the code of “${name}”?`,
+    removeKeepsLogin:
+      "The login keeps its password. The backup of the previous version keeps the key until the next change.",
+    removeDeletesEntry:
+      "This entry holds only the code, so it leaves the vault. The backup of the previous version keeps it until the next change.",
+    removeConfirm: "Remove",
     title: "Add authenticator codes",
     description:
       "Paste a screenshot of a QR code with Ctrl+V, drop a picture here, or paste otpauth:// links. Google Authenticator's Transfer accounts export works too.",

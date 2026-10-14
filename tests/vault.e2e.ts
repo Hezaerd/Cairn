@@ -460,7 +460,12 @@ try {
   await page.screenshot({ path: path.join(directory, "add-totp.png") });
   await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
-  await page.getByRole("button", { name: /Code seul/ }).click();
+  // An entry without a password isn't a login, so only the authenticator view lists it.
+  const logins = page.getByRole("complementary", { name: "Liste des identifiants" });
+  assert.equal(await logins.getByRole("button", { name: /Code seul/ }).count(), 0);
+  await page.getByRole("link", { name: /^Authentificateur/ }).click();
+  const codes = page.getByRole("complementary", { name: "Liste des codes" });
+  await codes.getByRole("button", { name: /Code seul/ }).click();
   await page.getByRole("heading", { name: "Code seul" }).waitFor();
   await page.getByText("Code d'authentification", { exact: true }).waitFor();
   const code = page.locator("code").filter({ hasText: /^\d{3} \d{3}$/ });
@@ -483,7 +488,7 @@ try {
   await dialog.waitFor({ state: "hidden" });
 
   // Links add a key to the login named after their issuer, or a new entry.
-  await page.getByRole("button", { name: "Ajouter des codes d'authentification" }).click();
+  await page.getByRole("button", { name: "Ajouter des codes", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog
     .getByLabel("Liens")
@@ -507,20 +512,16 @@ try {
   await page.screenshot({ path: path.join(directory, "import-totp.png") });
   await dialog.getByRole("button", { name: "Ajouter 2 codes" }).click();
   await page.locator("[data-sonner-toast]").filter({ hasText: "2 codes ajoutés." }).waitFor();
-  await page.getByRole("button", { name: /Service de test/ }).click();
-  await page.getByRole("heading", { name: "Service de test" }).waitFor();
-  await code.waitFor();
-  await page.getByRole("button", { name: /Compte modifié/ }).click();
+  assert.equal(await codes.getByRole("listitem").count(), 3);
+  await codes.getByRole("button", { name: /Compte modifié/ }).click();
   await page.getByRole("heading", { name: "Compte modifié" }).waitFor();
+  await page.getByText("Code d'authentification d'un identifiant", { exact: true }).waitFor();
   await code.waitFor();
   assert.ok(expectedCodes().includes((await code.textContent()) ?? ""));
-  // The login keeps its password next to its new key.
-  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
-  await page.getByText(changedSecret, { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Masquer le mot de passe" }).click();
+  await page.screenshot({ path: path.join(directory, "authenticator.png") });
 
   // A picture without a QR code is refused.
-  await page.getByRole("button", { name: "Ajouter des codes d'authentification" }).click();
+  await page.getByRole("button", { name: "Ajouter des codes", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.locator("input[type=file]").setInputFiles({
     name: "blank.png",
@@ -533,6 +534,25 @@ try {
   await dialog.getByText("Aucun QR code d'authentification dans cette image.").waitFor();
   await page.keyboard.press("Escape");
   await dialog.waitFor({ state: "hidden" });
+
+  // Removing the code of an entry that holds only the code deletes the entry.
+  await codes.getByRole("button", { name: /Service de test/ }).click();
+  await page.getByRole("heading", { name: "Service de test" }).waitFor();
+  await page.getByRole("button", { name: "Retirer le code" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByText("ne contient que le code", { exact: false }).waitFor();
+  await dialog.getByRole("button", { name: "Retirer", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await page.waitForFunction(() => !document.body.textContent?.includes("Service de test"));
+  assert.equal(await codes.getByRole("listitem").count(), 2);
+
+  // The login keeps its password next to its new key, and shows the code too.
+  await page.getByRole("link", { name: /^Identifiants/ }).click();
+  await page.getByRole("heading", { name: "Compte modifié" }).waitFor();
+  await code.waitFor();
+  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
+  await page.getByText(changedSecret, { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Masquer le mot de passe" }).click();
 
   await page.clock.install();
   await page.getByRole("button", { name: "Afficher le mot de passe" }).click();

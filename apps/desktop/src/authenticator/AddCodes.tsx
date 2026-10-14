@@ -182,14 +182,9 @@ export function AddCodesDialog({ vault }: { vault: ReturnType<typeof useVault> }
       }}
     >
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled={vault.busy}
-          aria-label={t.authenticator.open}
-          title={t.authenticator.open}
-        >
+        <Button disabled={vault.busy} size="sm">
           <ScanQrCode />
+          {t.authenticator.open}
         </Button>
       </DialogTrigger>
       <DialogContent
