@@ -1,4 +1,4 @@
-import { Effect, Layer, Match, Option, Result } from "effect";
+import { Effect, Layer, Match, Result } from "effect";
 import { CairnClient, CairnClientLive } from "@cairn/client/CairnClient";
 import { chromiumTransport } from "@cairn/client/ChromiumTransport";
 import { IndexedDbKey } from "@cairn/client/IndexedDbKey";
@@ -74,13 +74,18 @@ function browserName() {
   return `${brand?.brand ?? "Chromium"} (Windows)`;
 }
 
+/**
+ * The code of this browser's last pairing request. Kept in memory only: if
+ * the worker stops, the popup offers to pair again.
+ */
+let pairingCode: string | null = null;
+
 const state = (tabId: number) =>
   Effect.gen(function* () {
     const client = yield* CairnClient;
     const { appVersion } = yield* client.getStatus;
-    const code = yield* client.pairingCode;
 
-    if (Option.isNone(code)) return { type: "Unpaired", appVersion } satisfies PopupResult;
+    if (!(yield* client.hasKey)) return { type: "Unpaired", appVersion } satisfies PopupResult;
 
     const url = yield* tabOrigin(tabId);
 
@@ -94,7 +99,9 @@ const state = (tabId: number) =>
           Effect.succeed(
             error.code === "VaultLocked"
               ? { type: "Locked", appVersion }
-              : { type: "Pairing", appVersion, code: code.value },
+              : pairingCode === null
+                ? { type: "Unpaired", appVersion }
+                : { type: "Pairing", appVersion, code: pairingCode },
           ),
       ),
     );
@@ -103,7 +110,9 @@ const state = (tabId: number) =>
 const pair = Effect.gen(function* () {
   const client = yield* CairnClient;
   const { appVersion } = yield* client.getStatus;
+  pairingCode = null;
   const code = yield* client.pair(browserName());
+  pairingCode = code;
 
   return { type: "Pairing", appVersion, code } satisfies PopupResult;
 });

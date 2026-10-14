@@ -100,6 +100,9 @@ pub enum ErrorCode {
     NotPaired,
     Unauthorized,
     NotFound,
+    /// Another browser asked to pair while this request waited, so the app
+    /// refused both.
+    PairingConflict,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
@@ -135,7 +138,12 @@ pub enum Response {
         challenge: String,
     },
     /// The app shows the pairing code and waits for the user to approve it.
-    PairingRequested { version: u8, request_id: String },
+    /// The code comes from the SHA-256 of `nonce` and the browser's key.
+    PairingRequested {
+        version: u8,
+        request_id: String,
+        nonce: String,
+    },
     Logins {
         version: u8,
         request_id: String,
@@ -186,6 +194,7 @@ pub fn valid_base64url(value: &str, bytes: usize) -> bool {
 pub const PUBLIC_KEY_BYTES: usize = 65;
 pub const CLIENT_ID_BYTES: usize = 32;
 pub const CHALLENGE_BYTES: usize = 32;
+pub const PAIRING_NONCE_BYTES: usize = 32;
 pub const SIGNATURE_BYTES: usize = 64;
 pub const PROOF_BYTES: usize = 32;
 
@@ -428,10 +437,15 @@ impl Response {
                 Self::PairingRequested {
                     version,
                     request_id,
+                    nonce,
                 },
                 Request::Pair { .. },
-            )
-            | (
+            ) => {
+                *version == VERSION
+                    && request_id == id
+                    && valid_base64url(nonce, PAIRING_NONCE_BYTES)
+            }
+            (
                 Self::Logins {
                     version,
                     request_id,

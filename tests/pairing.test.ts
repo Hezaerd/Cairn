@@ -7,6 +7,7 @@ import {
   generateKeys,
   keyPair,
   pairingCode,
+  pairingDigits,
   passwordProof,
 } from "@cairn/client/BrowserKey";
 import { signedMessage } from "@cairn/contracts";
@@ -22,8 +23,15 @@ test("the extension derives the same client ID and code as the app", async () =>
   const raw = decode(fixture.publicKey);
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", raw));
   assert.equal(base64url(digest), fixture.clientId);
-  assert.equal(pairingCode(digest), fixture.code);
-  assert.equal(pairingCode(new Uint8Array([0, 0, 0, 7])), "0000 0007");
+  assert.equal(
+    await Effect.runPromise(pairingCode(fixture.publicKey, fixture.nonce)),
+    fixture.code,
+  );
+  assert.notEqual(
+    await Effect.runPromise(pairingCode(fixture.publicKey, "B".repeat(43))),
+    fixture.code,
+  );
+  assert.equal(pairingDigits(new Uint8Array([0, 0, 0, 7])), "0000 0007");
 });
 
 test("signed messages match the bytes the app checks", async () => {
@@ -108,7 +116,6 @@ test("generated keys can't be exported and sign in the expected format", async (
   await assert.rejects(crypto.subtle.exportKey("pkcs8", keys.privateKey));
   const pair = await Effect.runPromise(keyPair(keys));
   assert.equal(decode(pair.publicKey).length, 65);
-  assert.match(pair.code, /^\d{4} \d{4}$/);
   const signature = await Effect.runPromise(pair.sign("message"));
   assert.equal(decode(signature).length, 64);
 });
