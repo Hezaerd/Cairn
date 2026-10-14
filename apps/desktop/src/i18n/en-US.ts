@@ -70,6 +70,12 @@ export const enUS = {
     create: "Create vault",
     unlock: "Unlock",
   },
+  window: {
+    minimize: "Minimize",
+    maximize: "Maximize",
+    restore: "Restore Down",
+    close: "Close",
+  },
   app: {
     loading: "Opening Cairn…",
     recoveryTitle: "Backup available",

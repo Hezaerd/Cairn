@@ -72,6 +72,12 @@ export const frFR: Messages = {
     create: "Créer le coffre",
     unlock: "Déverrouiller",
   },
+  window: {
+    minimize: "Réduire",
+    maximize: "Agrandir",
+    restore: "Niveau inférieur",
+    close: "Fermer",
+  },
   app: {
     loading: "Ouverture de Cairn…",
     recoveryTitle: "Sauvegarde disponible",

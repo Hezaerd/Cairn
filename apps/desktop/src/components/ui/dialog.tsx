@@ -60,6 +60,12 @@ function DialogContent({
           className,
         )}
         {...props}
+        onInteractOutside={(event) => {
+          // The title bar stays usable while a dialog is open, as the system one would.
+          if (event.target instanceof Element && event.target.closest("[data-titlebar]"))
+            event.preventDefault();
+          props.onInteractOutside?.(event);
+        }}
       >
         {children}
         {showCloseButton && (
