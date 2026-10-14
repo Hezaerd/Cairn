@@ -1,4 +1,8 @@
 import { MAX_PICKER_HEIGHT } from "@cairn/contracts/picker";
+import markSvg from "../../../../brand/cairn.svg?raw";
+
+/** The path of Cairn's mark. The build inlines its SVG as text. */
+const MARK = /\sd="([^"]+)"/.exec(markSvg)?.[1] ?? "";
 
 const ICON_SIZE = 18;
 
@@ -21,16 +25,23 @@ button {
   border-radius: 4px;
   cursor: pointer;
 }
-button:hover, button:focus-visible { background: rgb(137 148 129 / 0.25); }
+button:hover, button:focus-visible { background: rgb(117 117 117 / 0.2); }
 iframe {
   position: fixed;
   width: ${PICKER_WIDTH}px;
   height: 0;
   border: 0;
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
   color-scheme: normal;
-  background: #202520;
+  /* The popover tokens in packages/ui, so the frame's edge matches its page while it loads. */
+  background: #fff;
+  box-shadow: 0 0 0 1px #e2e2e2, 0 8px 24px rgb(0 0 0 / 0.18);
+}
+@media (prefers-color-scheme: dark) {
+  iframe {
+    background: #282828;
+    box-shadow: 0 0 0 1px #383838, 0 8px 24px rgb(0 0 0 / 0.4);
+  }
 }
 iframe.banner {
   top: ${BANNER_MARGIN}px;
@@ -48,31 +59,16 @@ const svg = (tag: string, attributes: Record<string, string>) => {
   return element;
 };
 
-/** Three stacked stones, drawn with DOM calls so no markup is parsed in the page. */
+/** Cairn's mark, drawn with DOM calls so no markup is parsed in the page. */
 function icon() {
   const image = svg("svg", {
-    viewBox: "0 0 16 16",
+    viewBox: "0 0 1254 1254",
     width: "14",
     height: "14",
     "aria-hidden": "true",
   });
 
-  for (const [cx, cy, rx, ry] of [
-    [8, 13, 6, 2.2],
-    [8, 8.6, 4.4, 1.9],
-    [8, 4.6, 2.8, 1.6],
-  ])
-    image.append(
-      svg("ellipse", {
-        cx: String(cx),
-        cy: String(cy),
-        rx: String(rx),
-        ry: String(ry),
-        fill: "#899481",
-        stroke: "#202520",
-        "stroke-width": "0.8",
-      }),
-    );
+  image.append(svg("path", { d: MARK, fill: "#757575" }));
 
   return image;
 }

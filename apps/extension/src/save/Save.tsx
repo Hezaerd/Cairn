@@ -7,6 +7,10 @@ import {
   type SaveRequest,
   type SaveResult,
 } from "@cairn/contracts";
+import { CircleCheck } from "lucide-react";
+import { Button } from "@cairn/ui/components/button";
+import { Input } from "@cairn/ui/components/input";
+import { Field, FieldLabel } from "@cairn/ui/components/field";
 import { useTrustedVisibility } from "../frame/visibility";
 import { t } from "../popup/i18n";
 
@@ -114,60 +118,68 @@ export default function Save() {
   };
 
   const later = (
-    <button type="button" className="secondary" onClick={dismiss}>
+    <Button type="button" variant="outline" size="sm" onClick={dismiss}>
       {t("notNow")}
-    </button>
+    </Button>
   );
 
   return (
-    <main className="save" ref={main}>
+    <main className="p-3.5" ref={main}>
       {(state.type === "Loading" || state.type === "Saving") && (
-        <p className="detail">{t("connecting")}</p>
+        <p className="text-xs text-muted-foreground">{t("connecting")}</p>
       )}
       {state.type === "Saved" && (
-        <p className="detail" role="status">
+        <p className="flex items-center gap-2 text-xs" role="status">
+          <CircleCheck className="size-4 text-primary" />
           {t("saved")}
         </p>
       )}
       {state.type === "Locked" && (
-        <section>
-          <p className="detail">{t("saveLocked")}</p>
-          <div className="actions">
-            <button type="button" onClick={retry}>
+        <section className="grid gap-3">
+          <p className="text-xs/relaxed text-muted-foreground">{t("saveLocked")}</p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" size="sm" onClick={retry}>
               {t("retry")}
-            </button>
+            </Button>
             {later}
           </div>
         </section>
       )}
       {state.type === "Unavailable" && (
-        <section>
-          <p className="detail">{problem(state.code)}</p>
-          <div className="actions">{later}</div>
+        <section className="grid gap-3">
+          <p className="text-xs/relaxed text-muted-foreground">{problem(state.code)}</p>
+          <div className="flex justify-end gap-2">{later}</div>
         </section>
       )}
       {(state.type === "New" || state.type === "Changed") && (
-        <form onSubmit={submit}>
-          <h2>{state.type === "New" ? t("saveTitle") : t("updateTitle")}</h2>
-          <p className="login">
-            <strong>{state.type === "New" ? state.host : state.name}</strong>
-            <span>{state.username || t("noUsername")}</span>
+        <form className="grid gap-3" onSubmit={submit}>
+          <h2 className="text-xs font-semibold">
+            {state.type === "New" ? t("saveTitle") : t("updateTitle")}
+          </h2>
+          <p className="flex min-w-0 flex-col gap-0.5 rounded-md border bg-muted px-2.5 py-2 *:truncate">
+            <strong className="text-xs font-semibold">
+              {state.type === "New" ? state.host : state.name}
+            </strong>
+            <span className="text-2xs text-muted-foreground">
+              {state.username || t("noUsername")}
+            </span>
           </p>
           {state.type === "New" && (
-            <label>
-              {t("saveName")}
-              <input
+            <Field>
+              <FieldLabel htmlFor="save-name">{t("saveName")}</FieldLabel>
+              <Input
+                id="save-name"
                 value={name}
                 maxLength={256}
                 required
                 onChange={(event) => setName(event.target.value)}
               />
-            </label>
+            </Field>
           )}
-          <div className="actions">
-            <button type="submit" disabled={state.type === "New" && !name.trim()}>
+          <div className="flex justify-end gap-2">
+            <Button type="submit" size="sm" disabled={state.type === "New" && !name.trim()}>
               {state.type === "New" ? t("save") : t("update")}
-            </button>
+            </Button>
             {later}
           </div>
         </form>

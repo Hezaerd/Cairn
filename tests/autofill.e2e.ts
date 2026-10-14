@@ -404,7 +404,7 @@ try {
   await popup.goto(`chrome-extension://${id}/index.html`);
   await popup.getByRole("status").filter({ hasText: "Cairn connecté" }).waitFor();
   await popup.getByRole("button", { name: "Associer à Cairn" }).click();
-  const code = (await popup.locator(".code").textContent())?.trim() ?? "";
+  const code = (await popup.locator("p.font-mono").textContent())?.trim() ?? "";
   assert.match(code, /^\d{4} \d{4}$/);
   await popup.screenshot({ path: path.join(directory, "popup-pairing.png") });
 
@@ -518,7 +518,7 @@ try {
   frame = await openGenerator(signup);
   let generated = await preview(frame);
   assert.equal(generated.length, 20);
-  assert.equal(await frame.locator('input[type="range"]').getAttribute("max"), "64");
+  assert.equal(await frame.getByRole("slider").getAttribute("aria-valuemax"), "64");
   await signup.screenshot({ path: path.join(directory, "page-generator.png") });
 
   await frame.getByRole("button", { name: "Régénérer" }).click();

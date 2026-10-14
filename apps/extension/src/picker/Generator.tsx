@@ -6,6 +6,12 @@ import {
   type PickerRequest,
   type PickerResult,
 } from "@cairn/contracts";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@cairn/ui/components/button";
+import { Checkbox } from "@cairn/ui/components/checkbox";
+import { Label } from "@cairn/ui/components/label";
+import { Slider } from "@cairn/ui/components/slider";
+import { cn } from "@cairn/ui/lib/utils";
 import { t, type Message } from "../popup/i18n";
 
 type CharacterSet = "lowercase" | "uppercase" | "digits" | "symbols";
@@ -88,58 +94,93 @@ export function Generator({ host, maxLength, send, trusted, onResult }: Props) {
   const enabled = characterSets.filter(([set]) => options[set]).length;
 
   return (
-    <section className="generator">
-      <h2>{t("generatorFor", host)}</h2>
-      <output className="password" aria-label={t("generatorPreview")} aria-live="polite">
+    <section className="grid gap-3 p-2">
+      <h2 className="truncate text-xs font-semibold">{t("generatorFor", host)}</h2>
+      <output
+        aria-label={t("generatorPreview")}
+        aria-live="polite"
+        className="min-h-13 rounded-md border bg-muted px-2.5 py-2 font-mono text-body/snug wrap-anywhere select-all"
+      >
         {password}
       </output>
-      <label className="length">
-        <span>
-          {t("generatorLength")} <strong>{options.length}</strong>
-        </span>
-        <input
-          type="range"
+      <div className="grid gap-2">
+        <div className="flex items-center justify-between text-xs">
+          <span>{t("generatorLength")}</span>
+          <span className="tabular-nums">{options.length}</span>
+        </div>
+        <Slider
+          thumbLabel={t("generatorLength")}
           min={MIN_PASSWORD_LENGTH}
           max={maxLength}
-          value={options.length}
-          onChange={(event) => change({ ...options, length: Number(event.target.value) })}
+          step={1}
+          value={[options.length]}
+          onValueChange={([length]) => {
+            if (length !== undefined) change({ ...options, length });
+          }}
         />
-      </label>
-      <div className="sets">
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
         {characterSets.map(([set, label]) => (
-          <label key={set}>
-            <input
-              type="checkbox"
-              checked={options[set]}
-              // At least one set stays on; the generator refuses an empty selection anyway.
-              disabled={options[set] && enabled === 1}
-              onChange={(event) => change({ ...options, [set]: event.target.checked })}
-            />
-            {t(label)}
-          </label>
-        ))}
-        <label className="wide">
-          <input
-            type="checkbox"
-            checked={options.avoidAmbiguous}
-            onChange={(event) => change({ ...options, avoidAmbiguous: event.target.checked })}
+          <Option
+            key={set}
+            id={`generator-${set}`}
+            label={t(label)}
+            checked={options[set]}
+            // At least one set stays on; the generator refuses an empty selection anyway.
+            disabled={options[set] && enabled === 1}
+            onChange={(checked) => change({ ...options, [set]: checked })}
           />
-          {t("generatorAvoidAmbiguous")}
-        </label>
+        ))}
+        <Option
+          id="generator-avoid-ambiguous"
+          className="col-span-2"
+          label={t("generatorAvoidAmbiguous")}
+          checked={options.avoidAmbiguous}
+          onChange={(avoidAmbiguous) => change({ ...options, avoidAmbiguous })}
+        />
       </div>
       {notice && (
-        <p className="detail" role="alert">
+        <p className="text-xs text-destructive" role="alert">
           {notice}
         </p>
       )}
-      <div className="actions">
-        <button className="secondary" onClick={() => generate(options, true)}>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => generate(options, true)}>
+          <RefreshCw />
           {t("generatorRegenerate")}
-        </button>
-        <button disabled={password === null} onClick={use}>
+        </Button>
+        <Button size="sm" disabled={password === null} onClick={use}>
           {t("generatorUse")}
-        </button>
+        </Button>
       </div>
     </section>
+  );
+}
+
+function Option({
+  id,
+  label,
+  checked,
+  disabled,
+  className,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  className?: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      <Checkbox
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={(state) => onChange(state === true)}
+      />
+      <Label htmlFor={id}>{label}</Label>
+    </div>
   );
 }

@@ -19,13 +19,13 @@ pnpm dev:desktop
 
 Create a vault with a master password of at least 12 characters. Closing the window locks the vault and hides Cairn in the system tray; its status server keeps running. Click the tray icon or launch Cairn again to restore the window. Right-click the icon for **Open Cairn**, **Lock vault**, and **Quit**. Only **Quit** exits the app. Minimizing keeps the normal Windows behavior.
 
-The UI uses the shadcn/ui components in `packages/ui/src/components`, with Tailwind CSS 4 and the Windows-style tokens in `packages/ui/src/styles.css`. An app's stylesheet imports only `@cairn/ui/styles.css`, which imports Tailwind and tells it to scan the shared components. Each app's `components.json` points shadcn at the package's components and stylesheet. Import a component as `@cairn/ui/components/button`. Add one with:
+The desktop app and the extension's popup, picker, and save banner use the shadcn/ui components in `packages/ui/src/components`, with Tailwind CSS 4 and the Windows-style tokens in `packages/ui/src/styles.css`. An app's stylesheet imports only `@cairn/ui/styles.css`, which imports Tailwind and tells it to scan the shared components. Each app's `components.json` points shadcn at the package's components and stylesheet. Import a component as `@cairn/ui/components/button`. Add one with:
 
 ```sh
 pnpm dlx shadcn@latest add <component> -c packages/ui
 ```
 
-The CLI writes the component to `packages/ui` and installs its dependencies there. Take anything app-specific, like a translated label, as a prop.
+The CLI writes the component to `packages/ui` and installs its dependencies there. Take anything app-specific, like a translated label, as a prop. The extension has no theme setting: its pages follow the Windows light or dark mode, and the frames it adds to a page use the popover colors while they load. The content script's field icon stays plain DOM, without Tailwind or React.
 
 UI state that outlives a component lives in the Zustand stores in `apps/desktop/src/store`. `preferences.ts` holds the theme and the password generator options. `navigation.ts` holds the current view, each view's selected entry and each view's search. Components read a store with a selector, such as `usePreferences((state) => state.theme)`. Anything else, React or not, changes it through the exported actions or `setState`, and code outside React can `subscribe`, as `theme/follow.ts` does. Both stores persist to local storage with a version and decode what they read with Schema, so a bad field falls back to its default. Persist only settings and entry IDs there: never a credential or anything typed into a search, which is why `navigation.ts` leaves the searches out of storage.
 
@@ -103,7 +103,7 @@ pnpm format
 
 Oxlint and Oxfmt are configured once at the root for every TypeScript package. Anti-slop's generic and Effect rules run as errors. It is vendored in `tools/oxlint/anti-slop`, with its revision in [UPSTREAM.md](../tools/oxlint/anti-slop/UPSTREAM.md). Its Effect service-import rule only checks relative imports, so it misses aliases such as `@cairn/client`.
 
-[`@shadcn/lint`](https://github.com/shadcn-ui/lint) holds the desktop UI and `packages/ui` to the design system. It reads each project's `components.json` and the theme in `packages/ui/src/styles.css`. The desktop's `components.json` names that file directly, because the linter ignores tokens it reaches through `node_modules`. It rejects raw colors, arbitrary values like `text-[11px]`, inline styles, classes Tailwind can't generate, and class names it can't read. Outside `packages/ui/src/components`, a kit component's `className` may only carry layout classes such as margins, widths, and positions. When a screen needs something the kit or the theme lacks, add a variant to the component or a token to `styles.css`. The extension's pages use their own CSS rather than Tailwind, so these rules don't run there.
+[`@shadcn/lint`](https://github.com/shadcn-ui/lint) holds the desktop UI, the extension's pages, and `packages/ui` to the design system. It reads each project's `components.json` and the theme in `packages/ui/src/styles.css`. Each app's `components.json` names that file directly, because the linter ignores tokens it reaches through `node_modules`. It rejects raw colors, arbitrary values like `text-[11px]`, inline styles, classes Tailwind can't generate, and class names it can't read. Outside `packages/ui/src/components`, a kit component's `className` may only carry layout classes such as margins, widths, and positions. When a screen needs something the kit or the theme lacks, add a variant to the component or a token to `styles.css`. The content script draws its field icon and frames with plain DOM and a stylesheet string, so the class rules don't reach it.
 
 ## Tests
 

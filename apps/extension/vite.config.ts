@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { build, defineConfig, type Plugin } from "vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { RELEASE_KEY } from "./release";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
@@ -71,9 +72,12 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
     react(),
+    tailwindcss(),
     contentScript(),
     releaseKey(),
   ],
+  // class-variance-authority imports clsx; cn exports a drop-in clsx.
+  resolve: { alias: { clsx: "cn" } },
   base: "./",
   build: {
     ...(mode === "release" && {
