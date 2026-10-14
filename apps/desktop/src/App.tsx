@@ -444,7 +444,7 @@ function Credentials({ vault }: { vault: Vault }) {
 
 function AuthView({ children }: { children: ReactNode }) {
   return (
-    <section className="flex flex-1 items-center justify-center overflow-y-auto p-8">
+    <section className="flex flex-1 items-center justify-center overflow-y-auto p-8 pb-16">
       {children}
     </section>
   );
