@@ -7,10 +7,11 @@ import {
   type PickerResult,
 } from "@cairn/contracts";
 import { useTrustedVisibility } from "../frame/visibility";
+import { Generator } from "./Generator";
 import { t } from "../popup/i18n";
 
-// The list of logins shown under a login field, in a frame the page can't
-// read.
+// The list of logins shown under a login field, or the password generator
+// under a sign-up form's password field, in a frame the page can't read.
 
 type State = { type: "Loading" } | PickerResult;
 
@@ -19,8 +20,8 @@ const send = (request: PickerRequest) =>
     Effect.flatMap((response) => Effect.try(() => decodePickerResult(response))),
     Effect.timeout("5 seconds"),
     Effect.match({
-      onSuccess: (result): State => result,
-      onFailure: (): State => ({ type: "Unavailable", code: "ConnectionLost" }),
+      onSuccess: (result): PickerResult => result,
+      onFailure: (): PickerResult => ({ type: "Unavailable", code: "ConnectionLost" }),
     }),
   );
 
@@ -73,7 +74,9 @@ export default function Picker() {
     };
 
     // Arrow Down in the field moves focus here.
-    const onFocus = () => list.current?.querySelector("button")?.focus();
+    const onFocus = () =>
+      (list.current ?? main.current)?.querySelector<HTMLElement>("button, input")?.focus();
+
     addEventListener("keydown", onKey);
     addEventListener("focus", onFocus);
 
@@ -115,6 +118,15 @@ export default function Picker() {
           </p>
           <button onClick={retry}>{t("retry")}</button>
         </section>
+      )}
+      {state.type === "Generator" && (
+        <Generator
+          host={state.host}
+          maxLength={state.maxLength}
+          send={send}
+          trusted={trusted}
+          onResult={setState}
+        />
       )}
       {state.type === "Logins" && (
         <>

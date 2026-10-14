@@ -52,5 +52,20 @@
   "notNow": { "message": "Not now" },
   "saved": { "message": "Saved in Cairn." },
   "saveLocked": { "message": "Unlock Cairn to save this login." },
-  "saveExpired": { "message": "This login is no longer waiting to be saved." }
+  "saveExpired": { "message": "This login is no longer waiting to be saved." },
+  "generatorFor": {
+    "message": "New password for $HOST$",
+    "placeholders": { "host": { "content": "$1" } }
+  },
+  "generatorIcon": { "message": "Generate a password with Cairn" },
+  "generatorPreview": { "message": "Generated password" },
+  "generatorLength": { "message": "Length" },
+  "generatorLowercase": { "message": "Lowercase (a–z)" },
+  "generatorUppercase": { "message": "Uppercase (A–Z)" },
+  "generatorDigits": { "message": "Digits (0–9)" },
+  "generatorSymbols": { "message": "Symbols (!#$$…)" },
+  "generatorAvoidAmbiguous": { "message": "Avoid look-alike characters" },
+  "generatorRegenerate": { "message": "Regenerate" },
+  "generatorUse": { "message": "Use password" },
+  "noSignUpForm": { "message": "No sign-up form found on this page." }
 }

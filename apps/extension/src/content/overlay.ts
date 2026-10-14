@@ -88,7 +88,7 @@ function extensionFrame(page: string) {
 }
 
 /**
- * The icon in a login field, the picker frame under it, and the banner that
+ * The icon in a login or sign-up field, the picker frame under it, and the banner that
  * offers to save a login. They live in a closed shadow root, so page scripts
  * can't reach them, though the page still controls the host element's box.
  * The frames check their own visibility.
@@ -120,8 +120,6 @@ export class Overlay {
     const sheet = document.createElement("style");
     sheet.textContent = style;
     this.#button.type = "button";
-    this.#button.title = chrome.i18n.getMessage("pickerIcon");
-    this.#button.setAttribute("aria-label", this.#button.title);
     this.#button.hidden = true;
     this.#button.append(icon());
     this.#button.addEventListener("click", onIcon);
@@ -147,7 +145,11 @@ export class Overlay {
     return target === this.#host;
   }
 
-  showIcon(anchor: HTMLInputElement) {
+  /** Shows the icon in `anchor`, which offers to generate a password if `generator`. */
+  showIcon(anchor: HTMLInputElement, generator: boolean) {
+    this.#button.title = chrome.i18n.getMessage(generator ? "generatorIcon" : "pickerIcon");
+    this.#button.setAttribute("aria-label", this.#button.title);
+
     if (this.#anchor !== anchor) {
       this.#resized.disconnect();
       this.#resized.observe(anchor);

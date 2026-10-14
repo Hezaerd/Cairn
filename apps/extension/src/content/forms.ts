@@ -1,3 +1,5 @@
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@cairn/contracts/picker";
+
 export interface LoginFields {
   readonly username: HTMLInputElement | undefined;
   readonly password: HTMLInputElement | undefined;
@@ -79,6 +81,55 @@ export function loginFields(anchor?: HTMLInputElement): LoginFields | null {
   return found.find((fields) => fields.password) ?? found[0] ?? null;
 }
 
+export interface SignUpFields {
+  /** The new password and its confirmation, if the form asks for one. */
+  readonly passwords: ReadonlyArray<HTMLInputElement>;
+  /** The longest password every field takes. */
+  readonly maxLength: number;
+}
+
+/**
+ * The sign-up fields among the inputs of one form: one password field that
+ * asks for a new password, or two that don't say otherwise. Null for a login
+ * form, and for a password change, where one field asks for the current
+ * password, or only one of two asks for a new one.
+ */
+function signUpIn(inputs: ReadonlyArray<HTMLInputElement>): SignUpFields | null {
+  const passwords = inputs.filter((input) => input.type === "password");
+  const asksNew = passwords.filter((input) => input.autocomplete === "new-password");
+
+  if (
+    passwords.length === 0 ||
+    passwords.length > 2 ||
+    passwords.some((input) => input.autocomplete === "current-password") ||
+    (passwords.length === 1 && asksNew.length === 0) ||
+    (asksNew.length === 1 && passwords.length === 2)
+  )
+    return null;
+
+  const maxLength = Math.min(
+    MAX_PASSWORD_LENGTH,
+    ...passwords.map((input) => (input.maxLength > 0 ? input.maxLength : MAX_PASSWORD_LENGTH)),
+  );
+
+  // A field too short for a generated password gets none.
+  return maxLength >= MIN_PASSWORD_LENGTH ? { passwords, maxLength } : null;
+}
+
+/**
+ * The sign-up fields `anchor` belongs to, or null if it isn't one of their
+ * password fields. Without an anchor, the page's first sign-up form.
+ */
+export function signUpFields(anchor?: HTMLInputElement): SignUpFields | null {
+  if (anchor) {
+    const fields = signUpIn(groups().find((group) => group.includes(anchor)) ?? []);
+
+    return fields?.passwords.includes(anchor) ? fields : null;
+  }
+
+  return groups().flatMap((group) => signUpIn(group) ?? [])[0] ?? null;
+}
+
 export interface Submission {
   readonly username: HTMLInputElement | undefined;
   readonly password: HTMLInputElement;
@@ -116,6 +167,11 @@ function fillField(input: HTMLInputElement, value: string) {
   setter?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/** Puts a generated password in a sign-up form's password fields. */
+export function fillNewPassword(fields: SignUpFields, password: string) {
+  for (const input of fields.passwords) fillField(input, password);
 }
 
 /** Fills `fields`. Returns whether anything was filled. */

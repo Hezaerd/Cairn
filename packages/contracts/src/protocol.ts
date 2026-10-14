@@ -1,7 +1,12 @@
 import { Schema } from "effect";
-import { MAX_PICKER_HEIGHT } from "./picker";
+import { MAX_PASSWORD_LENGTH, MAX_PICKER_HEIGHT, MIN_PASSWORD_LENGTH } from "./picker";
 
-export { MAX_PICKER_HEIGHT, type PageCommand } from "./picker";
+export {
+  MAX_PASSWORD_LENGTH,
+  MAX_PICKER_HEIGHT,
+  MIN_PASSWORD_LENGTH,
+  type PageCommand,
+} from "./picker";
 
 /** The native host the installer registers for the release extension. */
 export const HOST_NAME = "com.hezaerd.cairn";
@@ -324,12 +329,35 @@ export const decodePopupResult = Schema.decodeUnknownSync(PopupResult, {
   onExcessProperty: "error",
 });
 
+const PasswordLength = Schema.Int.check(
+  Schema.isBetween({ minimum: MIN_PASSWORD_LENGTH, maximum: MAX_PASSWORD_LENGTH }),
+);
+
+/** The same options as the desktop generator. */
+export const PasswordOptions = Schema.Struct({
+  length: PasswordLength,
+  lowercase: Schema.Boolean,
+  uppercase: Schema.Boolean,
+  digits: Schema.Boolean,
+  symbols: Schema.Boolean,
+  avoidAmbiguous: Schema.Boolean,
+});
+
+export type PasswordOptions = typeof PasswordOptions.Type;
+
 /** Messages from the content script in a page's top frame to the service worker. */
 export const PageRequest = Schema.Union([
-  /** The page shows a login form. */
+  /** The page shows a login or sign-up form. */
   Schema.Struct({ type: Schema.Literal("FormFound") }),
-  /** The user focused a login field or clicked its icon, so the picker may open. */
-  Schema.Struct({ type: Schema.Literal("OpenPicker") }),
+  /**
+   * The user focused a login field or clicked its icon, so the picker may
+   * open. `newPassword` opens the generator for a sign-up form, limited to
+   * what its fields accept.
+   */
+  Schema.Struct({
+    type: Schema.Literal("OpenPicker"),
+    newPassword: Schema.optionalKey(Schema.Struct({ maxLength: PasswordLength })),
+  }),
   Schema.Struct({ type: Schema.Literal("ClosePicker") }),
   /** The user submitted a login or sign-up form with these values. */
   Schema.Struct({ type: Schema.Literal("Submitted"), username: Username, password: Password }),
@@ -345,12 +373,14 @@ export const decodePageRequest = Schema.decodeUnknownResult(PageRequest, {
 
 /**
  * What the content script may know about the site: whether Cairn has logins
- * for it, never which ones. `Offer` asks it to open the save banner.
+ * for it, never which ones. `Offer` asks it to open the save banner. `Off`
+ * means suggestions aren't on for the site.
  */
 export const PageResult = Schema.Union([
   Schema.Struct({ type: Schema.Literal("Matches") }),
   Schema.Struct({ type: Schema.Literal("Locked") }),
   Schema.Struct({ type: Schema.Literal("None") }),
+  Schema.Struct({ type: Schema.Literal("Off") }),
   Schema.Struct({ type: Schema.Literal("Offer") }),
 ]);
 
@@ -360,6 +390,17 @@ export type PageResult = typeof PageResult.Type;
 export const PickerRequest = Schema.Union([
   Schema.Struct({ type: Schema.Literal("GetSuggestions") }),
   Schema.Struct({ type: Schema.Literal("Fill"), entryId: EntryId }),
+  /**
+   * A password for the sign-up form. Without `fresh`, the one generated last
+   * for the tab's site, if it's still kept.
+   */
+  Schema.Struct({
+    type: Schema.Literal("Generate"),
+    options: PasswordOptions,
+    fresh: Schema.Boolean,
+  }),
+  /** Fills the password generated last into the sign-up form. */
+  Schema.Struct({ type: Schema.Literal("UseGenerated") }),
   Schema.Struct({ type: Schema.Literal("Close") }),
   Schema.Struct({
     type: Schema.Literal("Resize"),
@@ -378,6 +419,17 @@ export const PickerResult = Schema.Union([
     type: Schema.Literal("Logins"),
     host: Schema.String,
     logins: Schema.Array(LoginSummary),
+  }),
+  /** The picker opened on a sign-up form, whose fields take at most `maxLength` characters. */
+  Schema.Struct({
+    type: Schema.Literal("Generator"),
+    host: Schema.String,
+    maxLength: PasswordLength,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("Generated"),
+    password: Password,
+    options: PasswordOptions,
   }),
   Schema.Struct({ type: Schema.Literal("Locked") }),
   Schema.Struct({ type: Schema.Literal("Unavailable"), code: ClientErrorCode }),

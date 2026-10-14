@@ -1,13 +1,14 @@
 import type { PageRequest, PageResult } from "@cairn/contracts";
 import type { PageCommand } from "@cairn/contracts/picker";
-import { fill, loginFields, submission, usable } from "./forms";
+import { fill, fillNewPassword, loginFields, signUpFields, submission, usable } from "./forms";
 import { Overlay } from "./overlay";
 
 // Runs in the isolated world of a page's top frame, registered for every
 // site once the user allows suggestions, or injected by the service worker to
 // fill from the popup. It never sees a login's name, only whether the site has
-// some, and receives a password only to fill it. It reports what the user
-// submits in a login or sign-up form, so Cairn can offer to save it.
+// some, and receives a password only to fill it. In a sign-up form it opens
+// the picker's generator instead. It reports what the user submits in a login
+// or sign-up form, so Cairn can offer to save it.
 
 declare global {
   // Set once per page so a second injection does nothing.
@@ -73,18 +74,38 @@ function start() {
   const dismiss = (anchor: HTMLInputElement) => {
     const fields = loginFields(anchor);
 
-    for (const field of [anchor, fields?.username, fields?.password])
+    for (const field of [
+      anchor,
+      fields?.username,
+      fields?.password,
+      ...(signUpFields(anchor)?.passwords ?? []),
+    ])
       if (field) dismissed.add(field);
   };
+
+  /**
+   * Whether focusing or clicking `field` opens the picker: a login field, when
+   * Cairn has logins for the site. A sign-up form's generator opens only from
+   * its icon, so it doesn't cover the form for someone typing a password.
+   */
+  const opensOnFocus = (field: HTMLInputElement) =>
+    site === "Matches" && loginFields(field) !== null;
 
   async function open(force: boolean) {
     const anchor = overlay.anchor;
 
     if (overlay.isOpen || opening || !anchor || (!force && dismissed.has(anchor))) return;
 
+    const signUp = signUpFields(anchor);
     opening = true;
+
     // The service worker only answers a picker this tab asked for.
-    const reply = await send({ type: "OpenPicker" });
+    const reply = await send(
+      signUp
+        ? { type: "OpenPicker", newPassword: { maxLength: signUp.maxLength } }
+        : { type: "OpenPicker" },
+    );
+
     opening = false;
 
     if (reply && reply.type !== "None" && overlay.anchor === anchor) overlay.open();
@@ -109,8 +130,9 @@ function start() {
     if (current?.isConnected && usable(current)) return;
 
     const fields = loginFields();
+    const signUp = signUpFields();
 
-    if (!fields) {
+    if (!fields && !signUp) {
       overlay.hide();
 
       return;
@@ -118,22 +140,31 @@ function start() {
 
     if (site === "Unknown") await check();
 
-    if (site === "None") return observer.disconnect();
+    if (site === "Off") return observer.disconnect();
 
-    const anchor = fields.username ?? fields.password;
+    const anchor =
+      site !== "None" && fields ? (fields.username ?? fields.password) : signUp?.passwords[0];
 
-    if (anchor) overlay.showIcon(anchor);
+    if (anchor) overlay.showIcon(anchor, signUp?.passwords.includes(anchor) ?? false);
+
+    // Without logins for the site, only a sign-up form gets the icon, and a
+    // focused sign-up field still gets it later.
+    if (site === "None") observer.disconnect();
   }
 
   async function focusField(field: HTMLInputElement) {
     // A locked vault may have been unlocked since.
     if (site === "Unknown" || site === "Locked") await check();
 
-    if (site === "None" || document.activeElement !== field) return;
+    if (document.activeElement !== field) return;
 
-    overlay.showIcon(field);
+    const signUp = signUpFields(field) !== null;
 
-    if (site === "Matches") await open(false);
+    if (site === "Off" || (site === "None" && !signUp)) return;
+
+    overlay.showIcon(field, signUp);
+
+    if (opensOnFocus(field)) await open(false);
   }
 
   let scheduled = false;
@@ -161,7 +192,11 @@ function start() {
     (event) => {
       const field = event.target;
 
-      if (event.isTrusted && field instanceof HTMLInputElement && loginFields(field))
+      if (
+        event.isTrusted &&
+        field instanceof HTMLInputElement &&
+        (loginFields(field) || signUpFields(field))
+      )
         void focusField(field);
     },
     true,
@@ -174,12 +209,12 @@ function start() {
 
       if (!event.isTrusted || overlay.contains(target)) return;
 
-      if (target instanceof HTMLInputElement && loginFields(target)) {
+      if (target instanceof HTMLInputElement && (loginFields(target) || signUpFields(target))) {
         // A click asks for the picker, even on a field where it was closed.
         // Focusing another field moves the picker there.
         dismissed.delete(target);
 
-        if (target === overlay.anchor && site === "Matches") void open(true);
+        if (target === overlay.anchor && opensOnFocus(target)) void open(true);
       } else closePicker(false);
     },
     true,
@@ -209,6 +244,25 @@ function start() {
     if (!fields || !fill(fields, username, password)) return false;
 
     if (fields.password) filled.add(fields.password);
+
+    return true;
+  }
+
+  /**
+   * Puts a generated password in the sign-up form. It isn't marked as filled,
+   * so submitting the form offers to save it.
+   */
+  function fillGenerated(origin: string, password: string) {
+    if (location.origin !== origin) return false;
+
+    const anchor = overlay.anchor;
+    const fields = (anchor?.isConnected ? signUpFields(anchor) : null) ?? signUpFields();
+
+    if (!fields) return false;
+
+    fillNewPassword(fields, password);
+
+    for (const field of fields.passwords) filled.delete(field);
 
     return true;
   }
@@ -309,6 +363,9 @@ function start() {
     switch (message.type) {
       case "Fill":
         sendResponse(fillPage(message.origin, message.username, message.password));
+        break;
+      case "FillNewPassword":
+        sendResponse(fillGenerated(message.origin, message.password));
         break;
       case "ResizePicker":
         overlay.resize(message.height);

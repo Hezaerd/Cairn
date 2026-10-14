@@ -55,14 +55,23 @@ const cache = new Map<
   { origin: string; expires: number; logins: ReadonlyArray<LoginSummary> }
 >();
 
-// The site each tab opened a picker for, after real input in that page.
-const pickers = new Map<number, string>();
+/**
+ * A picker a tab's page opened after real input: the site, and for a sign-up
+ * form, the longest password its fields take.
+ */
+export interface OpenPicker {
+  readonly origin: string;
+  readonly newPassword?: { readonly maxLength: number };
+}
 
-export const openPicker = (tabId: number, origin: string) => pickers.set(tabId, origin);
+// The picker each tab opened.
+const pickers = new Map<number, OpenPicker>();
+
+export const openPicker = (tabId: number, picker: OpenPicker) => pickers.set(tabId, picker);
 
 export const closePicker = (tabId: number) => pickers.delete(tabId);
 
-export const pickerOrigin = (tabId: number) => pickers.get(tabId);
+export const pickerFor = (tabId: number) => pickers.get(tabId);
 
 /** Drops the tab's cached logins, after one was saved from it. */
 export const forgetLogins = (tabId: number) => cache.delete(tabId);
@@ -108,7 +117,7 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
     void setBadge(tabId, 0);
   }
 
-  if (pickers.get(tabId) !== origin) pickers.delete(tabId);
+  if (pickers.get(tabId)?.origin !== origin) pickers.delete(tabId);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
