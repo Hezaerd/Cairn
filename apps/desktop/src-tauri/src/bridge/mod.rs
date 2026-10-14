@@ -42,11 +42,37 @@ pub(crate) struct Bridge {
     pending: Mutex<Option<Pending>>,
 }
 
+impl Bridge {
+    /// Makes `pending` the request waiting for your answer. The same browser
+    /// asking again replaces its own request. Another browser asking while
+    /// one waits refuses both: only one of them can be the browser in front
+    /// of you, and the user can't tell which.
+    fn wait(&self, pending: Pending) -> Result<(), ErrorCode> {
+        let mut slot = self.pending.lock().map_err(|_| ErrorCode::AppUnavailable)?;
+        if slot.as_ref().is_some_and(|waiting| {
+            waiting.created.elapsed() < PAIRING_LIFETIME && waiting.client_id != pending.client_id
+        }) {
+            *slot = None;
+            return Err(ErrorCode::PairingConflict);
+        }
+        *slot = Some(pending);
+        Ok(())
+    }
+}
+
 pub fn start(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(Arc::new(Bridge::default()));
     let runtime = tauri::async_runtime::handle();
-    // Pipe construction requires an entered Tokio reactor.
-    let server = runtime.block_on(async { cairn_local_bridge::BridgeServer::bind() })?;
+    // Pipe construction requires an entered Tokio reactor. Another process
+    // holding the pipe name leaves the browser without Cairn, not Cairn
+    // without a window.
+    let server = match runtime.block_on(async { cairn_local_bridge::BridgeServer::bind() }) {
+        Ok(server) => server,
+        Err(error) => {
+            eprintln!("Cairn bridge unavailable: {error}");
+            return Ok(());
+        }
+    };
     let handle = app.handle().clone();
     tauri::async_runtime::spawn(async move {
         let handler = move |request| {
@@ -80,9 +106,10 @@ fn answer(app: &AppHandle, request: Request) -> Response {
             .ok_or(ErrorCode::AppUnavailable),
         Request::Pair {
             public_key, name, ..
-        } => pair(app, &bridge, public_key, name).map(|()| Response::PairingRequested {
+        } => pair(app, &bridge, public_key, name).map(|nonce| Response::PairingRequested {
             version: VERSION,
             request_id: id.clone(),
+            nonce,
         }),
         Request::ListLogins { .. }
         | Request::GetLogin { .. }
@@ -112,10 +139,18 @@ fn with_vault<T>(
     operation(&mut vault)
 }
 
-fn pair(app: &AppHandle, bridge: &Bridge, public_key: &str, name: &str) -> Result<(), ErrorCode> {
-    let (Some(client_id), Some(code)) =
-        (auth::client_id(public_key), auth::pairing_code(public_key))
-    else {
+/// Starts a pairing and returns the nonce the browser mixes into its code.
+fn pair(
+    app: &AppHandle,
+    bridge: &Bridge,
+    public_key: &str,
+    name: &str,
+) -> Result<String, ErrorCode> {
+    let nonce = auth::pairing_nonce().ok_or(ErrorCode::AppUnavailable)?;
+    let (Some(client_id), Some(code)) = (
+        auth::client_id(public_key),
+        auth::pairing_code(public_key, &nonce),
+    ) else {
         return Err(ErrorCode::InvalidRequest);
     };
     with_vault(app, |_| Ok(()))?;
@@ -123,19 +158,21 @@ fn pair(app: &AppHandle, bridge: &Bridge, public_key: &str, name: &str) -> Resul
         name: name.trim().to_owned(),
         code,
     };
-    // Only the latest request waits for an answer.
-    *bridge
-        .pending
-        .lock()
-        .map_err(|_| ErrorCode::AppUnavailable)? = Some(Pending {
+    if let Err(code) = bridge.wait(Pending {
         client_id,
         public_key: public_key.to_owned(),
         request: request.clone(),
         created: Instant::now(),
-    });
+    }) {
+        if code == ErrorCode::PairingConflict {
+            crate::tray::restore(app);
+            let _ = app.emit_to("main", "pairing-conflict", ());
+        }
+        return Err(code);
+    }
     crate::tray::restore(app);
     let _ = app.emit_to("main", "pairing-requested", request);
-    Ok(())
+    Ok(nonce)
 }
 
 fn authenticated(
@@ -207,6 +244,9 @@ fn authenticated(
                 if !sites::matches(&login.site, &origin) {
                     return Err(ErrorCode::NotFound);
                 }
+                // Someone picked this login, so it counts as activity. Listing
+                // and checking logins run in the background and don't.
+                vault.touch().map_err(|_| ErrorCode::VaultLocked)?;
                 Ok(Response::Login {
                     version: VERSION,
                     request_id: request_id.clone(),
@@ -390,4 +430,58 @@ pub async fn remove_browser(
     id: String,
 ) -> Result<(), VaultError> {
     run(window, &store, move |vault| vault.remove_browser(&id)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pending(client_id: &str, code: &str) -> Pending {
+        Pending {
+            client_id: client_id.to_owned(),
+            public_key: String::new(),
+            request: PairingRequest {
+                name: "Helium".to_owned(),
+                code: code.to_owned(),
+            },
+            created: Instant::now(),
+        }
+    }
+
+    fn waiting_code(bridge: &Bridge) -> Option<String> {
+        let slot = bridge.pending.lock().unwrap();
+        slot.as_ref().map(|pending| pending.request.code.clone())
+    }
+
+    #[test]
+    fn the_same_browser_can_ask_again() {
+        let bridge = Bridge::default();
+        bridge.wait(pending("a", "1111 1111")).unwrap();
+        bridge.wait(pending("a", "2222 2222")).unwrap();
+        assert_eq!(waiting_code(&bridge).as_deref(), Some("2222 2222"));
+    }
+
+    #[test]
+    fn a_second_browser_refuses_both() {
+        let bridge = Bridge::default();
+        bridge.wait(pending("a", "1111 1111")).unwrap();
+        assert_eq!(
+            bridge.wait(pending("b", "1111 1111")),
+            Err(ErrorCode::PairingConflict)
+        );
+        assert_eq!(waiting_code(&bridge), None);
+        // Once nothing waits, a new request can start.
+        bridge.wait(pending("b", "3333 3333")).unwrap();
+        assert_eq!(waiting_code(&bridge).as_deref(), Some("3333 3333"));
+    }
+
+    #[test]
+    fn an_expired_request_doesnt_conflict() {
+        let bridge = Bridge::default();
+        let mut old = pending("a", "1111 1111");
+        old.created = Instant::now() - PAIRING_LIFETIME;
+        bridge.wait(old).unwrap();
+        bridge.wait(pending("b", "2222 2222")).unwrap();
+        assert_eq!(waiting_code(&bridge).as_deref(), Some("2222 2222"));
+    }
 }

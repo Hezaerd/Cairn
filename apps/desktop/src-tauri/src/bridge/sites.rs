@@ -14,18 +14,27 @@ pub fn parse_origin(origin: &str) -> Option<Url> {
     Some(url)
 }
 
-/// A stored site matches a page with the same scheme and port, on the same
-/// host or one of its subdomains. A site without a scheme means `https`, so
-/// a login is never offered to a plain `http` page unless it says so.
+/// A stored site matches a page with the same scheme, port, and host. A host
+/// and the same host with `www.` in front match each other. A host written
+/// as `*.example.com` also matches every subdomain of `example.com`. A site
+/// without a scheme means `https`, so a login is never offered to a plain
+/// `http` page unless it says so.
 pub fn matches(site: &str, origin: &Url) -> bool {
     let site = site.trim();
-    if site.is_empty() {
+    let (scheme, rest) = match site.split_once("://") {
+        Some((scheme, rest)) => (scheme, rest),
+        None => ("https", site),
+    };
+    let (subdomains, rest) = match rest.strip_prefix("*.") {
+        Some(rest) => (true, rest),
+        None => (false, rest),
+    };
+    if rest.is_empty() {
         return false;
     }
-    let Some(stored) = Url::parse(site)
+    let Some(stored) = Url::parse(&format!("{scheme}://{rest}"))
         .ok()
         .filter(|url| url.host().is_some())
-        .or_else(|| Url::parse(&format!("https://{site}")).ok())
     else {
         return false;
     };
@@ -35,13 +44,20 @@ pub fn matches(site: &str, origin: &Url) -> bool {
         return false;
     }
     match (stored.host(), origin.host()) {
-        (Some(Host::Domain(stored)), Some(Host::Domain(page))) => {
-            let stored = stored.strip_prefix("www.").unwrap_or(stored);
-            page == stored || page.ends_with(&format!(".{stored}"))
+        // A wildcard needs at least a registrable-looking domain, never `*.com`.
+        (Some(Host::Domain(stored)), Some(Host::Domain(page))) if subdomains => {
+            stored.contains('.') && (page == stored || page.ends_with(&format!(".{stored}")))
         }
-        (Some(stored), Some(page)) => stored == page,
+        (Some(Host::Domain(stored)), Some(Host::Domain(page))) => {
+            without_www(page) == without_www(stored)
+        }
+        (Some(stored), Some(page)) => !subdomains && stored == page,
         _ => false,
     }
+}
+
+fn without_www(host: &str) -> &str {
+    host.strip_prefix("www.").unwrap_or(host)
 }
 
 #[cfg(test)]
@@ -71,21 +87,19 @@ mod tests {
     }
 
     #[test]
-    fn sites_match_hosts_and_subdomains() {
+    fn sites_match_exact_hosts() {
         let github = page("https://github.com");
         for site in [
             "github.com",
             "https://github.com",
             "https://github.com/login",
             "www.github.com",
+            "https://www.github.com",
             " GitHub.com ",
         ] {
             assert!(matches(site, &github), "{site}");
         }
-        assert!(matches(
-            "example.com",
-            &page("https://accounts.example.com")
-        ));
+        assert!(matches("github.com", &page("https://www.github.com")));
         for site in [
             "",
             "gist.github.com",
@@ -97,6 +111,41 @@ mod tests {
         ] {
             assert!(!matches(site, &github), "{site}");
         }
+        for origin in [
+            "https://accounts.example.com",
+            "https://user.www.example.com",
+        ] {
+            assert!(!matches("example.com", &page(origin)), "{origin}");
+            assert!(!matches("www.example.com", &page(origin)), "{origin}");
+        }
+    }
+
+    #[test]
+    fn wildcards_opt_into_subdomains() {
+        for site in [
+            "*.example.com",
+            "https://*.example.com",
+            "*.example.com/login",
+        ] {
+            for origin in [
+                "https://example.com",
+                "https://accounts.example.com",
+                "https://a.b.example.com",
+            ] {
+                assert!(matches(site, &page(origin)), "{site} {origin}");
+            }
+            for origin in [
+                "https://notexample.com",
+                "https://example.com.evil.example",
+                "http://accounts.example.com",
+            ] {
+                assert!(!matches(site, &page(origin)), "{site} {origin}");
+            }
+        }
+        assert!(!matches("*.com", &page("https://example.com")));
+        assert!(!matches("*.localhost", &page("https://app.localhost")));
+        assert!(!matches("*.", &page("https://example.com")));
+        assert!(!matches("*.192.168.1.1", &page("https://192.168.1.1")));
     }
 
     #[test]

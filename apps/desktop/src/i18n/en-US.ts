@@ -13,6 +13,7 @@ export const enUS = {
     namePlaceholder: "e.g. Personal GitHub",
     site: "Site",
     sitePlaceholder: "https://example.com",
+    siteHint: "Filled on this exact site. Write *.example.com to include its subdomains.",
     username: "Username",
     password: "Password",
     keepPassword: "leave empty to keep it",
@@ -101,15 +102,25 @@ export const enUS = {
     approve: "Approve",
     refuse: "Refuse",
     paired: (name: string) => `${name} is paired.`,
+    conflict:
+      "Two browsers asked to pair at the same time, so Cairn refused both. If you asked from only one, something else on this computer tried to pair. Try again from the extension.",
   },
   settings: {
     open: "Settings",
     title: "Settings",
     back: "Back to logins",
+    sections: "Settings sections",
+    general: "General",
+    language: "Language",
+    languageHint: "The language of the window and the tray menu.",
+    languageFailed: "Couldn't save the language.",
     appearance: "Appearance",
     colorScheme: "Color scheme",
     updates: "Updates",
     extension: "Browser extension",
+  },
+  language: {
+    system: "Computer language",
   },
   theme: {
     light: "Light",

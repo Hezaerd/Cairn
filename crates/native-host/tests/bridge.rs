@@ -5,7 +5,9 @@ use cairn_protocol::{Request, Response};
 use cairn_protocol::{read_frame, write_frame};
 use serde_json::{Value, json};
 use std::{
+    fs::OpenOptions,
     io::Write,
+    os::windows::fs::OpenOptionsExt,
     process::{Command, Stdio},
     time::Duration,
 };
@@ -59,6 +61,20 @@ async fn native_process_and_windows_pipe_lifecycle() {
         BridgeServer::bind().is_err(),
         "a second server must not bind"
     );
+    // Same-user processes can neither add a server instance nor take over
+    // the DACL to grant themselves that right.
+    assert!(
+        ServerOptions::new().create(pipe_name().unwrap()).is_err(),
+        "another instance must not be created"
+    );
+    const WRITE_DAC: u32 = 0x0004_0000;
+    assert!(
+        OpenOptions::new()
+            .access_mode(WRITE_DAC)
+            .open(pipe_name().unwrap())
+            .is_err(),
+        "the DACL must not be writable"
+    );
     let task = tokio::spawn(server.run(status));
     let a = tokio::task::spawn_blocking(|| exchange(vec![request("profile-a"), request("again")]));
     let b = tokio::task::spawn_blocking(|| exchange(vec![request("profile-b")]));
@@ -94,6 +110,10 @@ async fn native_process_and_windows_pipe_lifecycle() {
         .first_pipe_instance(true)
         .create(pipe_name().unwrap())
         .unwrap();
+    assert!(
+        BridgeServer::bind().is_err(),
+        "Cairn must not share a pipe another process created"
+    );
     let client = tokio::task::spawn_blocking(|| exchange(vec![request("timeout")]));
     stalled.connect().await.unwrap();
     let response = tokio::time::timeout(Duration::from_secs(4), client)

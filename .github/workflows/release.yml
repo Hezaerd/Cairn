@@ -5,48 +5,131 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
 
+env:
+  # Signs the installer for the updater. Keep it at the version in pnpm-lock.yaml;
+  # the build checks that it matches.
+  TAURI_CLI_VERSION: 2.12.2
+
 jobs:
-  windows:
+  # Builds the unsigned installer. The build runs vite, Tailwind, the router CLI,
+  # and their plugins, so it never sees the signing key or a token that can write.
+  build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Check the tag matches the app version
+        id: version
         shell: pwsh
         run: |
           $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           if ("v$version" -ne $env:GITHUB_REF_NAME) {
             throw "Tag $env:GITHUB_REF_NAME doesn't match tauri.conf.json version $version"
           }
+          "version=$version" >> $env:GITHUB_OUTPUT
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
           cache: pnpm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - run: pnpm install --frozen-lockfile
 
-      - uses: tauri-apps/tauri-action@v1
+      - name: Check the signing CLI version
+        shell: pwsh
+        run: |
+          $installed = (Get-Content apps/desktop/node_modules/@tauri-apps/cli/package.json -Raw | ConvertFrom-Json).version
+          if ($installed -ne $env:TAURI_CLI_VERSION) {
+            throw "TAURI_CLI_VERSION is $env:TAURI_CLI_VERSION but pnpm-lock.yaml has @tauri-apps/cli $installed"
+          }
+
+      # The release config bundles the extension and native host.
+      - name: Build the unsigned installer
+        run: pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.release.conf.json
+
+      - name: Find the installer
+        id: installer
+        shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $installer = Get-Item "target/release/bundle/nsis/*_$($env:VERSION)_*-setup.exe"
+          if (@($installer).Count -ne 1) { throw "Expected one NSIS installer, found $(@($installer).Count)" }
+          "path=$($installer.FullName)" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer
+          path: ${{ steps.installer.outputs.path }}
+          if-no-files-found: error
+          retention-days: 1
+
+  # Signs the installer for the updater and drafts the release. Nothing from the
+  # repository's dependencies runs here; only the pinned Tauri CLI sees the key.
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: updater-signing
+    permissions:
+      contents: write
+    steps:
+      - name: Install the Tauri CLI
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --ignore-scripts --no-audit --no-fund "@tauri-apps/cli@$TAURI_CLI_VERSION"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: installer
+          path: installer
+
+      - name: Sign the installer
+        shell: pwsh
+        env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          projectPath: apps/desktop
-          tauriScript: pnpm tauri
-          args: --config src-tauri/tauri.release.conf.json
-          tagName: ${{ github.ref_name }}
-          releaseName: Cairn ${{ github.ref_name }}
-          releaseBody: See the commits since the previous release.
-          releaseDraft: true
+        run: |
+          $installer = Get-Item installer/*-setup.exe
+          if (@($installer).Count -ne 1) { throw "Expected one NSIS installer, found $(@($installer).Count)" }
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          & "$env:RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" signer sign --app-version $version $installer.FullName
+          if ($LASTEXITCODE -ne 0) { throw "Signing failed" }
+
+      - name: Draft the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $installer = Get-Item installer/*-setup.exe
+          $signature = Get-Item "$($installer.FullName).sig"
+          $notes = "See the commits since the previous release."
+          $platform = @{
+            signature = (Get-Content $signature -Raw).Trim()
+            url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$($installer.Name)"
+          }
+          @{
+            version = $env:GITHUB_REF_NAME.Substring(1)
+            notes = $notes
+            pub_date = Get-Date -AsUTC -Format "yyyy-MM-ddTHH:mm:ssZ"
+            platforms = @{ "windows-x86_64" = $platform; "windows-x86_64-nsis" = $platform }
+          } | ConvertTo-Json -Depth 4 | Set-Content latest.json
+
+          gh release create $env:GITHUB_REF_NAME $installer.FullName $signature.FullName latest.json `
+            --draft --verify-tag `
+            --title "Cairn $env:GITHUB_REF_NAME" `
+            --notes $notes
+          if ($LASTEXITCODE -ne 0) { throw "Creating the release failed" }

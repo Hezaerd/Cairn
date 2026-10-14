@@ -13,6 +13,7 @@ export const frFR: Messages = {
     namePlaceholder: "Ex. GitHub personnel",
     site: "Site",
     sitePlaceholder: "https://exemple.com",
+    siteHint: "Rempli sur ce site exact. Écris *.exemple.com pour inclure ses sous-domaines.",
     username: "Identifiant",
     password: "Mot de passe",
     keepPassword: "laisser vide pour le conserver",
@@ -104,15 +105,25 @@ export const frFR: Messages = {
     approve: "Approuver",
     refuse: "Refuser",
     paired: (name: string) => `${name} est associé.`,
+    conflict:
+      "Deux navigateurs ont demandé l’association en même temps, alors Cairn a refusé les deux. Si tu n’as demandé que depuis un seul, autre chose sur cet ordinateur a essayé de s’associer. Réessaie depuis l’extension.",
   },
   settings: {
     open: "Paramètres",
     title: "Paramètres",
     back: "Retour aux identifiants",
+    sections: "Sections des paramètres",
+    general: "Général",
+    language: "Langue",
+    languageHint: "La langue de la fenêtre et du menu de la zone de notification.",
+    languageFailed: "Impossible d'enregistrer la langue.",
     appearance: "Apparence",
     colorScheme: "Jeu de couleurs",
     updates: "Mises à jour",
     extension: "Extension de navigateur",
+  },
+  language: {
+    system: "Langue de l'ordinateur",
   },
   theme: {
     light: "Clair",

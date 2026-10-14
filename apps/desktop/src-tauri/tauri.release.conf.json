@@ -4,7 +4,6 @@
     "beforeBuildCommand": "pnpm build && pnpm -w build:connector"
   },
   "bundle": {
-    "createUpdaterArtifacts": true,
     "resources": {
       "../../../target/release/cairn-native-host.exe": "cairn-native-host.exe",
       "../../../target/connector/cairn-native-host.json": "cairn-native-host.json",
