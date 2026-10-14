@@ -71,7 +71,7 @@
   ],
   "overrides": [
     {
-      "files": ["apps/desktop/src/**", "packages/ui/src/**"],
+      "files": ["apps/desktop/src/**", "apps/extension/src/**", "packages/ui/src/**"],
       "rules": {
         "shadcn/no-restyle": [
           "error",

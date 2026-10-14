@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { Effect } from "effect";
 import { decodePopupResult, type PopupRequest, type PopupResult } from "@cairn/contracts";
+import { Button } from "@cairn/ui/components/button";
+import { Checkbox } from "@cairn/ui/components/checkbox";
+import { Label } from "@cairn/ui/components/label";
 import { SITES } from "../sites";
 import { t } from "./i18n";
+import { Login } from "./Login";
 
 type State = { type: "Loading" } | PopupResult;
 
@@ -74,62 +78,80 @@ export default function App() {
     return <Status state={state} onRetry={refresh} />;
 
   return (
-    <main className="panel">
-      <header>
-        <h1>Cairn</h1>
-        <p role="status" aria-live="polite">
+    <main className="grid">
+      <header className="flex items-center gap-2 border-b px-4 py-3">
+        {/* A mask paints the mark in the text color, so it follows the theme. */}
+        <span
+          aria-hidden
+          className="size-4 bg-current mask-mark mask-contain mask-center mask-no-repeat"
+        />
+        <h1 className="mr-auto text-sm font-semibold">Cairn</h1>
+        <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
           {t("connected")}
         </p>
       </header>
       {state.type === "Unpaired" && (
-        <section>
-          <p className="detail">{t("pairIntro")}</p>
-          <button onClick={pair}>{t("pair")}</button>
+        <section className="grid gap-3 p-4">
+          <p className="text-xs/relaxed text-muted-foreground">{t("pairIntro")}</p>
+          <Button size="sm" className="justify-self-start" onClick={pair}>
+            {t("pair")}
+          </Button>
         </section>
       )}
       {state.type === "Pairing" && (
-        <section>
-          <p className="detail">{t("pairingCode")}</p>
-          <p className="code">{state.code}</p>
-          <p className="detail">{t("pairingThen")}</p>
-          <div className="actions">
-            <button onClick={refresh}>{t("refresh")}</button>
-            <button className="secondary" onClick={pair}>
+        <section className="grid gap-3 p-4">
+          <p className="text-xs/relaxed text-muted-foreground">{t("pairingCode")}</p>
+          <p className="rounded-md border bg-muted py-2 text-center font-mono text-display font-semibold tracking-widest">
+            {state.code}
+          </p>
+          <p className="text-xs/relaxed text-muted-foreground">{t("pairingThen")}</p>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={refresh}>
+              {t("refresh")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={pair}>
               {t("pairAgain")}
-            </button>
+            </Button>
           </div>
         </section>
       )}
       {state.type === "Locked" && (
-        <section>
-          <p className="detail">{t("locked")}</p>
-          <button onClick={refresh}>{t("refresh")}</button>
+        <section className="grid gap-3 p-4">
+          <p className="text-xs/relaxed text-muted-foreground">{t("locked")}</p>
+          <Button size="sm" className="justify-self-start" onClick={refresh}>
+            {t("refresh")}
+          </Button>
         </section>
       )}
       {state.type === "NoSite" && (
-        <section>
-          <p className="detail">{t("noSite")}</p>
+        <section className="p-4">
+          <p className="text-xs/relaxed text-muted-foreground">{t("noSite")}</p>
         </section>
       )}
       {state.type === "Logins" && (
-        <section>
-          <h2>{t("loginsFor", state.host)}</h2>
+        <section className="grid gap-1 px-1.5 pt-3 pb-1.5">
+          <h2 className="truncate px-2.5 text-2xs text-muted-foreground">
+            {t("loginsFor", state.host)}
+          </h2>
           {state.logins.length === 0 ? (
-            <p className="detail">{t("noLogins", state.host)}</p>
+            <p className="px-2.5 pb-2 text-xs/relaxed text-muted-foreground">
+              {t("noLogins", state.host)}
+            </p>
           ) : (
-            <ul className="logins">
+            <ul className="grid max-h-65 gap-0.5 overflow-y-auto">
               {state.logins.map((login) => (
                 <li key={login.id}>
-                  <button className="login" onClick={() => fill(login.id)}>
-                    <strong>{login.name}</strong>
-                    <span>{login.username || t("noUsername")}</span>
-                  </button>
+                  <Login
+                    name={login.name}
+                    username={login.username}
+                    onFill={() => fill(login.id)}
+                  />
                 </li>
               ))}
             </ul>
           )}
           {notice && (
-            <p className="detail" role="alert">
+            <p className="px-2.5 pb-1 text-xs text-destructive" role="alert">
               {notice}
             </p>
           )}
@@ -139,7 +161,9 @@ export default function App() {
         <SuggestionsToggle />
       )}
       {state.type !== "Filled" && state.type !== "NoForm" && (
-        <footer>{t("appVersion", state.appVersion)}</footer>
+        <footer className="border-t px-4 py-2 text-2xs text-muted-foreground">
+          {t("appVersion", state.appVersion)}
+        </footer>
       )}
     </main>
   );
@@ -169,17 +193,21 @@ function SuggestionsToggle() {
   if (enabled === null) return null;
 
   return (
-    <label className="toggle">
-      <input
-        type="checkbox"
+    <div className="flex items-start gap-2.5 border-t px-4 py-3">
+      <Checkbox
+        id="suggestions"
+        className="mt-px"
+        aria-describedby="suggestions-detail"
         checked={enabled}
-        onChange={(event) => void toggle(event.target.checked)}
+        onCheckedChange={(checked) => void toggle(checked === true)}
       />
-      <span>
-        {t("suggestions")}
-        <small>{t("suggestionsDetail")}</small>
-      </span>
-    </label>
+      <div className="grid gap-1">
+        <Label htmlFor="suggestions">{t("suggestions")}</Label>
+        <p id="suggestions-detail" className="text-2xs/snug text-muted-foreground">
+          {t("suggestionsDetail")}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -193,16 +221,16 @@ function Status({
   const installationError = state.type === "Unavailable" && state.code === "HostUnavailable";
 
   return (
-    <main className="welcome">
-      <h1>Cairn</h1>
-      <p role="status" aria-live="polite">
+    <main className="grid min-h-50 content-center justify-items-center gap-1.5 p-6 text-center">
+      <h1 className="text-lg font-semibold">Cairn</h1>
+      <p role="status" aria-live="polite" className="text-sm">
         {state.type === "Loading"
           ? t("connecting")
           : installationError
             ? t("hostMissing")
             : t("unavailable")}
       </p>
-      <p className="detail">
+      <p className="text-xs/relaxed text-muted-foreground">
         {state.type === "Loading"
           ? t("searching")
           : installationError
@@ -213,9 +241,9 @@ function Status({
                 ? t("pairingConflict")
                 : t("connectionFailed", state.code)}
       </p>
-      <button disabled={state.type === "Loading"} onClick={onRetry}>
+      <Button size="sm" className="mt-3" disabled={state.type === "Loading"} onClick={onRetry}>
         {t("retry")}
-      </button>
+      </Button>
     </main>
   );
 }

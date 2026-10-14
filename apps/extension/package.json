@@ -17,10 +17,14 @@
   "dependencies": {
     "@cairn/client": "workspace:*",
     "@cairn/contracts": "workspace:*",
+    "@cairn/ui": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "1.170.44",
     "effect": "^4.0.4",
+    "lucide-react": "^1.55.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@tanstack/router-cli": "1.167.43",

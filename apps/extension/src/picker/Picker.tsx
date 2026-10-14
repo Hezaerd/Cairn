@@ -7,7 +7,9 @@ import {
   type PickerResult,
 } from "@cairn/contracts";
 import { useTrustedVisibility } from "../frame/visibility";
+import { Button } from "@cairn/ui/components/button";
 import { Generator } from "./Generator";
+import { Login } from "../popup/Login";
 import { t } from "../popup/i18n";
 
 // The list of logins shown under a login field, or the password generator
@@ -75,7 +77,9 @@ export default function Picker() {
 
     // Arrow Down in the field moves focus here.
     const onFocus = () =>
-      (list.current ?? main.current)?.querySelector<HTMLElement>("button, input")?.focus();
+      (list.current ?? main.current)
+        ?.querySelector<HTMLElement>("button, input, [role=slider]")
+        ?.focus();
 
     addEventListener("keydown", onKey);
     addEventListener("focus", onFocus);
@@ -103,20 +107,26 @@ export default function Picker() {
   };
 
   return (
-    <main className="picker" ref={main}>
-      {state.type === "Loading" && <p className="detail">{t("connecting")}</p>}
+    <main className="grid max-h-80 gap-1 p-1.5" ref={main}>
+      {state.type === "Loading" && (
+        <p className="px-2.5 py-2 text-xs text-muted-foreground">{t("connecting")}</p>
+      )}
       {state.type === "Locked" && (
-        <section>
-          <p className="detail">{t("locked")}</p>
-          <button onClick={retry}>{t("refresh")}</button>
+        <section className="grid justify-items-start gap-2.5 p-2.5">
+          <p className="text-xs/relaxed text-muted-foreground">{t("locked")}</p>
+          <Button size="sm" onClick={retry}>
+            {t("refresh")}
+          </Button>
         </section>
       )}
       {state.type === "Unavailable" && (
-        <section>
-          <p className="detail">
+        <section className="grid justify-items-start gap-2.5 p-2.5">
+          <p className="text-xs/relaxed text-muted-foreground">
             {state.code === "AppUnavailable" ? t("openApp") : t("connectionFailed", state.code)}
           </p>
-          <button onClick={retry}>{t("retry")}</button>
+          <Button size="sm" onClick={retry}>
+            {t("retry")}
+          </Button>
         </section>
       )}
       {state.type === "Generator" && (
@@ -130,23 +140,28 @@ export default function Picker() {
       )}
       {state.type === "Logins" && (
         <>
-          <h2>{t("loginsFor", state.host)}</h2>
+          <h2 className="truncate px-2.5 pt-1 text-2xs text-muted-foreground">
+            {t("loginsFor", state.host)}
+          </h2>
           {state.logins.length === 0 ? (
-            <p className="detail">{t("noLogins", state.host)}</p>
+            <p className="px-2.5 pb-1.5 text-xs/relaxed text-muted-foreground">
+              {t("noLogins", state.host)}
+            </p>
           ) : (
-            <ul className="logins" ref={list}>
+            <ul className="grid max-h-65 gap-0.5 overflow-y-auto" ref={list}>
               {state.logins.map((login) => (
                 <li key={login.id}>
-                  <button className="login" onClick={() => fill(login.id)}>
-                    <strong>{login.name}</strong>
-                    <span>{login.username || t("noUsername")}</span>
-                  </button>
+                  <Login
+                    name={login.name}
+                    username={login.username}
+                    onFill={() => fill(login.id)}
+                  />
                 </li>
               ))}
             </ul>
           )}
           {notice && (
-            <p className="detail" role="alert">
+            <p className="px-2.5 pb-1 text-xs text-destructive" role="alert">
               {notice}
             </p>
           )}
