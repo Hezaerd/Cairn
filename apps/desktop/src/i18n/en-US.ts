@@ -106,8 +106,16 @@ export const enUS = {
     open: "Settings",
     title: "Settings",
     back: "Back to logins",
+    sections: "Settings sections",
+    general: "General",
+    language: "Language",
+    languageHint: "The language of the window and the tray menu.",
+    languageFailed: "Couldn't save the language.",
     appearance: "Appearance",
     colorScheme: "Color scheme",
+  },
+  language: {
+    system: "Windows language",
   },
   theme: {
     light: "Light",

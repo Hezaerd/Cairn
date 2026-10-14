@@ -7,7 +7,8 @@ use zeroize::Zeroizing;
 
 pub(crate) type Store = Arc<Mutex<Vault>>;
 
-pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+/// The vault's folder, which also holds the app's settings.
+pub fn directory(app: &tauri::App) -> tauri::Result<std::path::PathBuf> {
     let directory = app.path().app_local_data_dir()?;
     // Isolated native-app tests must never create or open the user's real vault.
     // Release builds always use Tauri's per-user application directory.
@@ -15,6 +16,13 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let directory = std::env::var_os("CAIRN_TEST_DATA_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or(directory);
+    Ok(directory)
+}
+
+pub fn setup(
+    app: &mut tauri::App,
+    directory: std::path::PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
     let store = Arc::new(Mutex::new(Vault::open(directory)?));
     app.manage(store.clone());
     let handle = app.handle().clone();
