@@ -24,6 +24,9 @@
   },
   "pairingThen": { "message": "Approve it in Cairn, then refresh." },
   "pairAgain": { "message": "Ask again" },
+  "pairingConflict": {
+    "message": "Another browser asked to pair at the same time, so Cairn refused both. Check Cairn, then try again."
+  },
   "locked": { "message": "Unlock Cairn to see your logins." },
   "noSite": { "message": "Open a website to see its logins." },
   "loginsFor": {
