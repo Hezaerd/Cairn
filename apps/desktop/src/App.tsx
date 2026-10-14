@@ -1,5 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { useSearch } from "@tanstack/react-router";
+import type { FormEvent, ReactNode } from "react";
 import { Match, Schema } from "effect";
 import { toast } from "sonner";
 import { Eye, EyeOff, KeyRound, LockKeyhole, Pencil, Timer, Trash2 } from "lucide-react";
@@ -19,13 +18,14 @@ import { BrowsersDialog } from "./bridge/Browsers";
 import { Authenticator } from "./authenticator/Authenticator";
 import { OneTimeCode } from "./authenticator/OneTimeCode";
 import { useT } from "./i18n/I18nProvider";
+import { searchEntries, selectEntry, useNavigation } from "./store/navigation";
 
 type Vault = ReturnType<typeof useVault>;
 
 function Credentials({ vault }: { vault: Vault }) {
   const t = useT();
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const query = useNavigation((state) => state.query.logins);
+  const selectedId = useNavigation((state) => state.selected.logins);
 
   // Entries that hold only an authenticator key live in the other view.
   const entries = vault.snapshot.entries.filter(
@@ -37,7 +37,7 @@ function Credentials({ vault }: { vault: Vault }) {
 
   return (
     <>
-      <Toolbar vault={vault} view="logins">
+      <Toolbar vault={vault}>
         <BrowsersDialog />
         <EntryDialog vault={vault} />
       </Toolbar>
@@ -51,11 +51,11 @@ function Credentials({ vault }: { vault: Vault }) {
           selected={selected}
           query={query}
           onQuery={(next) => {
-            setQuery(next);
+            searchEntries("logins", next);
             vault.hideSecret();
           }}
           onSelect={(id) => {
-            setSelectedId(id);
+            selectEntry("logins", id);
             vault.hideSecret();
           }}
           marker={(entry) =>
@@ -257,7 +257,7 @@ function Authentication({ vault }: { vault: Vault }) {
 export default function App() {
   const vault = useVault();
   const t = useT();
-  const { view } = useSearch({ from: "/" });
+  const view = useNavigation((state) => state.view);
 
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Cairn">

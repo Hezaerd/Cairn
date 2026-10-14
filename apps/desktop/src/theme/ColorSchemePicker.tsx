@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useT } from "../i18n/I18nProvider";
 import type { Theme } from "./theme";
-import { useTheme } from "./ThemeProvider";
+import { setTheme, usePreferences } from "../store/preferences";
 import { ThemeWireframe } from "./ThemeWireframe";
 
 const themes = ["system", "light", "dark"] as const satisfies ReadonlyArray<Theme>;
@@ -9,7 +9,7 @@ const themes = ["system", "light", "dark"] as const satisfies ReadonlyArray<Them
 const labels = { system: "useSystem", light: "useLight", dark: "useDark" } as const;
 
 export function ColorSchemePicker({ labelledBy }: { labelledBy: string }) {
-  const { theme, setTheme } = useTheme();
+  const theme = usePreferences((state) => state.theme);
   const t = useT();
 
   return (

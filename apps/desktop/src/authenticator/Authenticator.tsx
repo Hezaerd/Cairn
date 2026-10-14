@@ -15,6 +15,7 @@ import type { EntrySummary } from "../vault/VaultClient";
 import type { useVault } from "../vault/useVault";
 import { DetailField, EditDialog } from "../vault/EntryDialogs";
 import { EntryList, NoSelection, Toolbar, matches } from "../vault/Workspace";
+import { searchEntries, selectEntry, useNavigation } from "../store/navigation";
 import { AddCodesDialog } from "./AddCodes";
 import { OneTimeCode } from "./OneTimeCode";
 
@@ -79,15 +80,15 @@ function RemoveCodeDialog({
 /** The entries that hold an authenticator key, laid out like the logins. */
 export function Authenticator({ vault }: { vault: Vault }) {
   const t = useT();
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const query = useNavigation((state) => state.query.authenticator);
+  const selectedId = useNavigation((state) => state.selected.authenticator);
   const [removing, setRemoving] = useState<string | null>(null);
   const entries = vault.snapshot.entries.filter((entry) => entry.hasTotp && matches(entry, query));
   const selected = entries.find((entry) => entry.id === selectedId) ?? entries[0];
 
   return (
     <>
-      <Toolbar vault={vault} view="authenticator">
+      <Toolbar vault={vault}>
         <AddCodesDialog vault={vault} />
       </Toolbar>
       <div className="grid min-h-0 flex-1 grid-cols-sidebar max-[680px]:grid-cols-sidebar-narrow">
@@ -99,8 +100,8 @@ export function Authenticator({ vault }: { vault: Vault }) {
           entries={entries}
           selected={selected}
           query={query}
-          onQuery={setQuery}
-          onSelect={setSelectedId}
+          onQuery={(next) => searchEntries("authenticator", next)}
+          onSelect={(id) => selectEntry("authenticator", id)}
         />
         <section className="flex overflow-y-auto" aria-label={t.authenticator.details}>
           {selected ? (

@@ -174,7 +174,7 @@ export const enUS = {
   settings: {
     open: "Settings",
     title: "Settings",
-    back: "Back to logins",
+    back: "Back to the vault",
     sections: "Settings sections",
     general: "General",
     language: "Language",

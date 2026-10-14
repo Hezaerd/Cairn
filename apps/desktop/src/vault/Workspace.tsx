@@ -15,52 +15,44 @@ import type { useVault } from "./useVault";
 import { SiteIcon } from "../favicon/SiteIcon";
 import { PairingDialog } from "../bridge/Browsers";
 import { useT } from "../i18n/I18nProvider";
+import { showView, useNavigation } from "../store/navigation";
 
 type Vault = ReturnType<typeof useVault>;
-
-export type View = "logins" | "authenticator";
 
 const tab =
   "flex items-center gap-2 rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=page]:font-semibold aria-[current=page]:text-foreground";
 
 /** The tabs for the two views, the view's own actions, and what both share. */
-export function Toolbar({
-  vault,
-  view,
-  children,
-}: {
-  vault: Vault;
-  view: View;
-  children: ReactNode;
-}) {
+export function Toolbar({ vault, children }: { vault: Vault; children: ReactNode }) {
   const t = useT();
+  const view = useNavigation((state) => state.view);
   const logins = vault.snapshot.entries.filter((entry) => entry.hasPassword).length;
   const codes = vault.snapshot.entries.filter((entry) => entry.hasTotp).length;
 
   return (
     <div className="flex min-h-14.25 items-center gap-2 border-b px-4 py-2.5 max-[680px]:px-3">
       <nav className="mr-auto flex items-center gap-1" aria-label={t.views.label}>
-        <Link
-          to="/"
-          search={{}}
+        <button
+          type="button"
           className={tab}
           aria-current={view === "logins" ? "page" : undefined}
+          onClick={() => showView("logins")}
         >
           <KeyRound size={16} />
           <span className="text-sm">{t.credentials.title}</span>
           <span className="text-xs font-normal text-muted-foreground">{logins}</span>
-        </Link>
+        </button>
         <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-        <Link
-          to="/"
-          search={{ view: "authenticator" }}
+        <button
+          type="button"
           className={tab}
           aria-current={view === "authenticator" ? "page" : undefined}
+          onClick={() => showView("authenticator")}
         >
           <Timer size={16} />
           <span className="text-sm">{t.views.authenticator}</span>
           <span className="text-xs font-normal text-muted-foreground">{codes}</span>
-        </Link>
+        </button>
       </nav>
       {children}
       <Button variant="ghost" size="icon-sm" asChild>
