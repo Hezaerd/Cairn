@@ -14,7 +14,7 @@ pnpm build:host
 pnpm dev:desktop
 ```
 
-To load the extension in Helium and connect it to the app, follow [Development](docs/development.md#browser-extension), then pair it as described in [Browser bridge](docs/browser-bridge.md#using-it).
+The installer ships the extension; Cairn's Settings → Browser extension shows how to load it. To load a dev copy from the checkout instead, follow [Development](docs/development.md#browser-extension). Then pair it as described in [Browser bridge](docs/browser-bridge.md#using-it).
 
 ## Commands
 

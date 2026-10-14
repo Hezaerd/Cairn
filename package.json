@@ -13,6 +13,7 @@
     "check:rust": "cargo check --workspace",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm check:rust",
     "build:host": "cargo build -p cairn-native-host",
+    "build:connector": "tsx scripts/build-connector.ts",
     "test:ts": "tsx --test tests/*.test.ts",
     "test:rust": "cargo test --workspace",
     "test": "pnpm test:ts && pnpm test:rust",
