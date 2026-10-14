@@ -22,6 +22,9 @@ const MAX_FILE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_PLAINTEXT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_ENTRIES: usize = 10_000;
 const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+/// Version 2 binds the paired-browser list to the vault. Version 1 vaults
+/// still open and are rewritten as version 2 on unlock.
+const VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum VaultError {
@@ -59,7 +62,7 @@ struct Header {
 
 impl Header {
     fn validate(&self) -> Result<()> {
-        if self.version != 1 {
+        if !(1..=VERSION).contains(&self.version) {
             return Err(VaultError::UnsupportedVersion);
         }
         // Bound untrusted costs before asking Argon2 to allocate or compute.
@@ -83,6 +86,15 @@ struct Envelope {
     wrapped_key: Vec<u8>,
     data_nonce: [u8; 24],
     ciphertext: Vec<u8>,
+}
+
+/// The encrypted payload since version 2. Version 1 held only the entries.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Contents<E> {
+    entries: E,
+    /// The nonce of the `browsers.cairn` write this vault vouches for.
+    browsers: Option<[u8; 24]>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Zeroize, ZeroizeOnDrop)]
@@ -174,6 +186,7 @@ struct Session {
     favicon_token: String,
     favicons: Option<Vec<favicon::CachedIcon>>,
     browsers: Option<Vec<browsers::PairedBrowser>>,
+    browsers_nonce: Option<[u8; 24]>,
     key: Zeroizing<[u8; 32]>,
     envelope: Envelope,
     entries: Vec<Entry>,
@@ -234,7 +247,7 @@ impl Vault {
             return Err(VaultError::InvalidInput);
         }
         let mut header = Header {
-            version: 1,
+            version: VERSION,
             memory_kib: 65_536,
             iterations: 3,
             lanes: 1,
@@ -261,6 +274,7 @@ impl Vault {
             favicon_token: favicon::session_token()?,
             favicons: None,
             browsers: None,
+            browsers_nonce: None,
             key,
             envelope: Envelope {
                 header,
@@ -310,8 +324,15 @@ impl Vault {
             &envelope.ciphertext,
             &envelope.header.aad(b"cairn-data-v1")?,
         )?;
-        let entries: Vec<Entry> =
-            serde_json::from_slice(&plaintext).map_err(|_| VaultError::InvalidVault)?;
+        let legacy = envelope.header.version == 1;
+        let (entries, browsers_nonce): (Vec<Entry>, _) = if legacy {
+            let entries = serde_json::from_slice(&plaintext);
+            (entries.map_err(|_| VaultError::InvalidVault)?, None)
+        } else {
+            let contents: Contents<Vec<Entry>> =
+                serde_json::from_slice(&plaintext).map_err(|_| VaultError::InvalidVault)?;
+            (contents.entries, contents.browsers)
+        };
         if entries.len() > MAX_ENTRIES {
             return Err(VaultError::InvalidVault);
         }
@@ -319,13 +340,40 @@ impl Vault {
             favicon_token: favicon::session_token()?,
             favicons: None,
             browsers: None,
+            browsers_nonce,
             key,
             envelope,
             entries,
             disk_bytes: bytes,
             last_used: Instant::now(),
         });
+        if legacy && let Err(error) = self.upgrade(&wrapping_key) {
+            self.lock();
+            return Err(error);
+        }
         Ok(())
+    }
+
+    /// Rewrites a version 1 vault as version 2 and binds the paired-browser
+    /// list found next to it, which version 1 had no way to vouch for.
+    fn upgrade(&mut self, wrapping_key: &[u8; 32]) -> Result<()> {
+        let path = self.directory.join("browsers.cairn");
+        let session = self.active()?;
+        // Read under the version 1 header, before the header changes.
+        let browsers = browsers::read_list(&path, session).ok();
+        let header = &mut session.envelope.header;
+        header.version = VERSION;
+        session.envelope.key_nonce = random()?;
+        session.envelope.wrapped_key = encrypt(
+            wrapping_key,
+            &session.envelope.key_nonce,
+            session.key.as_ref(),
+            &header.aad(b"cairn-key-v1")?,
+        )?;
+        self.write(|session| match browsers {
+            Some((list, _)) => browsers::bind(&path, session, list),
+            None => Ok(()),
+        })
     }
 
     pub fn lock(&mut self) {
@@ -444,9 +492,13 @@ impl Vault {
         })
     }
 
+    fn commit(&mut self, change: impl FnOnce(&mut Vec<Entry>) -> Result<()>) -> Result<()> {
+        self.write(|session| change(&mut session.entries))
+    }
+
     /// Applies `change` and writes the vault. A rejected change leaves the
     /// session untouched; a failed write locks it.
-    fn commit(&mut self, change: impl FnOnce(&mut Vec<Entry>) -> Result<()>) -> Result<()> {
+    fn write(&mut self, change: impl FnOnce(&mut Session) -> Result<()>) -> Result<()> {
         let path = self.path();
         let backup = self.directory.join("backups/previous.cairn");
         let session = self.active()?;
@@ -454,7 +506,7 @@ impl Vault {
         if storage::read(&path)? != session.disk_bytes {
             return Err(VaultError::ChangedOnDisk);
         }
-        change(&mut session.entries)?;
+        change(session)?;
         let result = (|| {
             let bytes = seal(session)?;
             storage::replace(&backup, &session.disk_bytes)?;
@@ -522,7 +574,11 @@ fn seal(session: &mut Session) -> Result<Vec<u8>> {
     // allocations behind. Cursor refuses writes past this fixed capacity.
     let mut plaintext = Zeroizing::new(vec![0u8; MAX_PLAINTEXT_BYTES]);
     let mut writer = std::io::Cursor::new(plaintext.as_mut_slice());
-    serde_json::to_writer(&mut writer, &session.entries).map_err(|_| VaultError::InvalidInput)?;
+    let contents = Contents {
+        entries: &session.entries,
+        browsers: session.browsers_nonce,
+    };
+    serde_json::to_writer(&mut writer, &contents).map_err(|_| VaultError::InvalidInput)?;
     let length = writer.position() as usize;
     session.envelope.data_nonce = random()?;
     session.envelope.ciphertext = encrypt(

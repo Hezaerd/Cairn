@@ -20,7 +20,9 @@ The popup needs Cairn running with the vault unlocked. The vault locks when Cair
 
 ## Matching sites
 
-A login matches a tab when they share the scheme and port, and the tab's host is the login's host or one of its subdomains. A leading `www.` on the stored site is ignored. A site saved without a scheme means `https`, so a login is offered to a plain `http` page only if its site says `http://`. IP addresses must match exactly.
+A login matches a tab when they share the scheme, port, and host. `example.com` and `www.example.com` count as the same host, but `accounts.example.com` doesn't match either. To include subdomains, write the site as `*.example.com`: it matches `example.com` and every host under it. A wildcard needs a dot after it, so `*.com` matches nothing. A site saved without a scheme means `https`, so a login is offered to a plain `http` page only if its site says `http://`. IP addresses must match exactly.
+
+Use a wildcard only for a domain you trust as a whole. Any page under it gets the login, so XSS or user content on one subdomain, or a shared host like `*.github.io`, is enough to obtain a fill. Logins saved from the browser keep the exact origin of the form.
 
 The content script fills the login, after checking that the tab is still on the origin it was asked for. It fills the form whose field opened the picker, or else the first form with a visible password field: that password field and the username field before it in the same form. On a page that asks for the username alone, it fills a field marked `autocomplete="username"` or `type="email"`. It skips sign-up and password-change forms, with two password fields or one marked `new-password`. It doesn't submit the form.
 
