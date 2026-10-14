@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { Effect } from "effect";
 import { Download, Loader2, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
+import { Button } from "@cairn/ui/components/button";
+import { Separator } from "@cairn/ui/components/separator";
+import { cn } from "@cairn/ui/lib/utils";
 import { useT } from "../i18n/I18nProvider";
 import {
   checkForUpdate,

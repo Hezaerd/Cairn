@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { Effect } from "effect";
 import { RefreshCw, WandSparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Slider } from "@/components/ui/slider";
+import { Button } from "@cairn/ui/components/button";
+import { Checkbox } from "@cairn/ui/components/checkbox";
+import { Label } from "@cairn/ui/components/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@cairn/ui/components/popover";
+import { Slider } from "@cairn/ui/components/slider";
 import { VaultClient, type ErrorCode, type PasswordOptions } from "../vault/VaultClient";
 import { useRuntime } from "../vault/useVault";
 import { useT } from "../i18n/I18nProvider";

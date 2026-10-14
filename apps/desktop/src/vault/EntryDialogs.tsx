@@ -1,13 +1,13 @@
 import { useRef, type FormEvent, type ReactNode } from "react";
 import { Schema } from "effect";
-import { toast } from "sonner";
+import { toast } from "@cairn/ui/components/sonner";
 import { Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@cairn/ui/lib/utils";
+import { Button } from "@cairn/ui/components/button";
+import { Field, FieldDescription, FieldLabel } from "@cairn/ui/components/field";
+import { Checkbox } from "@cairn/ui/components/checkbox";
+import { Input } from "@cairn/ui/components/input";
+import { Textarea } from "@cairn/ui/components/textarea";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@cairn/ui/components/dialog";
 import { EntryUpdate, NewEntry, type EntrySummary } from "./VaultClient";
 import type { useVault } from "./useVault";
 import { PasswordGenerator } from "../generator/PasswordGenerator";
@@ -187,7 +187,7 @@ export function EntryDialog({ vault }: { vault: Vault }) {
           {t.add.open}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent closeLabel={t.common.close}>
         <DialogHeader>
           <DialogTitle>{t.add.title}</DialogTitle>
           <DialogDescription>{t.add.description}</DialogDescription>
@@ -239,7 +239,7 @@ export function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary
 
   return (
     <Dialog open={editing !== null} onOpenChange={(open) => !open && vault.stopEdit()}>
-      <DialogContent>
+      <DialogContent closeLabel={t.common.close}>
         <DialogHeader>
           <DialogTitle>{t.edit.title}</DialogTitle>
           <DialogDescription>{t.edit.description}</DialogDescription>
@@ -270,7 +270,7 @@ export function DeleteDialog({ vault, entry }: { vault: Vault; entry: EntrySumma
       open={vault.deleting === entry.id}
       onOpenChange={(open) => vault.setDeleting(open ? entry.id : null)}
     >
-      <DialogContent>
+      <DialogContent closeLabel={t.common.close}>
         <DialogHeader>
           <DialogTitle>{t.remove.title(entry.name)}</DialogTitle>
           <DialogDescription>{t.remove.description}</DialogDescription>

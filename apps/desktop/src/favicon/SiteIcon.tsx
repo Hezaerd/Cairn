@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { Effect } from "effect";
 import { VaultRuntime } from "../vault/runtime";
 import { FaviconService } from "./FaviconService";
-import { cn } from "@/lib/utils";
+import { cn } from "@cairn/ui/lib/utils";
 
 export function SiteIcon({
   id,

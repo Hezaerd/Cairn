@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { KeyRound, LockKeyhole, Search, Settings, Timer } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@cairn/ui/components/button";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
-import { Input } from "@/components/ui/input";
+} from "@cairn/ui/components/empty";
+import { Input } from "@cairn/ui/components/input";
 import type { EntrySummary } from "./VaultClient";
 import type { useVault } from "./useVault";
 import { SiteIcon } from "../favicon/SiteIcon";

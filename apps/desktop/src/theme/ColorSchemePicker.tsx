@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@cairn/ui/lib/utils";
 import { useT } from "../i18n/I18nProvider";
 import type { Theme } from "./theme";
 import { setTheme, usePreferences } from "../store/preferences";

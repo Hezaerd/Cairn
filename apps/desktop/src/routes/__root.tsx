@@ -1,5 +1,5 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@cairn/ui/components/sonner";
 import { useT } from "@/i18n/I18nProvider";
 import { TitleBar } from "@/window/TitleBar";
 import "../App.css";

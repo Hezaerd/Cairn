@@ -55,7 +55,7 @@
   ],
   "settings": {
     "shadcn": {
-      "note": "Reuse the components in apps/desktop/src/components/ui and the tokens in apps/desktop/src/App.css. When a design needs a new treatment, add a variant or a token there."
+      "note": "Reuse the components in packages/ui/src/components and the tokens in packages/ui/src/styles.css. When a design needs a new treatment, add a variant or a token there."
     }
   },
   "jsPlugins": [
@@ -71,7 +71,7 @@
   ],
   "overrides": [
     {
-      "files": ["apps/desktop/src/**"],
+      "files": ["apps/desktop/src/**", "packages/ui/src/**"],
       "rules": {
         "shadcn/no-restyle": [
           "error",
@@ -87,7 +87,7 @@
       }
     },
     {
-      "files": ["apps/desktop/src/components/ui/**"],
+      "files": ["packages/ui/src/components/**"],
       "rules": {
         "shadcn/no-restyle": "off",
         "shadcn/no-arbitrary-values": "off"

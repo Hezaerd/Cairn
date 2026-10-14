@@ -7,7 +7,7 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@cairn/ui/components/select";
 import { useLanguage, useT } from "@/i18n/I18nProvider";
 import { Locale, localeNames, locales } from "@/i18n/locale";
 import { UpdateSettings } from "@/updater/UpdateSettings";
