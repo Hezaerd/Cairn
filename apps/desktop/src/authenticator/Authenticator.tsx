@@ -90,7 +90,7 @@ export function Authenticator({ vault }: { vault: Vault }) {
       <Toolbar vault={vault} view="authenticator">
         <AddCodesDialog vault={vault} />
       </Toolbar>
-      <div className="grid min-h-0 flex-1 grid-cols-[270px_minmax(0,1fr)] max-[680px]:grid-cols-[210px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-sidebar max-[680px]:grid-cols-sidebar-narrow">
         <EntryList
           label={t.authenticator.list}
           searchLabel={t.authenticator.search}
@@ -104,7 +104,7 @@ export function Authenticator({ vault }: { vault: Vault }) {
         />
         <section className="flex overflow-y-auto" aria-label={t.authenticator.details}>
           {selected ? (
-            <article className="w-full max-w-[720px] p-8 max-[680px]:p-5.5">
+            <article className="w-full max-w-180 p-8 max-[680px]:p-5.5">
               <header className="flex items-center gap-3.5 pb-7">
                 <SiteIcon
                   key={`${selected.id}:${selected.site}`}

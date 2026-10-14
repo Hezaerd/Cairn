@@ -19,7 +19,7 @@ function Toaster(props: ToasterProps) {
   return (
     <Sonner
       theme="system"
-      className="toaster group"
+      className="group"
       closeButton
       containerAriaLabel="Notifications"
       icons={{

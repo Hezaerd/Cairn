@@ -79,19 +79,19 @@ export function PasswordGenerator({ onUse }: { onUse: (password: string) => void
           type="button"
           variant="outline"
           size="icon"
-          className="size-[34px] shrink-0"
+          className="size-8.5 shrink-0"
           aria-label={t.generator.open}
           title={t.generator.open}
         >
           <WandSparkles />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="grid w-80 gap-3.5 p-3.5">
+      <PopoverContent align="end" className="w-80">
         <h3 className="text-xs font-semibold">{t.generator.title}</h3>
         <output
           aria-label={t.generator.preview}
           aria-live="polite"
-          className="min-h-[52px] rounded-md border bg-muted px-2.5 py-2 font-mono text-[13px]/[1.4] wrap-anywhere"
+          className="min-h-13 rounded-md border bg-muted px-2.5 py-2 font-mono text-body/snug wrap-anywhere"
         >
           {error ? (
             <span className="font-sans text-xs text-destructive">{t.errors[error]}</span>
@@ -178,9 +178,7 @@ function GeneratorOption({
         disabled={disabled}
         onCheckedChange={(state) => onChange(state === true)}
       />
-      <Label htmlFor={id} className="text-xs font-normal">
-        {label}
-      </Label>
+      <Label htmlFor={id}>{label}</Label>
     </div>
   );
 }

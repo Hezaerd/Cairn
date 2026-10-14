@@ -9,7 +9,7 @@ function Appearance() {
 
   return (
     <section aria-labelledby="appearance" className="grid gap-3">
-      <h2 id="appearance" className="text-[11px] text-muted-foreground">
+      <h2 id="appearance" className="text-2xs text-muted-foreground">
         {t.settings.appearance}
       </h2>
       <div className="grid gap-3 rounded-lg border bg-muted/50 p-4">

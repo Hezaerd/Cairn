@@ -53,6 +53,11 @@
     "**/routeTree.gen.ts",
     "**/.tanstack/**"
   ],
+  "settings": {
+    "shadcn": {
+      "note": "Reuse the components in apps/desktop/src/components/ui and the tokens in apps/desktop/src/App.css. When a design needs a new treatment, add a variant or a token there."
+    }
+  },
   "jsPlugins": [
     {
       "name": "anti-slop",
@@ -61,6 +66,32 @@
     {
       "name": "anti-slop-effect",
       "specifier": "./tools/oxlint/anti-slop/effect/index.ts"
+    },
+    "@shadcn/lint"
+  ],
+  "overrides": [
+    {
+      "files": ["apps/desktop/src/**"],
+      "rules": {
+        "shadcn/no-restyle": [
+          "error",
+          {
+            "allow": ["layout"]
+          }
+        ],
+        "shadcn/no-raw-colors": "error",
+        "shadcn/no-arbitrary-values": "error",
+        "shadcn/no-inline-styles": "error",
+        "shadcn/no-unknown-classes": "error",
+        "shadcn/require-static-classes": "error"
+      }
+    },
+    {
+      "files": ["apps/desktop/src/components/ui/**"],
+      "rules": {
+        "shadcn/no-restyle": "off",
+        "shadcn/no-arbitrary-values": "off"
+      }
     }
   ]
 }
