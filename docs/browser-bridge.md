@@ -89,8 +89,10 @@ Both hops send UTF-8 JSON behind a four-byte little-endian length. Messages over
 The desktop app is the only pipe server.
 
 - The endpoint name includes the Windows user SID and session ID.
-- It rejects remote clients and has a protected DACL that grants access to the current user only.
-- It runs at most 16 handlers at once and drops idle peers.
+- It rejects remote clients. Its protected DACL lets the current user read, write, and query it, but not create pipe instances. An `OWNER RIGHTS` entry stops the owner from rewriting the DACL.
+- Cairn creates all 16 instances at startup, with a limit of 16, then removes the create-instance right. It reuses them, so it answers at most 16 requests at once, and no other process can add a server to the pipe while Cairn runs. It drops idle peers.
+- If another process already holds the name, Cairn starts without the bridge.
+- Before writing, the native host checks that the server process is `cairn-desktop.exe`, either beside the host or in `%LOCALAPPDATA%\Cairn`. Otherwise it answers `AppUnavailable`. Debug hosts also accept any program under their own folder, where Cargo puts tests.
 - The native host validates each request before forwarding it, and checks that each reply answers it.
 
 ## Extension permissions
@@ -100,6 +102,7 @@ The extension asks for `nativeMessaging`, `activeTab`, and `scripting`. `activeT
 ## Limits
 
 - Software running as your Windows user can reach the pipe. Without the pairing key, it gets only the status and challenges. With the vault unlocked, it can also ask for a pairing, which you have to approve in Cairn.
+- The native host trusts the server by its executable path, and Cairn installs per user. Software running as you can replace `cairn-desktop.exe` and then serve the pipe, receiving what the browser saves and answering its requests.
 - The pairing key is in the browser profile on disk. Software that can read that profile and drive WebCrypto in the extension's context, or that reads the browser's memory, can use the key while the vault is unlocked. Nothing on a desktop protects an unlocked vault from malware running as you.
 - A click in the popup or the picker is the only approval for a fill. Cairn doesn't ask again.
 - The page owns the picker's host element, so it can cover the picker, make it transparent, or move it under the pointer. The picker ignores clicks unless Chromium reports it fully visible for 400 ms. A script running on the login's own site, through XSS for example, can still read a filled password field.
