@@ -6,6 +6,10 @@ const GAP = 4;
 
 const PICKER_WIDTH = 300;
 
+const BANNER_WIDTH = 320;
+
+const BANNER_MARGIN = 12;
+
 const style = `
 button {
   all: initial;
@@ -27,6 +31,11 @@ iframe {
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
   color-scheme: normal;
   background: #202520;
+}
+iframe.banner {
+  top: ${BANNER_MARGIN}px;
+  right: ${BANNER_MARGIN}px;
+  width: min(${BANNER_WIDTH}px, calc(100vw - ${2 * BANNER_MARGIN}px));
 }
 [hidden] { display: none; }
 `;
@@ -68,10 +77,21 @@ function icon() {
   return image;
 }
 
+/** A frame for one of the extension's pages. The page can't read its contents. */
+function extensionFrame(page: string) {
+  const frame = document.createElement("iframe");
+  frame.src = chrome.runtime.getURL(page);
+  frame.title = "Cairn";
+  frame.setAttribute("allow", "");
+
+  return frame;
+}
+
 /**
- * The icon in a login field and the picker frame under it. Both live in a
- * closed shadow root, so page scripts can't reach them, though the page still
- * controls the host element's box. The picker checks its own visibility.
+ * The icon in a login field, the picker frame under it, and the banner that
+ * offers to save a login. They live in a closed shadow root, so page scripts
+ * can't reach them, though the page still controls the host element's box.
+ * The frames check their own visibility.
  */
 export class Overlay {
   readonly #host = document.createElement("div");
@@ -79,6 +99,7 @@ export class Overlay {
   readonly #button = document.createElement("button");
   readonly #resized = new ResizeObserver(() => this.#schedule());
   #frame: HTMLIFrameElement | null = null;
+  #banner: HTMLIFrameElement | null = null;
   #anchor: HTMLInputElement | null = null;
   #height = 0;
   #scheduled = false;
@@ -143,20 +164,44 @@ export class Overlay {
     this.#resized.disconnect();
     this.#anchor = null;
     this.#button.hidden = true;
-    this.#host.remove();
+    this.#detach();
   }
 
   open() {
     if (this.#frame || !this.#anchor) return;
 
-    const frame = document.createElement("iframe");
-    frame.src = chrome.runtime.getURL("picker.html");
-    frame.title = "Cairn";
-    frame.setAttribute("allow", "");
+    const frame = extensionFrame("picker.html");
     this.#height = 0;
     this.#frame = frame;
     this.#root.append(frame);
     this.#place();
+  }
+
+  get isOffering() {
+    return this.#banner !== null;
+  }
+
+  /** Opens the banner that offers to save the login just submitted. */
+  offerSave() {
+    if (this.#banner) return;
+
+    const banner = extensionFrame("save.html");
+    banner.className = "banner";
+    this.#banner = banner;
+    this.#root.append(banner);
+    this.#attach();
+  }
+
+  closeSave() {
+    this.#banner?.remove();
+    this.#banner = null;
+
+    if (!this.#anchor) this.#detach();
+  }
+
+  resizeSave(height: number) {
+    if (this.#banner)
+      this.#banner.style.height = `${Math.min(Math.max(height, 0), MAX_PICKER_HEIGHT)}px`;
   }
 
   close() {
@@ -176,6 +221,11 @@ export class Overlay {
 
   #attach() {
     if (!this.#host.isConnected) document.documentElement.append(this.#host);
+  }
+
+  /** Takes the overlay out of the page, unless the banner is still open. */
+  #detach() {
+    if (!this.#banner) this.#host.remove();
   }
 
   #schedule() {

@@ -45,7 +45,12 @@ export default defineConfig({
   base: "./",
   build: {
     rollupOptions: {
-      input: { popup: "index.html", picker: "picker.html", background: "src/background/index.ts" },
+      input: {
+        popup: "index.html",
+        picker: "picker.html",
+        save: "save.html",
+        background: "src/background/index.ts",
+      },
       output: { entryFileNames: "[name].js" },
     },
   },
