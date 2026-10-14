@@ -44,11 +44,14 @@ pub fn run() {
             updater::update_set_channel,
             updater::update_check,
             updater::update_install,
+            connector::connector_extension_folder,
+            connector::connector_open_extension_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cairn");
 }
 mod bridge;
+mod connector;
 mod favicon;
 mod locale;
 mod tray;

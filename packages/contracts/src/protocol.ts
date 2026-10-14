@@ -3,7 +3,14 @@ import { MAX_PICKER_HEIGHT } from "./picker";
 
 export { MAX_PICKER_HEIGHT, type PageCommand } from "./picker";
 
+/** The native host the installer registers for the release extension. */
 export const HOST_NAME = "com.hezaerd.cairn";
+
+/**
+ * Dev builds connect to their own host, registered by the dev scripts, so a
+ * dev copy and an installed copy can run in one profile.
+ */
+export const DEV_HOST_NAME = "com.hezaerd.cairn.dev";
 
 // `as const` keeps the literal type when the value lands in an object literal.
 export const PROTOCOL_VERSION = 1 as const;

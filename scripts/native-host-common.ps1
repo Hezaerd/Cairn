@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
-$HostName = 'com.hezaerd.cairn'
+# Dev builds connect to their own host. The installer registers com.hezaerd.cairn.
+$HostName = 'com.hezaerd.cairn.dev'
 $RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $ManifestPath = Join-Path $RepoRoot '.local\native-host.json'
 # Chromium's Windows lookup checks this key, then Google\Chrome. Helium

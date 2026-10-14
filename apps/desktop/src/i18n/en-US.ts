@@ -117,6 +117,7 @@ export const enUS = {
     appearance: "Appearance",
     colorScheme: "Color scheme",
     updates: "Updates",
+    extension: "Browser extension",
   },
   language: {
     system: "Computer language",
@@ -128,6 +129,19 @@ export const enUS = {
     useLight: "Use the light theme",
     useDark: "Use the dark theme",
     useSystem: "Follow the Windows theme",
+  },
+  extension: {
+    folder: "Extension folder",
+    open: "Open folder",
+    notOpened: "The folder couldn't be opened.",
+    steps: [
+      "Open chrome://extensions in Helium.",
+      "Turn on Developer mode.",
+      "Choose Load unpacked and select this folder.",
+    ],
+    once: "Do this once per Helium profile. Updates replace the files in place; reload the extension in chrome://extensions afterwards.",
+    dev: "Development builds don't ship the extension. Set it up with the dev scripts in docs/development.md.",
+    missing: "The extension folder is missing. Reinstall Cairn to restore it.",
   },
   update: {
     available: (version: string) => `Cairn ${version} is available`,
