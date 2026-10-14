@@ -2,6 +2,7 @@
 
 use cairn_protocol::{ErrorCode, MAX_MESSAGE_BYTES, Request, Response, parse_request};
 use std::{
+    convert::Infallible,
     future::{Future, poll_fn},
     io,
     task::Poll,
@@ -54,7 +55,7 @@ impl BridgeServer {
     }
 
     /// Answers one request per connection with `handler`. Malformed requests
-    /// are answered here and never reach it. Returns only on a pipe error.
+    /// are answered here and never reach it. Runs until dropped.
     pub async fn run<H, F>(self, handler: H) -> io::Result<()>
     where
         H: Fn(Request) -> F + Clone + Send + Sync + 'static,
@@ -68,8 +69,8 @@ impl BridgeServer {
             .collect();
         poll_fn(|cx| {
             for instance in &mut instances {
-                if let Poll::Ready(error) = instance.as_mut().poll(cx) {
-                    return Poll::Ready(Err(error));
+                if let Poll::Ready(never) = instance.as_mut().poll(cx) {
+                    match never {}
                 }
             }
             Poll::Pending
@@ -78,29 +79,35 @@ impl BridgeServer {
     }
 }
 
-/// Answers connections on one instance, one at a time, until the pipe fails.
-async fn serve<H, F>(mut instance: NamedPipeServer, handler: H) -> io::Error
+/// Answers connections on one instance, one at a time. Cairn can't create
+/// another instance once the pool is locked, so a failing instance retries
+/// instead of taking the bridge down until restart.
+async fn serve<H, F>(mut instance: NamedPipeServer, handler: H) -> Infallible
 where
     H: Fn(Request) -> F,
     F: Future<Output = Response>,
 {
     loop {
-        if instance.connect().await.is_ok() {
-            let _ = timeout(Duration::from_millis(1500), async {
-                let bytes = read_frame(&mut instance).await?;
-                let response = match parse_request(&bytes) {
-                    Ok(request) => handler(request).await,
-                    Err(response) => response,
-                };
-                write_frame(&mut instance, &serde_json::to_vec(&response)?).await?;
-                // Disconnecting discards unread data, so wait for the client
-                // to read the reply and close its end.
-                instance.read(&mut [0; 1]).await
-            })
-            .await;
+        match instance.connect().await {
+            Ok(()) => {
+                let _ = timeout(Duration::from_millis(1500), async {
+                    let bytes = read_frame(&mut instance).await?;
+                    let response = match parse_request(&bytes) {
+                        Ok(request) => handler(request).await,
+                        Err(response) => response,
+                    };
+                    write_frame(&mut instance, &serde_json::to_vec(&response)?).await?;
+                    // Disconnecting discards unread data, so wait for the client
+                    // to read the reply and close its end.
+                    instance.read(&mut [0; 1]).await
+                })
+                .await;
+            }
+            Err(error) => eprintln!("Cairn bridge: connection failed: {error}"),
         }
         if let Err(error) = instance.disconnect() {
-            return error;
+            eprintln!("Cairn bridge: cannot reset pipe instance: {error}");
+            tokio::time::sleep(Duration::from_millis(250)).await;
         }
     }
 }
@@ -138,5 +145,28 @@ pub async fn send(request: &Request) -> Response {
         Ok(Ok(response)) => response,
         Ok(Err(code)) => Response::error(Some(request.id().into()), code),
         Err(_) => Response::error(Some(request.id().into()), ErrorCode::RequestTimeout),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cairn_protocol::VERSION;
+
+    // Uses the real per-user pipe name, so run it with Cairn closed.
+    #[tokio::test]
+    async fn survives_a_client_that_leaves_before_the_accept() {
+        let server = BridgeServer::bind().expect("bind the pipe; is Cairn running?");
+        // ConnectNamedPipe reports ERROR_NO_DATA for this client, which mio
+        // treats as connected. The read then fails and the instance is reset.
+        drop(security::open_client(&pipe_name().unwrap()).unwrap());
+        tokio::spawn(server.run(|request| async move { Response::status(&request, "1.0.0") }));
+
+        let request = Request::GetStatus {
+            version: VERSION,
+            request_id: "test-1".into(),
+        };
+        let response = send(&request).await;
+        assert_eq!(response, Response::status(&request, "1.0.0"));
     }
 }

@@ -1,6 +1,7 @@
 //! Browsers paired with the bridge. Their public keys aren't secret, but the
 //! list is sealed with the vault key so nothing can add a browser to it
-//! without the master password.
+//! without the master password. The vault records the nonce of the last
+//! write, so an older copy of the file can't bring back a removed browser.
 use super::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -25,22 +26,19 @@ pub struct BrowserSummary {
     pub paired_at: u64,
 }
 
-fn read_list(path: &Path, session: &Session) -> Result<Vec<PairedBrowser>> {
-    let bytes = match storage::read(path) {
-        Ok(bytes) => bytes,
-        Err(VaultError::Missing) => return Ok(vec![]),
-        Err(error) => return Err(error),
-    };
+/// Reads the list and the nonce that identifies this write of it.
+pub(super) fn read_list(path: &Path, session: &Session) -> Result<(Vec<PairedBrowser>, [u8; 24])> {
+    let bytes = storage::read(path)?;
     if bytes.len() > MAX_FILE || bytes.len() < PREFIX.len() + 24 + 16 || !bytes.starts_with(PREFIX)
     {
         return Err(VaultError::InvalidVault);
     }
-    let nonce = bytes[PREFIX.len()..PREFIX.len() + 24]
+    let nonce: [u8; 24] = bytes[PREFIX.len()..PREFIX.len() + 24]
         .try_into()
         .map_err(|_| VaultError::InvalidVault)?;
     let plaintext = decrypt(
         &session.key,
-        nonce,
+        &nonce,
         &bytes[PREFIX.len() + 24..],
         &session.envelope.header.aad(b"cairn-browsers-v1")?,
     )
@@ -50,10 +48,18 @@ fn read_list(path: &Path, session: &Session) -> Result<Vec<PairedBrowser>> {
     if browsers.len() > MAX_BROWSERS {
         return Err(VaultError::InvalidVault);
     }
-    Ok(browsers)
+    Ok((browsers, nonce))
 }
 
-fn write_list(path: &Path, session: &Session, browsers: &[PairedBrowser]) -> Result<()> {
+/// Writes the list and points the session at it. The caller writes the vault
+/// next, which records the new nonce.
+pub(super) fn bind(path: &Path, session: &mut Session, browsers: Vec<PairedBrowser>) -> Result<()> {
+    session.browsers_nonce = Some(write_list(path, session, &browsers)?);
+    session.browsers = Some(browsers);
+    Ok(())
+}
+
+fn write_list(path: &Path, session: &Session, browsers: &[PairedBrowser]) -> Result<[u8; 24]> {
     let plaintext = serde_json::to_vec(browsers).map_err(|_| VaultError::Storage)?;
     let nonce = random::<24>()?;
     let ciphertext = encrypt(
@@ -65,7 +71,8 @@ fn write_list(path: &Path, session: &Session, browsers: &[PairedBrowser]) -> Res
     let mut bytes = PREFIX.to_vec();
     bytes.extend(nonce);
     bytes.extend(ciphertext);
-    storage::replace(path, &bytes)
+    storage::replace(path, &bytes)?;
+    Ok(nonce)
 }
 
 impl Vault {
@@ -74,8 +81,17 @@ impl Vault {
         let path = self.directory.join("browsers.cairn");
         let session = self.session.as_mut().ok_or(VaultError::Locked)?;
         if session.browsers.is_none() {
-            // A damaged list only costs a new pairing, so it never blocks the vault.
-            session.browsers = Some(read_list(&path, session).unwrap_or_default());
+            // A missing, damaged, or older list only costs a new pairing, so it
+            // never blocks the vault.
+            let expected = session.browsers_nonce;
+            let list = expected
+                .and_then(|expected| {
+                    read_list(&path, session)
+                        .ok()
+                        .filter(|(_, nonce)| *nonce == expected)
+                })
+                .map(|(list, _)| list);
+            session.browsers = Some(list.unwrap_or_default());
         }
         Ok(session.browsers.get_or_insert_default())
     }
@@ -137,12 +153,11 @@ impl Vault {
         self.store_browsers(browsers)
     }
 
-    /// Writes first, so a failed write leaves the paired list as it was.
+    /// Writes the list, then the vault that vouches for it. If the vault
+    /// write fails, the session locks and the new list no longer matches, so
+    /// it reads as empty: a failure never restores a removed browser.
     fn store_browsers(&mut self, browsers: Vec<PairedBrowser>) -> Result<()> {
         let path = self.directory.join("browsers.cairn");
-        let session = self.active()?;
-        write_list(&path, session, &browsers)?;
-        session.browsers = Some(browsers);
-        Ok(())
+        self.write(|session| bind(&path, session, browsers))
     }
 }
