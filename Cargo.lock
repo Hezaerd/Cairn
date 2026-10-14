@@ -499,6 +499,7 @@ dependencies = [
  "cairn-protocol",
  "cairn-vault",
  "getrandom 0.4.3",
+ "hmac",
  "p256",
  "serde",
  "serde_json",

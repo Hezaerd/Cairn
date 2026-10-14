@@ -2,13 +2,16 @@
 //! challenges are public; pairing needs your approval in this window; logins
 //! need a paired browser's signature and an unlocked vault.
 mod auth;
+mod saving;
 mod sites;
 
 use crate::vault::{Store, run};
 use cairn_protocol::{
     ErrorCode, LoginSummary, MAX_MESSAGE_BYTES, Request, Response, VERSION, signed_message,
 };
-use cairn_vault::{BrowserSummary, Vault, VaultError, VaultStatus};
+use cairn_vault::{
+    BrowserSummary, EntrySummary, EntryUpdate, NewEntry, Vault, VaultError, VaultStatus,
+};
 use serde::Serialize;
 use std::{
     sync::{Arc, Mutex},
@@ -81,9 +84,11 @@ fn answer(app: &AppHandle, request: Request) -> Response {
             version: VERSION,
             request_id: id.clone(),
         }),
-        Request::ListLogins { .. } | Request::GetLogin { .. } => {
-            authenticated(app, &bridge, &request)
-        }
+        Request::ListLogins { .. }
+        | Request::GetLogin { .. }
+        | Request::CheckLogin { .. }
+        | Request::SaveLogin { .. }
+        | Request::UpdateLogin { .. } => authenticated(app, &bridge, &request),
     };
     result.unwrap_or_else(|code| Response::error(Some(id), code))
 }
@@ -141,7 +146,12 @@ fn authenticated(
     let (Some(auth), Some(message)) = (request.auth(), signed_message(request)) else {
         return Err(ErrorCode::InvalidRequest);
     };
-    let (Request::ListLogins { origin, .. } | Request::GetLogin { origin, .. }) = request else {
+    let (Request::ListLogins { origin, .. }
+    | Request::GetLogin { origin, .. }
+    | Request::CheckLogin { origin, .. }
+    | Request::SaveLogin { origin, .. }
+    | Request::UpdateLogin { origin, .. }) = request
+    else {
         return Err(ErrorCode::InvalidRequest);
     };
     let origin = sites::parse_origin(origin).ok_or(ErrorCode::InvalidRequest)?;
@@ -158,11 +168,8 @@ fn authenticated(
         }
         match request {
             Request::ListLogins { request_id, .. } => {
-                let mut logins: Vec<_> = vault
-                    .list()
-                    .map_err(|_| ErrorCode::VaultLocked)?
+                let mut logins: Vec<_> = site_entries(vault, &origin)?
                     .into_iter()
-                    .filter(|entry| sites::matches(&entry.site, &origin))
                     .map(|entry| LoginSummary {
                         id: entry.id,
                         name: entry.name,
@@ -207,9 +214,121 @@ fn authenticated(
                     password: Zeroizing::new(login.password.clone()),
                 })
             }
+            Request::CheckLogin {
+                request_id,
+                username,
+                proof,
+                challenge,
+                ..
+            } => {
+                let site_logins = site_entries(vault, &origin)?;
+                let logins = site_logins
+                    .into_iter()
+                    .map(|entry| vault.login(&entry.id).map(|login| (entry, login)))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| ErrorCode::VaultLocked)?;
+                let candidates = logins
+                    .iter()
+                    .map(|(entry, login)| saving::Candidate {
+                        summary: LoginSummary {
+                            id: entry.id.clone(),
+                            name: entry.name.clone(),
+                            username: entry.username.clone(),
+                        },
+                        password: &login.password,
+                    })
+                    .collect();
+                let (result, entry) = saving::check(candidates, username, challenge, proof);
+                Ok(Response::LoginCheck {
+                    version: VERSION,
+                    request_id: request_id.clone(),
+                    result,
+                    entry,
+                })
+            }
+            Request::SaveLogin {
+                request_id,
+                origin: site,
+                name,
+                username,
+                password,
+                ..
+            } => {
+                let entry = NewEntry {
+                    name: name.trim().to_owned(),
+                    site: site.clone(),
+                    username: username.trim().to_owned(),
+                    password: password.to_string(),
+                    notes: String::new(),
+                };
+                commit(app, vault, |vault| vault.save(entry))?;
+                Ok(Response::Saved {
+                    version: VERSION,
+                    request_id: request_id.clone(),
+                })
+            }
+            Request::UpdateLogin {
+                request_id,
+                entry_id,
+                password,
+                ..
+            } => {
+                // Only a login for the page's own site can change from it.
+                let entry = site_entries(vault, &origin)?
+                    .into_iter()
+                    .find(|entry| &entry.id == entry_id)
+                    .ok_or(ErrorCode::NotFound)?;
+                let update = EntryUpdate {
+                    name: entry.name.clone(),
+                    site: entry.site.clone(),
+                    username: entry.username.clone(),
+                    password: Some(password.to_string()),
+                    notes: None,
+                };
+                commit(app, vault, |vault| vault.update(entry_id, update))?;
+                Ok(Response::Saved {
+                    version: VERSION,
+                    request_id: request_id.clone(),
+                })
+            }
             _ => Err(ErrorCode::InvalidRequest),
         }
     })
+}
+
+/// The vault's logins for the page's site.
+fn site_entries(vault: &mut Vault, origin: &url::Url) -> Result<Vec<EntrySummary>, ErrorCode> {
+    Ok(vault
+        .list()
+        .map_err(|_| ErrorCode::VaultLocked)?
+        .into_iter()
+        .filter(|entry| sites::matches(&entry.site, origin))
+        .collect())
+}
+
+/// Writes a change from the browser and tells the window to show it. A failed
+/// write locks the vault, as it does from the window.
+fn commit(
+    app: &AppHandle,
+    vault: &mut Vault,
+    change: impl FnOnce(&mut Vault) -> Result<(), VaultError>,
+) -> Result<(), ErrorCode> {
+    match change(vault) {
+        Ok(()) => {
+            let _ = app.emit_to("main", "vault-changed", ());
+            Ok(())
+        }
+        Err(error) => {
+            if !matches!(vault.status(), Ok(VaultStatus::Unlocked)) {
+                let _ = app.emit_to("main", "vault-locked", ());
+            }
+            Err(match error {
+                VaultError::InvalidInput => ErrorCode::InvalidRequest,
+                VaultError::Locked => ErrorCode::VaultLocked,
+                _ => ErrorCode::AppUnavailable,
+            })
+        }
+    }
 }
 
 #[tauri::command]

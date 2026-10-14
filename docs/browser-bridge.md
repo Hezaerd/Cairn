@@ -6,14 +6,15 @@ The extension reaches the desktop app in two hops:
 popup -> service worker -> native host (stdio) -> desktop app (named pipe)
 ```
 
-The service worker accepts messages from its popup, its picker frame, and its content script in a page's top frame. Each request opens its own native connection. Credentials go from the app to the service worker and into the page being filled; nothing else in the extension sees them, and nothing is saved in browser storage except the pairing key.
+The service worker accepts messages from its popup, its picker and save frames, and its content script in a page's top frame. Each request opens its own native connection. Credentials go from the app to the service worker and into the page being filled, or from a page's form to the service worker and, once you choose to save them, to the app. Nothing else in the extension sees them, and nothing is saved in browser storage except the pairing key.
 
 ## Using it
 
 1. Open the popup and choose **Pair with Cairn**. The popup shows an eight-digit code, and Cairn comes to the front with the same code. Approve it there if the codes match.
 2. On a website, open the popup. It lists the logins whose site matches the tab. Click one to fill the username and password into the page.
 3. To get suggestions in login fields, turn on **Suggest logins in login fields** in the popup and allow access to websites. Focusing a login field on a site with saved logins then opens a list under it; click one to fill it. A Cairn icon in the field opens the list too, and the toolbar badge shows how many logins the site has.
-4. **Paired browsers** (the globe button in Cairn's header) lists the paired browsers. Removing one revokes it; the extension then shows the pairing code again.
+4. With suggestions on, logging in or signing up with a login Cairn doesn't have opens a banner at the top right of the next page. **Save** adds it to Cairn under the name you give it. When Cairn has the username with another password, the banner offers **Update** instead.
+5. **Paired browsers** (the globe button in Cairn's header) lists the paired browsers. Removing one revokes it; the extension then shows the pairing code again.
 
 The popup needs Cairn running with the vault unlocked. The vault locks when Cairn goes to the tray, so the popup asks you to unlock Cairn instead. Pairing needs the vault unlocked too, because the list of paired browsers is encrypted with the vault key.
 
@@ -33,6 +34,18 @@ Suggestions need the optional `https://*/*` and `http://*/*` permissions. Once t
 - The icon and the picker live in a closed shadow root. The picker is `picker.html`, a frame the page can't read. Only trusted focus, click, and key events open it, and the service worker answers a picker only after the tab's content script opened it for that site.
 - Escape, a click elsewhere, or a fill closes the picker. Focusing the same field doesn't reopen it; clicking it does.
 
+## Saving logins
+
+Saving is part of suggestions and needs the same permissions.
+
+- The content script watches trusted submits: a form's `submit` event, Enter in a field, and clicks on buttons. It reads the form's password field and the username field before it. A sign-up form counts when its two password fields match. A password change, with fields that differ, doesn't count. Neither does a password field that Cairn filled and you haven't edited since.
+- It sends the username and password to the service worker, which keeps the last pair for each tab in memory. The pair is never written to browser storage. It is dropped after two minutes, when the tab closes, when another login is submitted, or when the worker stops. The origin it's saved for is where the form was, as Chromium reports it.
+- The content script reports when the submitted form goes away: either it leaves the DOM or stops being visible, or a new page shows no login form for a second. If the form comes back, the login probably failed, and nothing is offered. A login that loads another site still gets offered there, for the site where it was typed.
+- The service worker then asks Cairn with `CheckLogin`. The request carries the username and an HMAC-SHA256 of the password keyed with the request's challenge, never the password. Cairn compares the HMAC with each login for the site in constant time and replies `New`, `Known`, or `Changed` with the login that has that username. A username compares without case or surrounding spaces. On a page that asks for the password alone, the password matching any login for the site counts as known, and nothing counts as changed.
+- `Known` offers nothing. `New` and `Changed` open `save.html` in the overlay's closed shadow root. So does a locked vault: the banner asks you to unlock Cairn and checks again. The banner shows the site, the username, and for an update, the login's name. It never shows the password. It gets an answer only on the page it was offered on, and it accepts a click only after Chromium reports it fully visible for 400 ms, like the picker.
+- **Save** sends `SaveLogin` with the name, the username, and the password, for the form's origin, with no notes. **Update** sends `UpdateLogin` for the login that `CheckLogin` named, and Cairn refuses it unless that login matches the form's origin. **Not now**, Escape, or leaving the page closes the banner.
+- The app's list reloads when the browser saves a login.
+
 ## Pairing and authorization
 
 - The extension creates a P-256 key pair with WebCrypto. The private key is non-extractable, so no script can read it back, and it is stored as a `CryptoKey` in the extension's IndexedDB.
@@ -49,6 +62,9 @@ Suggestions need the optional `https://*/*` and `http://*/*` permissions. Once t
 | `Pair`         | an unlocked vault          | `PairingRequested` |
 | `ListLogins`   | a signature from a pairing | `Logins`           |
 | `GetLogin`     | a signature from a pairing | `Login`            |
+| `CheckLogin`   | a signature from a pairing | `LoginCheck`       |
+| `SaveLogin`    | a signature from a pairing | `Saved`            |
+| `UpdateLogin`  | a signature from a pairing | `Saved`            |
 
 - A request has `version: 1`, an ASCII request ID of 1 to 64 characters, and a `type`. Keys, client IDs, challenges, and signatures are unpadded base64url of a fixed length. An origin is an `http` or `https` origin exactly as the browser serializes it.
 - A signed request carries `clientId`, `challenge`, and `signature`. The signature is ECDSA P-256 with SHA-256, in WebCrypto's 64-byte `r || s` form, over:
@@ -56,7 +72,12 @@ Suggestions need the optional `https://*/*` and `http://*/*` permissions. Once t
   ```text
   cairn-bridge-v1\n<challenge>\nListLogins\n<origin>\n
   cairn-bridge-v1\n<challenge>\nGetLogin\n<origin>\n<entryId>
+  cairn-bridge-v1\n<challenge>\nCheckLogin\n<origin>\n<proof>\n<username>
+  cairn-bridge-v1\n<challenge>\nSaveLogin\n<origin>\n<name>\n<username>\n<password>
+  cairn-bridge-v1\n<challenge>\nUpdateLogin\n<origin>\n<entryId>\n<password>
   ```
+
+  Names and usernames can't contain control characters, so only the last field can contain a newline. `proof` is the unpadded base64url HMAC-SHA256 of the password's UTF-8 bytes, keyed with the challenge's 32 bytes.
 
 - A reply echoes the ID with the reply type for its request, or `type: "Error"` and a code: `InvalidRequest`, `UnsupportedVersion`, `AppUnavailable`, `RequestTimeout`, `ProtocolMismatch`, `VaultLocked`, `NotPaired`, `Unauthorized`, or `NotFound`.
 - Unknown fields, operations, and versions are rejected. An invalid request with no usable ID gets an error with a null ID. `tests/fixtures/protocol` holds cases that both the Rust and TypeScript tests check.
@@ -74,7 +95,7 @@ The desktop app is the only pipe server.
 
 ## Extension permissions
 
-The extension asks for `nativeMessaging`, `activeTab`, and `scripting`. `activeTab` lets it read the address of the tab you opened the popup on, and inject the content script there, only after you click its toolbar button. Access to websites is optional and only needed for suggestions. `picker.html` is the only web-accessible resource, behind a per-session dynamic URL.
+The extension asks for `nativeMessaging`, `activeTab`, and `scripting`. `activeTab` lets it read the address of the tab you opened the popup on, and inject the content script there, only after you click its toolbar button. Access to websites is optional and only needed for suggestions and saving. `picker.html` and `save.html` are the only web-accessible resources, behind a per-session dynamic URL.
 
 ## Limits
 
@@ -83,4 +104,8 @@ The extension asks for `nativeMessaging`, `activeTab`, and `scripting`. `activeT
 - A click in the popup or the picker is the only approval for a fill. Cairn doesn't ask again.
 - The page owns the picker's host element, so it can cover the picker, make it transparent, or move it under the pointer. The picker ignores clicks unless Chromium reports it fully visible for 400 ms. A script running on the login's own site, through XSS for example, can still read a filled password field.
 - A page sees the icon in its own DOM, so it learns that you have a login for it.
+- A page controls its own fields, so it can put any username and password in them before you submit. It can only get them offered for its own origin, and only after real input from you. A click on **Save** or **Update** is the only approval, so read the banner before you click: an update replaces the password of the login it names.
+- Whether the banner opens tells a page whether the username and password it submitted match a login for its own site. Each check needs a real submit from you.
+- Anything that reads the pipe can test password guesses against a `CheckLogin` proof, since the challenge travels with it. `SaveLogin` and `UpdateLogin` carry the password itself, as `Login` does.
+- A submitted password stays in the service worker's memory until it's saved, dismissed, or two minutes pass.
 - The password crosses the native host and the service worker in memory, and the page receives it in its input field. Strings in JavaScript can't be wiped.

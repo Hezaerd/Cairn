@@ -38,7 +38,16 @@
   "noForm": { "message": "No login form found on this page." },
   "suggestions": { "message": "Suggest logins in login fields" },
   "suggestionsDetail": {
-    "message": "Shows your logins when you click a login field. Needs access to the websites you visit."
+    "message": "Shows your logins when you click a login field, and offers to save the ones you type. Needs access to the websites you visit."
   },
-  "pickerIcon": { "message": "Fill with Cairn" }
+  "pickerIcon": { "message": "Fill with Cairn" },
+  "saveTitle": { "message": "Save this login in Cairn?" },
+  "updateTitle": { "message": "Update this password in Cairn?" },
+  "saveName": { "message": "Name" },
+  "save": { "message": "Save" },
+  "update": { "message": "Update" },
+  "notNow": { "message": "Not now" },
+  "saved": { "message": "Saved in Cairn." },
+  "saveLocked": { "message": "Unlock Cairn to save this login." },
+  "saveExpired": { "message": "This login is no longer waiting to be saved." }
 }
