@@ -3,6 +3,8 @@ import { CairnClient, CairnClientLive } from "@cairn/client/CairnClient";
 import { chromiumTransport } from "@cairn/client/ChromiumTransport";
 import { IndexedDbKey } from "@cairn/client/IndexedDbKey";
 import {
+  DEV_HOST_NAME,
+  HOST_NAME,
   decodePageRequest,
   decodePickerRequest,
   decodePopupRequest,
@@ -33,11 +35,14 @@ import {
 /** How long the banner shows that a login was saved. */
 const SAVED_NOTICE_MS = 1_500;
 
+// The installer registers the release host; the dev scripts register the dev one.
+const hostName = import.meta.env.MODE === "release" ? HOST_NAME : DEV_HOST_NAME;
+
 // Each request owns a short-lived native connection. Only the pairing key
 // persists, in IndexedDB; credentials never leave this worker except into the
 // page being filled.
 const live = CairnClientLive.pipe(
-  Layer.provide(Layer.merge(chromiumTransport(chrome.runtime), IndexedDbKey)),
+  Layer.provide(Layer.merge(chromiumTransport(chrome.runtime, hostName), IndexedDbKey)),
 );
 
 /** An `http` or `https` address, or null. */

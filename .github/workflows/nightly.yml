@@ -46,8 +46,9 @@ jobs:
           $core = [version]($current -replace '[-+].*$', '')
           $stamp = Get-Date -AsUTC -Format yyyyMMddHHmm
           $version = "$($core.Major).$($core.Minor).$($core.Build + 1)-nightly.$stamp"
-          @{ version = $version; bundle = @{ createUpdaterArtifacts = $true } } |
-            ConvertTo-Json -Depth 3 |
+          # Layered over the release config, which bundles the extension and host.
+          @{ version = $version } |
+            ConvertTo-Json |
             Set-Content apps/desktop/src-tauri/tauri.nightly.conf.json
           "version=$version" >> $env:GITHUB_OUTPUT
 
@@ -68,7 +69,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.nightly.conf.json
+        run: pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.release.conf.json --config src-tauri/tauri.nightly.conf.json
 
       # The rolling `nightly` prerelease is replaced on each build. GitHub's
       # `latest` release skips prereleases, so stable installs never see it.

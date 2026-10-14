@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect";
 import {
-  HOST_NAME,
   MAX_MESSAGE_BYTES,
   REQUEST_TIMEOUT_MS,
   decodeResponse,
@@ -32,14 +31,14 @@ interface ConnectionState {
   disconnected?: CairnClientError;
 }
 
-export function chromiumTransport(runtime: NativeRuntime) {
+export function chromiumTransport(runtime: NativeRuntime, hostName: string) {
   return Layer.effect(
     NativeTransport,
     Effect.gen(function* () {
       const connection = yield* Effect.acquireRelease(
         Effect.try({
           try: () => {
-            const port = runtime.connectNative(HOST_NAME);
+            const port = runtime.connectNative(hostName);
             const state: ConnectionState = {};
 
             const onDisconnect = () => {

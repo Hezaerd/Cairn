@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ExtensionSettings } from "@/connector/ExtensionSettings";
 import { useT } from "@/i18n/I18nProvider";
 import { ColorSchemePicker } from "@/theme/ColorSchemePicker";
 import { UpdateSettings } from "@/updater/UpdateSettings";
@@ -40,6 +41,14 @@ function Settings() {
             </h2>
             <div className="rounded-lg border bg-muted/50 p-4">
               <UpdateSettings labelledBy="update-channel" />
+            </div>
+          </section>
+          <section aria-labelledby="extension" className="grid gap-3">
+            <h2 id="extension" className="text-[11px] text-muted-foreground">
+              {t.settings.extension}
+            </h2>
+            <div className="rounded-lg border bg-muted/50 p-4">
+              <ExtensionSettings labelledBy="extension-folder" />
             </div>
           </section>
         </div>

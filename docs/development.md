@@ -27,6 +27,8 @@ pnpm dlx shadcn@latest add <component> -c apps/desktop
 
 ## Browser extension
 
+An installed Cairn ships the extension and its native host, and **Settings → Browser extension** shows the folder to load. This section sets up a dev copy from the checkout instead.
+
 Build the extension and watch for changes:
 
 ```sh
@@ -49,15 +51,15 @@ The build makes `content.js` separately, as one classic script without Effect, b
 
 Load the extension in each Helium profile you want to test. Running the script again with another extension ID keeps the IDs already registered.
 
-The registration applies to the current Windows user and needs no administrator rights. It writes `.local/native-host.json` and sets `HKCU\Software\Chromium\NativeMessagingHosts\com.hezaerd.cairn` in both registry views. The script refuses to replace another installation. Pass `-BinaryPath` with an absolute path to register a release host.
+Dev builds connect to the `com.hezaerd.cairn.dev` host and release builds to `com.hezaerd.cairn`, so a dev copy and an installed copy can load in the same profile. Both reach whichever Cairn is running. Each copy has its own ID and is paired separately.
+
+The registration applies to the current Windows user and needs no administrator rights. It writes `.local/native-host.json` and sets `HKCU\Software\Chromium\NativeMessagingHosts\com.hezaerd.cairn.dev` in both registry views. The script refuses to replace another dev registration and never touches the installer's key. Pass `-BinaryPath` with an absolute path to register another host build, such as `target\release\cairn-native-host.exe`.
 
 The registration stores absolute paths. Before moving the checkout, unregister it:
 
 ```powershell
 .\scripts\unregister-native-host.ps1
 ```
-
-The desktop installer doesn't register the host yet.
 
 ## Languages
 
@@ -136,11 +138,20 @@ The test creates isolated Helium profiles under `.local` and registers the host 
 
 ## Builds
 
-| Command              | Output                                                   |
-| -------------------- | -------------------------------------------------------- |
-| `pnpm build`         | Desktop frontend and extension                           |
-| `pnpm build:desktop` | Native app and NSIS installer in `target/release/bundle` |
-| `pnpm build:host`    | Native Messaging host                                    |
+| Command                | Output                                                   |
+| ---------------------- | -------------------------------------------------------- |
+| `pnpm build`           | Desktop frontend and extension                           |
+| `pnpm build:desktop`   | Native app and NSIS installer in `target/release/bundle` |
+| `pnpm build:host`      | Native Messaging host                                    |
+| `pnpm build:connector` | Release native host, its manifest, and release extension |
+
+`pnpm build:desktop` makes a plain installer. The installer the workflows publish also bundles the extension and native host; build it with the release config:
+
+```sh
+pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.release.conf.json
+```
+
+Without `TAURI_SIGNING_PRIVATE_KEY`, the command writes the installer to `target/release/bundle/nsis` and then fails on the updater signature. The installer still works for a local test.
 
 Local builds aren't signed for the updater, so they can't be published as updates.
 
@@ -160,9 +171,25 @@ Pushing a `v*` tag runs `.github/workflows/release.yml` on a Windows runner. It 
 
 3. Install the draft's installer, check it, then publish the release.
 
+### What the installer ships
+
+`src-tauri/tauri.release.conf.json` runs `pnpm build:connector` before the app build. That builds the release native host, builds the extension with `--mode release` into `target/connector/extension`, and writes the host manifest to `target/connector`. The installer copies them into the install folder, `%LOCALAPPDATA%\Cairn`:
+
+| File                     | Contents                                                      |
+| ------------------------ | ------------------------------------------------------------- |
+| `cairn-native-host.exe`  | The native host                                               |
+| `cairn-native-host.json` | Host manifest, with a relative `path` and the release ID only |
+| `extension\`             | The release extension, loaded unpacked in Helium              |
+
+The hooks in `src-tauri/windows/connector.nsh` delete the old `extension\` before copying, so stale popup chunks don't pile up across updates. They point `HKCU\Software\Chromium\NativeMessagingHosts\com.hezaerd.cairn` at the manifest in both registry views. Uninstalling removes the key if it still points at that install.
+
+A release build adds `key` from `apps/extension/release.ts` to the extension manifest. That fixes the extension ID at `kidgkbpjficoclfmfidbipkjdkiikklb` wherever the folder is loaded from, so the host's `allowed_origins` can name it and a pairing survives updates. Dev builds leave the key out. Only the public key is in the repository. Nothing in the build needs the private key, but keep a copy outside the repository: losing it means a new key, a new ID, and pairing every browser again if the extension is ever packed or published.
+
+After an update replaces the files, reload the extension in `chrome://extensions`.
+
 ### Nightly builds
 
-`.github/workflows/nightly.yml` builds `main` every day at 03:00 UTC, and skips the build when `main` hasn't changed since the last nightly. Run it by hand from the Actions tab to build right away. It replaces a single prerelease tagged `nightly` with the new installer, its `.sig`, and a `latest.json` it writes itself.
+`.github/workflows/nightly.yml` builds `main` every day at 03:00 UTC, and skips the build when `main` hasn't changed since the last nightly. Run it by hand from the Actions tab to build right away. It builds with the release config too, so a nightly ships the extension and host the same way. It replaces a single prerelease tagged `nightly` with the new installer, its `.sig`, and a `latest.json` it writes itself.
 
 A nightly takes the next patch version with a timestamp, such as `0.1.1-nightly.202610130300` after `0.1.0`. That keeps it newer than the stable release it was built after and older than the next one.
 
