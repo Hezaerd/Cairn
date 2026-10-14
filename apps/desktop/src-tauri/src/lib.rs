@@ -48,6 +48,7 @@ pub fn run() {
             bridge::pairing_request,
             bridge::answer_pairing,
             bridge::list_browsers,
+            bridge::rename_browser,
             bridge::remove_browser,
             favicon::favicon_cached,
             favicon::favicon_refresh,

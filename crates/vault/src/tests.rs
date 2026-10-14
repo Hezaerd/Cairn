@@ -475,6 +475,21 @@ fn paired_browsers_are_encrypted_persistent_and_need_an_unlocked_vault() {
         .map(|browser| browser.name)
         .collect();
     assert_eq!(names, ["Work profile", "Helium again"]);
+
+    // A name you give survives pairing again, and an empty one clears it.
+    reopened.rename_browser("client-a", "  Laptop  ").unwrap();
+    reopened
+        .add_browser("client-a", "Helium once more", "public-key-a")
+        .unwrap();
+    let browser = reopened.browsers().unwrap().pop().unwrap();
+    assert_eq!(browser.name, "Helium once more");
+    assert_eq!(browser.label.as_deref(), Some("Laptop"));
+    reopened.rename_browser("client-a", " ").unwrap();
+    assert_eq!(reopened.browsers().unwrap().pop().unwrap().label, None);
+    assert_eq!(
+        reopened.rename_browser("unknown", "Name"),
+        Err(VaultError::InvalidInput)
+    );
     assert_eq!(
         reopened.browser_key("client-b").unwrap().as_deref(),
         Some("public-key-b")

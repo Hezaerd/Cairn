@@ -427,6 +427,16 @@ pub async fn list_browsers(
 }
 
 #[tauri::command]
+pub async fn rename_browser(
+    window: WebviewWindow,
+    store: State<'_, Store>,
+    id: String,
+    label: String,
+) -> Result<(), VaultError> {
+    run(window, &store, move |vault| vault.rename_browser(&id, &label)).await
+}
+
+#[tauri::command]
 pub async fn remove_browser(
     window: WebviewWindow,
     store: State<'_, Store>,
