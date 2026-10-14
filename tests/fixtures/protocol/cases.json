@@ -320,6 +320,24 @@
     "message": {
       "version": 1,
       "requestId": "test-1",
+      "type": "PairingRequested",
+      "nonce": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+    },
+    "request": {
+      "version": 1,
+      "requestId": "test-1",
+      "type": "Pair",
+      "publicKey": "BOOW1dyCHYY4QMqAT9TMDlKO4nUm7fnNINXHblR7cydfk_ujsAkq-A6_cRTFsW46o5CxC1EP_cE6bCtz-8u_x-g",
+      "name": "Helium"
+    }
+  },
+  {
+    "name": "pairing requested without a nonce",
+    "kind": "response",
+    "valid": false,
+    "message": {
+      "version": 1,
+      "requestId": "test-1",
       "type": "PairingRequested"
     },
     "request": {

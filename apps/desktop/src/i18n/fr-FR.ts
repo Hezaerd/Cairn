@@ -105,6 +105,8 @@ export const frFR: Messages = {
     approve: "Approuver",
     refuse: "Refuser",
     paired: (name: string) => `${name} est associé.`,
+    conflict:
+      "Deux navigateurs ont demandé l’association en même temps, alors Cairn a refusé les deux. Si tu n’as demandé que depuis un seul, autre chose sur cet ordinateur a essayé de s’associer. Réessaie depuis l’extension.",
   },
   settings: {
     open: "Paramètres",

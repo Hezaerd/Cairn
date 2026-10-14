@@ -24,6 +24,9 @@
   },
   "pairingThen": { "message": "Approuve-le dans Cairn, puis actualise." },
   "pairAgain": { "message": "Redemander" },
+  "pairingConflict": {
+    "message": "Un autre navigateur a demandé l’association en même temps, alors Cairn a refusé les deux. Vérifie Cairn, puis réessaie."
+  },
   "locked": { "message": "Déverrouille Cairn pour voir tes identifiants." },
   "noSite": { "message": "Ouvre un site web pour voir ses identifiants." },
   "loginsFor": {

@@ -209,7 +209,9 @@ function Status({
             ? t("registerHost")
             : state.code === "AppUnavailable"
               ? t("openApp")
-              : t("connectionFailed", state.code)}
+              : state.code === "PairingConflict"
+                ? t("pairingConflict")
+                : t("connectionFailed", state.code)}
       </p>
       <button disabled={state.type === "Loading"} onClick={onRetry}>
         {t("retry")}
