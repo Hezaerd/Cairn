@@ -13,7 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 cairn-local-bridge = { path = "../../../crates/local-bridge" }
 tauri-plugin-single-instance = "2"
 cairn-vault = { path = "../../../crates/vault" }
@@ -31,3 +31,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sys-locale = "0.3"
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"

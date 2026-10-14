@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import icon from "../../src-tauri/icons/32x32.png";
+import mark from "../../../../brand/cairn.svg";
 import { useT } from "../i18n/I18nProvider";
 
 // Glyphs from Segoe Fluent Icons, the font Windows 11 draws its own caption buttons with.
@@ -40,7 +40,12 @@ export function TitleBar() {
       data-focused={focused}
       className="group pointer-events-auto relative z-60 flex h-8 shrink-0 items-center bg-background text-xs select-none data-[focused=false]:text-muted-foreground"
     >
-      <img src={icon} alt="" className="mr-2 ml-3 size-4 group-data-[focused=false]:opacity-60" />
+      {/* A mask paints the mark in the text color, so it follows the theme. */}
+      <span
+        aria-hidden
+        className="mr-2 ml-3 size-4 bg-current mask-contain mask-center mask-no-repeat"
+        style={{ maskImage: `url("${mark}")` }}
+      />
       <span className="mr-auto truncate">Cairn</span>
       <div className="flex h-full" data-tauri-drag-region="false">
         <button
