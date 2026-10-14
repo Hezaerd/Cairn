@@ -4,6 +4,7 @@ import { Effect } from "effect";
 import { FolderOpen } from "lucide-react";
 import { toast } from "@cairn/ui/components/sonner";
 import { Button } from "@cairn/ui/components/button";
+import { CardDescription, CardHeader, CardTitle } from "@cairn/ui/components/card";
 import { useT } from "@/i18n/I18nProvider";
 import { extensionFolder, openExtensionFolder, type ExtensionFolder } from "./connector";
 
@@ -35,22 +36,20 @@ export function ExtensionSettings({ labelledBy }: { labelledBy: string }) {
 
   if (folder.state !== "installed")
     return (
-      <p className="text-sm text-muted-foreground">
+      <CardDescription>
         {folder.state === "dev" ? t.extension.dev : t.extension.missing}
-      </p>
+      </CardDescription>
     );
 
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="grid min-w-0 gap-0.5">
-          <h3 id={labelledBy} className="text-sm">
-            {t.extension.folder}
-          </h3>
+        <CardHeader>
+          <CardTitle id={labelledBy}>{t.extension.folder}</CardTitle>
           <code className="truncate text-xs text-muted-foreground select-text" title={folder.path}>
             {folder.path}
           </code>
-        </div>
+        </CardHeader>
         <Button size="sm" variant="outline" onClick={open}>
           <FolderOpen />
           {t.extension.open}

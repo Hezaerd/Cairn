@@ -55,7 +55,7 @@
   ],
   "settings": {
     "shadcn": {
-      "note": "Reuse the components in packages/ui/src/components and the tokens in packages/ui/src/styles.css. When a design needs a new treatment, add a variant or a token there."
+      "note": "Reuse the components in packages/ui/src/components and the tokens in packages/ui/src/styles.css. When a design needs a new treatment, add a variant or a token there. DESIGN.md says which to use where."
     }
   },
   "jsPlugins": [

@@ -4,7 +4,12 @@ import { Effect } from "effect";
 import { Download, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@cairn/ui/components/button";
 import { Separator } from "@cairn/ui/components/separator";
-import { cn } from "@cairn/ui/lib/utils";
+import { CardDescription, CardHeader, CardTitle } from "@cairn/ui/components/card";
+import {
+  ChoiceCard,
+  ChoiceCardDescription,
+  ChoiceCardTitle,
+} from "@cairn/ui/components/choice-card";
 import { useT } from "../i18n/I18nProvider";
 import {
   checkForUpdate,
@@ -123,50 +128,28 @@ export function UpdateSettings({ labelledBy }: { labelledBy: string }) {
   return (
     <div className="grid gap-4">
       <div className="grid gap-3">
-        <h3 id={labelledBy} className="text-sm">
-          {t.update.channel}
-        </h3>
+        <CardTitle id={labelledBy}>{t.update.channel}</CardTitle>
         <div role="group" aria-labelledby={labelledBy} className="grid grid-cols-2 gap-3">
-          {channels.map((channel) => {
-            const active = status?.channel === channel;
-
-            return (
-              <button
-                key={channel}
-                type="button"
-                aria-pressed={active}
-                disabled={!status || busy}
-                className={cn(
-                  "grid content-start gap-1 rounded-xl border p-3 text-left transition-colors disabled:cursor-default",
-                  active
-                    ? "border-ring bg-selection/60 inset-ring inset-ring-ring"
-                    : "hover:bg-accent/60",
-                )}
-                onClick={() => choose(channel)}
-              >
-                <span
-                  className={cn(
-                    "text-sm",
-                    active ? "font-semibold text-foreground" : "text-muted-foreground",
-                  )}
-                >
-                  {t.update[channel]}
-                </span>
-                <span className="text-xs text-muted-foreground">{t.update.hints[channel]}</span>
-              </button>
-            );
-          })}
+          {channels.map((channel) => (
+            <ChoiceCard
+              key={channel}
+              aria-pressed={status?.channel === channel}
+              disabled={!status || busy}
+              onClick={() => choose(channel)}
+            >
+              <ChoiceCardTitle>{t.update[channel]}</ChoiceCardTitle>
+              <ChoiceCardDescription>{t.update.hints[channel]}</ChoiceCardDescription>
+            </ChoiceCard>
+          ))}
         </div>
-        {leavingNightly && <p className="text-xs text-muted-foreground">{t.update.leaveNightly}</p>}
+        {leavingNightly && <CardDescription>{t.update.leaveNightly}</CardDescription>}
       </div>
       <Separator />
       <div className="flex items-center justify-between gap-3">
-        <div className="grid min-w-0 gap-0.5">
-          <span className="text-sm font-medium">{status && t.update.current(status.version)}</span>
-          <span role="status" className="text-xs text-muted-foreground">
-            {status && describe(status, check)}
-          </span>
-        </div>
+        <CardHeader>
+          <CardTitle>{status && t.update.current(status.version)}</CardTitle>
+          <CardDescription role="status">{status && describe(status, check)}</CardDescription>
+        </CardHeader>
         {check.state === "available" || check.state === "installing" ? (
           <Button size="sm" disabled={busy} onClick={install}>
             {busy ? <Loader2 className="animate-spin" /> : <Download />}

@@ -209,7 +209,7 @@ export function AddCodesDialog({ vault }: { vault: ReturnType<typeof useVault> }
                 return (
                   <li
                     key={index}
-                    className="flex items-center gap-3 rounded-md border bg-muted/50 p-2.5 max-[680px]:flex-col max-[680px]:items-stretch"
+                    className="flex items-center gap-3 rounded-md border bg-muted/50 p-2.5 max-compact:flex-col max-compact:items-stretch"
                   >
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5 *:truncate">
                       <strong className="text-xs font-semibold">
@@ -232,7 +232,7 @@ export function AddCodesDialog({ vault }: { vault: ReturnType<typeof useVault> }
                       }
                     >
                       <SelectTrigger
-                        className="w-52 max-[680px]:w-full"
+                        className="w-52 max-compact:w-full"
                         aria-label={`${t.authenticator.target}: ${account.issuer || account.account}`}
                       >
                         <SelectValue />

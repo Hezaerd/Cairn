@@ -8,6 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@cairn/ui/components/select";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Section,
+  SectionTitle,
+} from "@cairn/ui/components/card";
 import { useLanguage, useT } from "@/i18n/I18nProvider";
 import { Locale, localeNames, locales } from "@/i18n/locale";
 import { UpdateSettings } from "@/updater/UpdateSettings";
@@ -24,19 +32,13 @@ function General() {
 
   return (
     <>
-      <section aria-labelledby="general" className="grid gap-3">
-        <h2 id="general" className="text-2xs text-muted-foreground">
-          {t.settings.general}
-        </h2>
-        <div className="flex items-center justify-between gap-6 rounded-lg border bg-muted/50 p-4 max-[680px]:flex-col max-[680px]:items-stretch max-[680px]:gap-3">
-          <div className="grid gap-1">
-            <h3 id="language" className="text-sm">
-              {t.settings.language}
-            </h3>
-            <p id="language-hint" className="text-xs text-muted-foreground">
-              {t.settings.languageHint}
-            </p>
-          </div>
+      <Section aria-labelledby="general">
+        <SectionTitle id="general">{t.settings.general}</SectionTitle>
+        <Card layout="row">
+          <CardHeader>
+            <CardTitle id="language">{t.settings.language}</CardTitle>
+            <CardDescription id="language-hint">{t.settings.languageHint}</CardDescription>
+          </CardHeader>
           <Select
             value={language.chosen ?? system}
             onValueChange={(value) => {
@@ -45,7 +47,7 @@ function General() {
             }}
           >
             <SelectTrigger
-              className="w-56 max-[680px]:w-full"
+              className="w-56 max-compact:w-full"
               aria-labelledby="language"
               aria-describedby="language-hint"
             >
@@ -61,16 +63,14 @@ function General() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </section>
-      <section aria-labelledby="updates" className="grid gap-3">
-        <h2 id="updates" className="text-2xs text-muted-foreground">
-          {t.settings.updates}
-        </h2>
-        <div className="rounded-lg border bg-muted/50 p-4">
+        </Card>
+      </Section>
+      <Section aria-labelledby="updates">
+        <SectionTitle id="updates">{t.settings.updates}</SectionTitle>
+        <Card>
           <UpdateSettings labelledBy="update-channel" />
-        </div>
-      </section>
+        </Card>
+      </Section>
     </>
   );
 }

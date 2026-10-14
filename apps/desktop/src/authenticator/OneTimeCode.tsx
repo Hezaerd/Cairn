@@ -87,7 +87,7 @@ export function OneTimeCode({ id }: { id: string }) {
   return (
     <>
       <span className="flex min-w-0 items-center gap-3">
-        <code className="font-mono text-lg tracking-wider tabular-nums">
+        <code className="font-mono text-xl tracking-wider tabular-nums">
           {grouped(current.code)}
         </code>
         <span

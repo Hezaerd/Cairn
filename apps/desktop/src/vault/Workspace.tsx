@@ -10,6 +10,13 @@ import {
   EmptyTitle,
 } from "@cairn/ui/components/empty";
 import { Input } from "@cairn/ui/components/input";
+import {
+  ListItem,
+  ListItemContent,
+  ListItemDescription,
+  ListItemTitle,
+} from "@cairn/ui/components/list-item";
+import { Toolbar as Bar } from "@cairn/ui/components/toolbar";
 import type { EntrySummary } from "./VaultClient";
 import type { useVault } from "./useVault";
 import { SiteIcon } from "../favicon/SiteIcon";
@@ -20,7 +27,7 @@ import { showView, useNavigation } from "../store/navigation";
 type Vault = ReturnType<typeof useVault>;
 
 const tab =
-  "flex items-center gap-2 rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=page]:font-semibold aria-[current=page]:text-foreground";
+  "flex items-center gap-2 rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground current:font-semibold current:text-foreground";
 
 /** The tabs for the two views, the view's own actions, and what both share. */
 export function Toolbar({ vault, children }: { vault: Vault; children: ReactNode }) {
@@ -30,7 +37,7 @@ export function Toolbar({ vault, children }: { vault: Vault; children: ReactNode
   const codes = vault.snapshot.entries.filter((entry) => entry.hasTotp).length;
 
   return (
-    <div className="flex min-h-14.25 items-center gap-2 border-b px-4 py-2.5 max-[680px]:px-3">
+    <Bar>
       <nav className="mr-auto flex items-center gap-1" aria-label={t.views.label}>
         <button
           type="button"
@@ -65,7 +72,7 @@ export function Toolbar({ vault, children }: { vault: Vault; children: ReactNode
         {t.credentials.lock}
       </Button>
       <PairingDialog />
-    </div>
+    </Bar>
   );
 }
 
@@ -109,23 +116,22 @@ export function EntryList({
         />
       </div>
       <div className="px-4 pb-2.5 text-2xs text-muted-foreground">{heading}</div>
-      <ul className="overflow-y-auto px-1.5 pb-1.5">
+      <ul className="grid content-start gap-0.5 overflow-y-auto px-1.5 pb-1.5">
         {entries.map((entry) => (
           <li key={entry.id}>
-            <button
-              className="relative mb-0.5 flex w-full items-center gap-2.5 rounded-md p-2.5 text-left hover:bg-accent aria-[current=true]:bg-selection aria-[current=true]:before:absolute aria-[current=true]:before:left-0 aria-[current=true]:before:h-4.5 aria-[current=true]:before:w-0.75 aria-[current=true]:before:rounded-xs aria-[current=true]:before:bg-primary"
+            <ListItem
               aria-current={selected?.id === entry.id ? "true" : undefined}
               onClick={() => onSelect(entry.id)}
             >
               <SiteIcon key={entry.site} id={entry.id} name={entry.name} />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5 *:truncate">
-                <strong className="text-xs font-semibold">{entry.name}</strong>
-                <span className="text-2xs text-muted-foreground">
+              <ListItemContent>
+                <ListItemTitle>{entry.name}</ListItemTitle>
+                <ListItemDescription>
                   {entry.username || entry.site || t.credentials.noUsername}
-                </span>
-              </span>
+                </ListItemDescription>
+              </ListItemContent>
               {marker?.(entry)}
-            </button>
+            </ListItem>
           </li>
         ))}
       </ul>

@@ -6,14 +6,14 @@ Cairn is a personal password manager for Windows: a Tauri desktop app that holds
 
 Use the requested outcome and constraints to choose the workflow. Continue through implementation, relevant verification, and fixes until the result is complete or a concrete blocker prevents progress. Ask only when missing information materially affects the result and can't reasonably be inferred.
 
-Read what the task needs. [Development](docs/development.md) covers setup, the extension, and tests; [vault](docs/vault.md) covers storage, encryption, and site icons; [browser bridge](docs/browser-bridge.md) covers the protocol and the pipe. Don't treat these as a required reading list.
+Read what the task needs. [Development](docs/development.md) covers setup, the extension, and tests; [vault](docs/vault.md) covers storage, encryption, and site icons; [browser bridge](docs/browser-bridge.md) covers the protocol and the pipe; [design](DESIGN.md) covers how the UI looks and reads. Don't treat these as a required reading list.
 
 ## Project boundaries
 
 - The repository is a pnpm workspace and a Cargo workspace. Add an app's dependencies to that app; keep only repository-wide tooling in the root `package.json`.
 - `apps/desktop` is the Tauri app. Its Rust side is in `apps/desktop/src-tauri`.
 - `apps/extension` is the popup, the service worker, the content script, the picker frame, and the save banner. The service worker accepts messages only from its popup, its picker, its save banner, and its content script in a page's top frame. Keep its required permissions to `nativeMessaging`, `activeTab`, and `scripting`. Access to websites stays optional, asked for only when the user turns on suggestions, which also turns on saving.
-- `packages/ui` holds the design system both apps share: the shadcn/ui components, `cn`, and the tokens in `src/styles.css`. Reuse them instead of styling a surface by hand; `pnpm lint` enforces this with `@shadcn/lint`. If a screen needs something new, add a variant or a token instead of restyling through `className`. Keep app-specific code such as translations out of the package.
+- `packages/ui` holds the design system both apps share: the shadcn/ui components, `cn`, and the tokens in `src/styles.css`. [DESIGN.md](DESIGN.md) says when to use each. Reuse them instead of styling a surface by hand; `pnpm lint` enforces this with `@shadcn/lint`. If a screen needs something new, add a variant or a token instead of restyling through `className`. Keep app-specific code such as translations out of the package.
 - `packages/contracts` holds the Effect Schema wire contracts and typed errors. `packages/client` holds the Effect services and the Native Messaging adapter.
 - `crates/vault` holds the vault format, crypto, sessions, storage, and the paired-browser list, and doesn't depend on Tauri. `crates/favicon` downloads site icons and owns their cache. `crates/protocol`, `crates/local-bridge`, and `crates/native-host` carry the browser bridge; the app answers it in `apps/desktop/src-tauri/src/bridge`.
 - Each app keeps its routes in `src/routes`. Don't edit the generated `src/routeTree.gen.ts` files.

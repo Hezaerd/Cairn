@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Card, CardTitle, Section, SectionTitle } from "@cairn/ui/components/card";
 import { useT } from "@/i18n/I18nProvider";
 import { ColorSchemePicker } from "@/theme/ColorSchemePicker";
 
@@ -8,16 +9,12 @@ function Appearance() {
   const t = useT();
 
   return (
-    <section aria-labelledby="appearance" className="grid gap-3">
-      <h2 id="appearance" className="text-2xs text-muted-foreground">
-        {t.settings.appearance}
-      </h2>
-      <div className="grid gap-3 rounded-lg border bg-muted/50 p-4">
-        <h3 id="color-scheme" className="text-sm">
-          {t.settings.colorScheme}
-        </h3>
+    <Section aria-labelledby="appearance">
+      <SectionTitle id="appearance">{t.settings.appearance}</SectionTitle>
+      <Card layout="stack">
+        <CardTitle id="color-scheme">{t.settings.colorScheme}</CardTitle>
         <ColorSchemePicker labelledBy="color-scheme" />
-      </div>
-    </section>
+      </Card>
+    </Section>
   );
 }
