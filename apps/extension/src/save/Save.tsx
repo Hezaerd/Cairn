@@ -11,6 +11,11 @@ import { CircleCheck } from "lucide-react";
 import { Button } from "@cairn/ui/components/button";
 import { Input } from "@cairn/ui/components/input";
 import { Field, FieldLabel } from "@cairn/ui/components/field";
+import {
+  ListItemContent,
+  ListItemDescription,
+  ListItemTitle,
+} from "@cairn/ui/components/list-item";
 import { useTrustedVisibility } from "../frame/visibility";
 import { t } from "../popup/i18n";
 
@@ -156,13 +161,11 @@ export default function Save() {
           <h2 className="text-xs font-semibold">
             {state.type === "New" ? t("saveTitle") : t("updateTitle")}
           </h2>
-          <p className="flex min-w-0 flex-col gap-0.5 rounded-md border bg-muted px-2.5 py-2 *:truncate">
-            <strong className="text-xs font-semibold">
-              {state.type === "New" ? state.host : state.name}
-            </strong>
-            <span className="text-2xs text-muted-foreground">
-              {state.username || t("noUsername")}
-            </span>
+          <p className="flex rounded-md border bg-muted px-2.5 py-2">
+            <ListItemContent>
+              <ListItemTitle>{state.type === "New" ? state.host : state.name}</ListItemTitle>
+              <ListItemDescription>{state.username || t("noUsername")}</ListItemDescription>
+            </ListItemContent>
           </p>
           {state.type === "New" && (
             <Field>

@@ -44,6 +44,6 @@ The installer ships the extension; Cairn's Settings → Browser extension shows 
 
 ## Documentation
 
-[Development](docs/development.md) · [Vault](docs/vault.md) · [Browser bridge](docs/browser-bridge.md)
+[Development](docs/development.md) · [Vault](docs/vault.md) · [Browser bridge](docs/browser-bridge.md) · [Design](DESIGN.md)
 
 Cairn hasn't had an independent security audit.

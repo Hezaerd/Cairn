@@ -14,6 +14,11 @@ import {
   DialogTrigger,
 } from "@cairn/ui/components/dialog";
 import { Input } from "@cairn/ui/components/input";
+import {
+  ListItemContent,
+  ListItemDescription,
+  ListItemTitle,
+} from "@cairn/ui/components/list-item";
 import { useT } from "../i18n/I18nProvider";
 import { VaultRuntime } from "../vault/runtime";
 import type { VaultError } from "../vault/VaultClient";
@@ -247,13 +252,13 @@ export function BrowsersDialog() {
                     </form>
                   ) : (
                     <>
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <strong className="truncate text-xs font-semibold">{name}</strong>
-                        <span className="truncate text-2xs text-muted-foreground">
+                      <ListItemContent>
+                        <ListItemTitle>{name}</ListItemTitle>
+                        <ListItemDescription>
                           {browser.label !== null && `${browser.name} · `}
                           {t.browsers.pairedOn(new Date(browser.pairedAt * 1000))}
-                        </span>
-                      </span>
+                        </ListItemDescription>
+                      </ListItemContent>
                       <Button
                         variant="ghost"
                         size="icon-sm"

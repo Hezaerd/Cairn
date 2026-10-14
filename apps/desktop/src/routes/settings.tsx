@@ -7,19 +7,18 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@cairn/ui/components/button";
+import { ListItem } from "@cairn/ui/components/list-item";
+import { Toolbar } from "@cairn/ui/components/toolbar";
 import { useT } from "@/i18n/I18nProvider";
 
 export const Route = createFileRoute("/settings")({ component: Settings });
-
-const sectionLink =
-  "relative mb-0.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-xs hover:bg-accent aria-[current=page]:bg-selection aria-[current=page]:font-semibold aria-[current=page]:before:absolute aria-[current=page]:before:left-0 aria-[current=page]:before:h-4.5 aria-[current=page]:before:w-0.75 aria-[current=page]:before:rounded-xs aria-[current=page]:before:bg-primary [&_svg]:text-muted-foreground";
 
 function Settings() {
   const t = useT();
 
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={t.settings.title}>
-      <div className="flex min-h-14.25 items-center gap-2 border-b px-4 py-2.5 max-[680px]:px-3">
+      <Toolbar>
         <Button variant="ghost" size="icon-sm" asChild>
           <Link to="/" aria-label={t.settings.back} title={t.settings.back}>
             <ArrowLeft />
@@ -27,24 +26,33 @@ function Settings() {
         </Button>
         <SettingsIcon size={16} />
         <h1 className="font-semibold">{t.settings.title}</h1>
-      </div>
-      <div className="grid min-h-0 flex-1 grid-cols-settings max-[680px]:grid-cols-settings-narrow">
-        <nav className="border-r bg-muted px-1.5 py-3" aria-label={t.settings.sections}>
-          <Link to="/settings/general" className={sectionLink}>
-            <SlidersHorizontal size={16} />
-            {t.settings.general}
-          </Link>
-          <Link to="/settings/appearance" className={sectionLink}>
-            <Palette size={16} />
-            {t.settings.appearance}
-          </Link>
-          <Link to="/settings/extension" className={sectionLink}>
-            <Puzzle size={16} />
-            {t.settings.extension}
-          </Link>
+      </Toolbar>
+      <div className="grid min-h-0 flex-1 grid-cols-settings max-compact:grid-cols-settings-narrow">
+        <nav
+          className="grid content-start gap-0.5 border-r bg-muted px-1.5 py-3"
+          aria-label={t.settings.sections}
+        >
+          <ListItem size="sm" asChild>
+            <Link to="/settings/general">
+              <SlidersHorizontal size={16} />
+              {t.settings.general}
+            </Link>
+          </ListItem>
+          <ListItem size="sm" asChild>
+            <Link to="/settings/appearance">
+              <Palette size={16} />
+              {t.settings.appearance}
+            </Link>
+          </ListItem>
+          <ListItem size="sm" asChild>
+            <Link to="/settings/extension">
+              <Puzzle size={16} />
+              {t.settings.extension}
+            </Link>
+          </ListItem>
         </nav>
         <div className="min-h-0 overflow-y-auto">
-          <div className="mx-auto grid max-w-190 gap-4 px-6 py-6 max-[680px]:px-4">
+          <div className="mx-auto grid max-w-190 gap-4 px-6 py-6 max-compact:px-4">
             <Outlet />
           </div>
         </div>

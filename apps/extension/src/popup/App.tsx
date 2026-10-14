@@ -222,7 +222,7 @@ function Status({
 
   return (
     <main className="grid min-h-50 content-center justify-items-center gap-1.5 p-6 text-center">
-      <h1 className="text-lg font-semibold">Cairn</h1>
+      <h1 className="text-subtitle font-semibold">Cairn</h1>
       <p role="status" aria-live="polite" className="text-sm">
         {state.type === "Loading"
           ? t("connecting")
