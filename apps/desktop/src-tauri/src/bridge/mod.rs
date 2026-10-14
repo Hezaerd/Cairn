@@ -300,6 +300,7 @@ fn authenticated(
                     username: username.trim().to_owned(),
                     password: password.to_string(),
                     notes: String::new(),
+                    totp: String::new(),
                 };
                 commit(app, vault, |vault| vault.save(entry))?;
                 Ok(Response::Saved {
@@ -324,6 +325,7 @@ fn authenticated(
                     username: entry.username.clone(),
                     password: Some(password.to_string()),
                     notes: None,
+                    totp: None,
                 };
                 commit(app, vault, |vault| vault.update(entry_id, update))?;
                 Ok(Response::Saved {
@@ -336,13 +338,14 @@ fn authenticated(
     })
 }
 
-/// The vault's logins for the page's site.
+/// The vault's logins for the page's site. Entries that hold only an
+/// authenticator key have nothing to fill.
 fn site_entries(vault: &mut Vault, origin: &url::Url) -> Result<Vec<EntrySummary>, ErrorCode> {
     Ok(vault
         .list()
         .map_err(|_| ErrorCode::VaultLocked)?
         .into_iter()
-        .filter(|entry| sites::matches(&entry.site, origin))
+        .filter(|entry| entry.has_password && sites::matches(&entry.site, origin))
         .collect())
 }
 
@@ -451,6 +454,37 @@ mod tests {
     fn waiting_code(bridge: &Bridge) -> Option<String> {
         let slot = bridge.pending.lock().unwrap();
         slot.as_ref().map(|pending| pending.request.code.clone())
+    }
+
+    #[test]
+    fn entries_with_only_an_authenticator_key_are_not_logins() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut vault = Vault::open(directory.path()).unwrap();
+        vault
+            .create(Zeroizing::new("synthetic-master-password".to_owned()))
+            .unwrap();
+        for (name, password, totp) in [
+            ("Login", "synthetic-credential", ""),
+            ("Code only", "", "GEZDGNBVGY3TQOJQ"),
+        ] {
+            vault
+                .save(NewEntry {
+                    name: name.to_owned(),
+                    site: "https://example.com".to_owned(),
+                    username: String::new(),
+                    password: password.to_owned(),
+                    notes: String::new(),
+                    totp: totp.to_owned(),
+                })
+                .unwrap();
+        }
+        let origin = url::Url::parse("https://example.com").unwrap();
+        let names: Vec<_> = site_entries(&mut vault, &origin)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+        assert_eq!(names, ["Login"]);
     }
 
     #[test]

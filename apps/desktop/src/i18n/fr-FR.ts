@@ -21,6 +21,14 @@ export const frFR: Messages = {
     optional: "facultatif",
     notesUnchanged:
       "Les notes restent inchangées. Affiche le mot de passe avant de modifier pour les éditer.",
+    totp: "Clé d'authentification",
+    totpHint:
+      "La clé de configuration ou le lien otpauth:// qu'un site donne quand tu actives la double authentification.",
+    keepTotp: "laisser vide pour la conserver",
+    removeTotp: "Supprimer la clé d'authentification",
+    needsSecret: "Saisis un mot de passe, une clé d'authentification, ou les deux.",
+    invalid:
+      "Vérifie les champs. Une clé d'authentification est une clé Base32 ou un lien otpauth://totp.",
   },
   generator: {
     open: "Générer un mot de passe",
@@ -72,6 +80,34 @@ export const frFR: Messages = {
     notFound: "Aucun identifiant trouvé",
     notFoundHint: "Essaie un autre nom, site ou identifiant.",
     emptyHint: "Ajoute un identifiant pour le retrouver ici.",
+    codeOnly: "Code d'authentification",
+    hasCode: "A un code d'authentification",
+    code: "Code à usage unique",
+    copyCode: "Copier le code",
+    codeCopied: "Code copié.",
+    copyFailed: "Impossible de copier le code.",
+    codeChanges: (seconds) => `Change dans ${seconds} s`,
+  },
+  authenticator: {
+    open: "Ajouter des codes d'authentification",
+    title: "Ajouter des codes d'authentification",
+    description:
+      "Colle une capture d'un QR code avec Ctrl+V, dépose une image ici, ou colle des liens otpauth://. L'export « Transférer des comptes » de Google Authenticator fonctionne aussi.",
+    choose: "Choisir une image",
+    links: "Liens",
+    read: "Lire les liens",
+    scanning: "Lecture de l'image…",
+    noCode: "Aucun QR code d'authentification dans cette image.",
+    invalid:
+      "Cairn ne peut pas lire ces liens. Les codes basés sur un compteur (HOTP) ne sont pas pris en charge.",
+    found: (count) => (count === 1 ? "1 compte trouvé." : `${count} comptes trouvés.`),
+    noIssuer: "Sans émetteur",
+    target: "Enregistrer dans",
+    newEntry: "Nouvelle entrée",
+    replaces: "remplace son code",
+    back: "Retour",
+    add: (count) => (count === 1 ? "Ajouter 1 code" : `Ajouter ${count} codes`),
+    added: (count) => (count === 1 ? "1 code ajouté." : `${count} codes ajoutés.`),
   },
   auth: {
     createTitle: "Créer un coffre",

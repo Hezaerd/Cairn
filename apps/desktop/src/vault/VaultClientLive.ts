@@ -4,6 +4,8 @@ import {
   EntrySecret,
   EntrySummary,
   ErrorCode,
+  OtpPreview,
+  TotpCode,
   VaultClient,
   VaultError,
   VaultStatus,
@@ -39,5 +41,10 @@ export const VaultClientLive = Layer.succeed(
     remove: (id) => request("delete_entry", Schema.Null, { id }).pipe(Effect.asVoid),
     reveal: (id) => request("reveal_password", EntrySecret, { id }),
     generate: (options) => request("generate_password", Schema.String, { options }),
+    code: (id) => request("totp_code", TotpCode, { id }),
+    scanQr: (image) => request("scan_qr", Schema.String, image),
+    readOtp: (text) => request("read_otp", Schema.Array(OtpPreview), { text }),
+    importOtp: (text, targets) =>
+      request("import_otp", Schema.Null, { text, targets }).pipe(Effect.asVoid),
   }),
 );

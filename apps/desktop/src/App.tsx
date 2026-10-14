@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   Settings,
+  Timer,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -39,6 +41,8 @@ import { useVault } from "./vault/useVault";
 import { SiteIcon } from "./favicon/SiteIcon";
 import { PasswordGenerator } from "./generator/PasswordGenerator";
 import { BrowsersDialog, PairingDialog } from "./bridge/Browsers";
+import { AddCodesDialog } from "./authenticator/AddCodes";
+import { OneTimeCode } from "./authenticator/OneTimeCode";
 import { useT } from "./i18n/I18nProvider";
 
 type Vault = ReturnType<typeof useVault>;
@@ -113,7 +117,6 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
             name="password"
             type="password"
             className="h-[34px] border-b-muted-foreground"
-            required={!existing}
             maxLength={4096}
             autoComplete="new-password"
           />
@@ -125,6 +128,31 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
             }}
           />
         </div>
+      </FormField>
+      <FormField
+        id="entry-totp"
+        label={
+          <>
+            {t.entry.totp}
+            <Optional>{existing?.entry.hasTotp ? t.entry.keepTotp : t.entry.optional}</Optional>
+          </>
+        }
+      >
+        <Input
+          id="entry-totp"
+          name="totp"
+          type="password"
+          maxLength={4096}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <FieldDescription className="text-[11px]">{t.entry.totpHint}</FieldDescription>
+        {existing?.entry.hasTotp && (
+          <label className="flex items-center gap-2 text-xs">
+            <Checkbox name="removeTotp" />
+            {t.entry.removeTotp}
+          </label>
+        )}
       </FormField>
       <FormField
         id="entry-notes"
@@ -151,7 +179,13 @@ function EntryDialog({ vault }: { vault: Vault }) {
     event.preventDefault();
     const form = event.currentTarget;
     const entry = Schema.decodeUnknownSync(NewEntry)(Object.fromEntries(new FormData(form)));
-    form.reset();
+
+    if (!entry.password && !entry.totp.trim()) {
+      toast.error(t.entry.needsSecret, { id: "entry-error" });
+
+      return;
+    }
+
     vault.save(entry);
   }
 
@@ -198,6 +232,7 @@ function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const password = data.get("password");
+    const totp = data.get("totp");
 
     const changes = Schema.decodeUnknownSync(EntryUpdate)({
       name: data.get("name"),
@@ -205,7 +240,15 @@ function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
       username: data.get("username"),
       password: password === "" ? null : password,
       notes: data.get("notes"),
+      // An empty key keeps the stored one; removing it sends an empty key.
+      totp: data.get("removeTotp") ? "" : totp === "" ? null : totp,
     });
+
+    if (changes.totp === "" && !entry.hasPassword && !changes.password) {
+      toast.error(t.entry.needsSecret, { id: "entry-error" });
+
+      return;
+    }
 
     vault.update(entry.id, changes);
   }
@@ -307,6 +350,7 @@ function Credentials({ vault }: { vault: Vault }) {
           <h1 className="font-semibold">{t.credentials.title}</h1>
           <span className="text-xs text-muted-foreground">{vault.snapshot.entries.length}</span>
         </div>
+        <AddCodesDialog vault={vault} />
         <BrowsersDialog />
         <Button variant="ghost" size="icon-sm" asChild>
           <Link to="/settings" aria-label={t.settings.open} title={t.settings.open}>
@@ -348,12 +392,19 @@ function Credentials({ vault }: { vault: Vault }) {
                   }}
                 >
                   <SiteIcon key={entry.site} id={entry.id} name={entry.name} />
-                  <span className="flex min-w-0 flex-col gap-0.5 *:truncate">
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5 *:truncate">
                     <strong className="text-xs font-semibold">{entry.name}</strong>
                     <span className="text-[11px] text-muted-foreground">
                       {entry.username || entry.site || t.credentials.noUsername}
                     </span>
                   </span>
+                  {entry.hasTotp && (
+                    <Timer
+                      size={13}
+                      className="shrink-0 text-muted-foreground"
+                      aria-label={t.credentials.hasCode}
+                    />
+                  )}
                 </button>
               </li>
             ))}
@@ -376,7 +427,9 @@ function Credentials({ vault }: { vault: Vault }) {
                 />
                 <div className="min-w-0 flex-1">
                   <h2 className="text-xl/[1.3] font-semibold wrap-anywhere">{selected.name}</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">{t.credentials.kind}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {selected.hasPassword ? t.credentials.kind : t.credentials.codeOnly}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <Button
@@ -415,7 +468,11 @@ function Credentials({ vault }: { vault: Vault }) {
                   className="flex items-center justify-between gap-3"
                 >
                   <code className="min-w-0 font-mono wrap-anywhere">
-                    {secret ? secret.password : "••••••••••••"}
+                    {!selected.hasPassword
+                      ? t.common.notSet
+                      : secret
+                        ? secret.password
+                        : "••••••••••••"}
                   </code>
                   <Button
                     variant="ghost"
@@ -429,6 +486,14 @@ function Credentials({ vault }: { vault: Vault }) {
                     {secret ? <EyeOff /> : <Eye />}
                   </Button>
                 </DetailField>
+                {selected.hasTotp && (
+                  <DetailField
+                    label={t.credentials.code}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <OneTimeCode key={selected.id} id={selected.id} />
+                  </DetailField>
+                )}
                 <DetailField label={t.entry.site}>{selected.site || t.common.notSet}</DetailField>
                 <DetailField label={t.entry.notes} className="whitespace-pre-wrap">
                   {secret ? secret.notes || t.credentials.noNotes : t.credentials.notesHidden}

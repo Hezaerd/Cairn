@@ -6,6 +6,7 @@
 - A password or note reaches the UI only when you reveal it, and hides again after 30 seconds, or when you select another entry, search, or open a dialog.
 - The edit dialog leaves the password field empty, and an empty field keeps the stored password. Notes are editable only if you revealed them before opening the editor. Otherwise they stay unchanged.
 - The wand button next to the password field generates a password. See [password generator](#password-generator).
+- An entry can hold an authenticator key, and then shows its current two-factor code. An entry needs a password, a key, or both. See [authenticator codes](#authenticator-codes).
 - Deleting an entry asks for confirmation. `backups/previous.cairn` keeps the version that still holds the entry until the next change.
 - The backend locks after five minutes without activity, when closing the window to the tray, or through the tray's lock action. Activity is listing or revealing in the window, a change from the window or the browser, approving a pairing, or filling a login picked in the extension. The extension's background queries, listing a page's logins for suggestions and checking whether a typed login is new, don't count, so browsing can't keep the vault open. Typing alone doesn't reset the timer either. On lock, the desktop clears the list, the revealed secret, and the entry form. The bridge still answers while Cairn is in the tray, but only with its status: the vault is locked.
 - The WebView runs in private mode with form autofill turned off. No credential goes to browser storage or logs.
@@ -25,7 +26,7 @@ Cairn stores its data in Tauri's `app_local_data_dir()`:
   backups\previous.cairn
 ```
 
-`vault.cairn` is a versioned JSON envelope. Version 2 added the paired-browser binding. Cairn still opens version 1 vaults and rewrites them as version 2 when you unlock them, keeping the version 1 file in `backups/previous.cairn`. Older releases can't open a version 2 vault. It holds the public key derivation parameters, the wrapped key, nonces, and ciphertext. Names, sites, usernames, passwords, and notes are all inside the ciphertext. Cairn never writes the master password or an unwrapped key to disk.
+`vault.cairn` is a versioned JSON envelope. Version 2 added the paired-browser binding, and version 3 added authenticator keys to entries. Cairn still opens version 1 and 2 vaults and rewrites them as version 3 when you unlock them, keeping the previous file in `backups/previous.cairn`. The header is part of every file's header data, so the upgrade rewrites `browsers.cairn` too, and the icon cache refills. Older releases can't open a vault written by a newer version. It holds the public key derivation parameters, the wrapped key, nonces, and ciphertext. Names, sites, usernames, passwords, notes, and authenticator keys are all inside the ciphertext. Cairn never writes the master password or an unwrapped key to disk.
 
 `browsers.cairn` lists the browsers paired with the extension: their public keys, names, and pairing dates. It is encrypted with the vault key, under its own header data, so nothing can add a browser without the master password. The encrypted part of `vault.cairn` records the nonce of the last write to `browsers.cairn`, and Cairn rewrites both on every pairing change. An older copy of the list, which might still hold a removed browser, no longer matches and reads as empty. So does a damaged or missing file, which only means pairing again. This doesn't stop someone with access to your files from rolling back `vault.cairn` and `browsers.cairn` together. See [browser bridge](browser-bridge.md).
 
@@ -68,6 +69,17 @@ The add and edit dialogs can generate a password. Rust generates it, in `crates/
 - Generating doesn't open the vault or count as activity for the idle lock.
 
 The browser extension doesn't generate passwords.
+
+## Authenticator codes
+
+Cairn generates time-based one-time codes (TOTP, RFC 6238) in Rust, in `crates/vault/src/totp.rs`, so you don't need a phone app for them.
+
+- The add and edit dialogs take an authenticator key: the Base32 setup key a site shows when you turn on two-factor authentication, or its `otpauth://totp` link. Editing leaves the field empty, and an empty field keeps the stored key. **Remove the authenticator key** deletes it, unless the entry has no password.
+- The QR code button in the toolbar adds keys in bulk. Paste a screenshot with Ctrl+V, drop or choose a picture, or paste `otpauth://totp` links or the `otpauth-migration://` links of Google Authenticator's **Transfer accounts** export. Rust decodes the QR codes and the links. The dialog lists the accounts by issuer and name, without their keys, and offers to add each one to the login whose name or site mentions its issuer, or as a new entry without a password. Adding a key to a login that already has one replaces it. Everything saves in one write.
+- Counter-based codes (HOTP) aren't supported. SHA-1, SHA-256, and SHA-512, six to eight digits, and periods up to 300 seconds are.
+- Selecting an entry with a key shows its current code and the seconds it stays valid, and fetches the next one when it expires. The key itself never reaches the window. Reading a code doesn't count as activity, so leaving an entry selected doesn't keep the vault open. **Copy code** puts the code on the clipboard, where it stays until something replaces it.
+- A key that isn't valid is refused before anything is written, and the vault stays unlocked with the form still filled.
+- Entries that hold only a key have nothing to fill, so the browser extension doesn't list them. The extension doesn't fill codes yet.
 
 ## Site icons
 

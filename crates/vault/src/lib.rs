@@ -3,9 +3,11 @@ mod browsers;
 mod favicon;
 mod generator;
 mod storage;
+mod totp;
 pub use browsers::BrowserSummary;
 pub use favicon::FaviconLookup;
 pub use generator::{PasswordOptions, generate_password};
+pub use totp::{OtpAccount, OtpPreview, TotpCode, parse_accounts};
 
 use argon2::{Algorithm, Argon2, Block, Params, Version};
 use chacha20poly1305::{
@@ -24,9 +26,10 @@ const MAX_FILE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_PLAINTEXT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_ENTRIES: usize = 10_000;
 const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
-/// Version 2 binds the paired-browser list to the vault. Version 1 vaults
-/// still open and are rewritten as version 2 on unlock.
-const VERSION: u32 = 2;
+/// Version 2 binds the paired-browser list to the vault. Version 3 adds
+/// authenticator keys to entries. Older vaults still open and are rewritten
+/// as version 3 on unlock.
+const VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum VaultError {
@@ -106,8 +109,21 @@ struct Entry {
     name: String,
     site: String,
     username: String,
+    /// Empty when the entry holds only an authenticator key.
     password: String,
     notes: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    totp: Option<totp::Totp>,
+}
+
+impl Entry {
+    /// An entry holds a password, an authenticator key, or both.
+    fn validate(&self) -> Result<()> {
+        if self.password.is_empty() && self.totp.is_none() {
+            return Err(VaultError::InvalidInput);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
@@ -116,8 +132,12 @@ pub struct NewEntry {
     pub name: String,
     pub site: String,
     pub username: String,
+    /// Empty only when `totp` holds a key.
     pub password: String,
     pub notes: String,
+    /// A Base32 key or an `otpauth://totp` link. Empty means none.
+    #[serde(default)]
+    pub totp: String,
 }
 
 impl NewEntry {
@@ -127,8 +147,9 @@ impl NewEntry {
     }
 }
 
-/// Changes to an existing entry. `None` keeps the stored password or notes,
-/// so the UI can edit an entry without revealing its secrets first.
+/// Changes to an existing entry. `None` keeps the stored password, notes, or
+/// authenticator key, so the UI can edit an entry without revealing its
+/// secrets first. An empty `totp` removes the key.
 #[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
 #[serde(deny_unknown_fields)]
 pub struct EntryUpdate {
@@ -137,6 +158,8 @@ pub struct EntryUpdate {
     pub username: String,
     pub password: Option<String>,
     pub notes: Option<String>,
+    #[serde(default)]
+    pub totp: Option<String>,
 }
 
 impl EntryUpdate {
@@ -153,8 +176,17 @@ fn validate_fields(name: &str, site: &str, username: &str) -> Result<()> {
     Ok(())
 }
 
+/// Reads an optional key from a form. Empty means none.
+fn parse_totp(input: &str) -> Result<Option<totp::Totp>> {
+    if input.trim().is_empty() {
+        Ok(None)
+    } else {
+        totp::Totp::parse(input).map(Some)
+    }
+}
+
 fn validate_secret(password: Option<&str>, notes: Option<&str>) -> Result<()> {
-    if password.is_some_and(|password| password.is_empty() || password.len() > 4096)
+    if password.is_some_and(|password| password.len() > 4096)
         || notes.is_some_and(|notes| notes.len() > 16_384)
     {
         return Err(VaultError::InvalidInput);
@@ -163,11 +195,14 @@ fn validate_secret(password: Option<&str>, notes: Option<&str>) -> Result<()> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EntrySummary {
     pub id: String,
     pub name: String,
     pub site: String,
     pub username: String,
+    pub has_password: bool,
+    pub has_totp: bool,
 }
 
 /// What a browser needs to fill a login form.
@@ -326,8 +361,8 @@ impl Vault {
             &envelope.ciphertext,
             &envelope.header.aad(b"cairn-data-v1")?,
         )?;
-        let legacy = envelope.header.version == 1;
-        let (entries, browsers_nonce): (Vec<Entry>, _) = if legacy {
+        let version = envelope.header.version;
+        let (entries, browsers_nonce): (Vec<Entry>, _) = if version == 1 {
             let entries = serde_json::from_slice(&plaintext);
             (entries.map_err(|_| VaultError::InvalidVault)?, None)
         } else {
@@ -349,20 +384,27 @@ impl Vault {
             disk_bytes: bytes,
             last_used: Instant::now(),
         });
-        if legacy && let Err(error) = self.upgrade(&wrapping_key) {
+        if version < VERSION
+            && let Err(error) = self.upgrade(version, &wrapping_key)
+        {
             self.lock();
             return Err(error);
         }
         Ok(())
     }
 
-    /// Rewrites a version 1 vault as version 2 and binds the paired-browser
-    /// list found next to it, which version 1 had no way to vouch for.
-    fn upgrade(&mut self, wrapping_key: &[u8; 32]) -> Result<()> {
+    /// Rewrites an older vault in the current version. The header is part of
+    /// every file's header data, so the paired-browser list is rewritten too.
+    /// Version 1 had no way to vouch for the list found next to it, so it is
+    /// kept as is; a later version keeps it only if the vault vouches for it.
+    /// The icon cache reads as empty and refills.
+    fn upgrade(&mut self, version: u32, wrapping_key: &[u8; 32]) -> Result<()> {
         let path = self.directory.join("browsers.cairn");
         let session = self.active()?;
-        // Read under the version 1 header, before the header changes.
-        let browsers = browsers::read_list(&path, session).ok();
+        // Read under the old header, before it changes.
+        let browsers = browsers::read_list(&path, session)
+            .ok()
+            .filter(|(_, nonce)| version == 1 || session.browsers_nonce == Some(*nonce));
         let header = &mut session.envelope.header;
         header.version = VERSION;
         session.envelope.key_nonce = random()?;
@@ -423,6 +465,8 @@ impl Vault {
                 name: entry.name.clone(),
                 site: entry.site.clone(),
                 username: entry.username.clone(),
+                has_password: !entry.password.is_empty(),
+                has_totp: entry.totp.is_some(),
             })
             .collect())
     }
@@ -454,32 +498,34 @@ impl Vault {
 
     pub fn save(&mut self, input: NewEntry) -> Result<()> {
         input.validate()?;
-        let id = random::<16>()?.iter().map(|b| format!("{b:02x}")).collect();
+        let entry = Entry {
+            id: random_id()?,
+            name: input.name.clone(),
+            site: input.site.clone(),
+            username: input.username.clone(),
+            password: input.password.clone(),
+            notes: input.notes.clone(),
+            totp: parse_totp(&input.totp)?,
+        };
+        entry.validate()?;
         self.commit(|entries| {
             if entries.len() >= MAX_ENTRIES {
                 return Err(VaultError::InvalidInput);
             }
-            entries.push(Entry {
-                id,
-                name: input.name.clone(),
-                site: input.site.clone(),
-                username: input.username.clone(),
-                password: input.password.clone(),
-                notes: input.notes.clone(),
-            });
+            entries.push(entry);
             Ok(())
         })
     }
 
     pub fn update(&mut self, id: &str, input: EntryUpdate) -> Result<()> {
         input.validate()?;
+        let totp = input.totp.as_deref().map(parse_totp).transpose()?;
         self.commit(|entries| {
             let entry = entries
                 .iter_mut()
                 .find(|entry| entry.id == id)
                 .ok_or(VaultError::InvalidInput)?;
-            // Replacing the whole entry drops the old one, which zeroizes its fields.
-            *entry = Entry {
+            let updated = Entry {
                 id: entry.id.clone(),
                 name: input.name.clone(),
                 site: input.site.clone(),
@@ -489,7 +535,11 @@ impl Vault {
                     .clone()
                     .unwrap_or_else(|| entry.password.clone()),
                 notes: input.notes.clone().unwrap_or_else(|| entry.notes.clone()),
+                totp: totp.unwrap_or_else(|| entry.totp.clone()),
             };
+            updated.validate()?;
+            // Replacing the whole entry drops the old one, which zeroizes its fields.
+            *entry = updated;
             Ok(())
         })
     }
@@ -537,6 +587,10 @@ impl Vault {
     fn path(&self) -> PathBuf {
         self.directory.join("vault.cairn")
     }
+}
+
+fn random_id() -> Result<String> {
+    Ok(random::<16>()?.iter().map(|b| format!("{b:02x}")).collect())
 }
 
 fn random<const N: usize>() -> Result<[u8; N]> {

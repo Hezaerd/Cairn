@@ -153,12 +153,14 @@ pub async fn delete_entry(
 }
 
 /// A failed change makes the desktop reload from disk, so the list never shows unsaved state.
+/// Invalid input is refused before anything is written, and keeps the session: a mistyped
+/// field shouldn't lock the vault. A failed write has already locked it.
 fn locking_on_error(
     vault: &mut Vault,
     change: impl FnOnce(&mut Vault) -> Result<(), VaultError>,
 ) -> Result<(), VaultError> {
     let result = change(vault);
-    if result.is_err() {
+    if result.is_err_and(|error| error != VaultError::InvalidInput) {
         vault.lock();
     }
     result
