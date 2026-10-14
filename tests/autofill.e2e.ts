@@ -66,7 +66,7 @@ const pages = new Map([
     `<!doctype html><title>Sign up</title><form>
       <input type="email" id="user" autocomplete="email">
       <input type="password" id="pass" autocomplete="new-password">
-      <input type="password" id="confirm" autocomplete="new-password">
+      <input type="password" id="confirm" autocomplete="new-password" maxlength="64">
     </form>`,
   ],
   // Submitting these loads a page without a form, as a successful login does.
@@ -295,6 +295,45 @@ async function submitLogin(path: string, username: string, password: string) {
   return page;
 }
 
+/**
+ * Clicks the Cairn icon in a field. It sits in a closed shadow root, so the
+ * click goes to where it's drawn: at the field's right edge.
+ */
+async function clickIcon(page: Page, selector: string) {
+  const box = await page.locator(selector).boundingBox();
+
+  assert.ok(box, `${selector} is on the page`);
+  await page.waitForTimeout(500);
+  await page.mouse.click(box.x + box.width - 15, box.y + box.height / 2);
+}
+
+/** Opens the generator on a sign-up form's password field. */
+async function openGenerator(page: Page) {
+  await page.click("#pass");
+  await assertNoPicker(page, "Focusing a sign-up field doesn't open the generator");
+  await clickIcon(page, "#pass");
+
+  const frame = await picker(page);
+  await frame.getByText(/^Nouveau mot de passe pour /).waitFor();
+
+  return frame;
+}
+
+/** The password the generator shows, once it shows one. */
+async function preview(frame: Frame, previous?: string) {
+  const output = frame.getByLabel("Mot de passe généré");
+
+  for (let poll = 0; poll < 50; poll++) {
+    const text = (await output.textContent()) ?? "";
+
+    if (text && text !== previous) return text;
+
+    await frame.waitForTimeout(100);
+  }
+
+  throw new Error("The generator showed no new password");
+}
+
 /** Styles the overlay's host element, which a page can reach. */
 const styleOverlay = (page: Page, opacity: string | null) =>
   page.evaluate((opacity) => {
@@ -472,8 +511,35 @@ try {
 
   const signup = await open(`${origin}/signup`);
   await signup.click("#user");
-  await assertNoPicker(signup, "No picker on a sign-up form");
-  console.log("Sign-up form is ignored: OK");
+  await assertNoPicker(signup, "No login picker on a sign-up form");
+  console.log("Sign-up form gets no login picker: OK");
+
+  // Generating: the icon in a sign-up form's password field opens the generator.
+  frame = await openGenerator(signup);
+  let generated = await preview(frame);
+  assert.equal(generated.length, 20);
+  assert.equal(await frame.locator('input[type="range"]').getAttribute("max"), "64");
+  await signup.screenshot({ path: path.join(directory, "page-generator.png") });
+
+  await frame.getByRole("button", { name: "Régénérer" }).click();
+  const regenerated = await preview(frame, generated);
+  await frame.getByLabel("Symboles (!#$…)").uncheck();
+  generated = await preview(frame, regenerated);
+  assert.match(generated, /^[A-Za-z0-9]{20}$/, "Turning symbols off removes them");
+
+  await signup.waitForTimeout(600);
+  await frame.getByRole("button", { name: "Utiliser" }).click();
+  await signup.waitForFunction(() => document.querySelector<HTMLInputElement>("#confirm")?.value);
+  assert.equal(await signup.inputValue("#pass"), generated);
+  assert.equal(await signup.inputValue("#confirm"), generated);
+  assert.equal(await signup.inputValue("#user"), "", "Generating fills no username");
+  await assertNoPicker(signup, "The generator closes after filling");
+
+  // Reopening keeps the password generated for the site.
+  frame = await openGenerator(signup);
+  assert.equal(await preview(frame), generated);
+  await signup.keyboard.press("Escape");
+  console.log("Generated a password into a sign-up form: OK");
 
   const other = await open(`http://127.0.0.1:${otherPort}/login`);
   await other.click("#user");
@@ -564,6 +630,46 @@ try {
   await bannerClosed(welcome);
   assert.equal((await listEntries()).length, 3, "Not now saves nothing");
   console.log("Sign-up offered, Not now closes it: OK");
+
+  // A generated password isn't a fill: signing up with it offers to save it.
+  const register = await open(`${otherOrigin}/register`);
+  frame = await openGenerator(register);
+  const signedUp = await preview(frame);
+  await register.waitForTimeout(600);
+  await frame.getByRole("button", { name: "Utiliser" }).click();
+  await register.waitForFunction(() => document.querySelector<HTMLInputElement>("#confirm")?.value);
+  await register.fill("#user", "generated@example.com");
+  await register.click("#go");
+  await register.waitForLoadState();
+  offer = await banner(register);
+  await offer.getByText("generated@example.com").waitFor();
+  assert.ok(
+    !(await offer.locator("body").innerText()).includes(signedUp),
+    "The banner hides the generated password",
+  );
+  await offer.getByLabel("Nom").fill("Inscription générée");
+  await register.waitForTimeout(600);
+  await offer.getByRole("button", { name: "Enregistrer" }).click();
+  await offer.getByText("Enregistré dans Cairn.").waitFor();
+  await bannerClosed(register);
+
+  const generatedEntry = (await listEntries()).find(
+    (entry) => entry.name === "Inscription générée",
+  );
+
+  assert.ok(generatedEntry, "The generated login is saved");
+
+  const generatedAccount = await open(`${otherOrigin}/account`);
+  assert.deepEqual(
+    await popupMessage(popup, {
+      type: "Fill",
+      tabId: await tabId(popup, `${otherOrigin}/account`),
+      entryId: generatedEntry.id,
+    }),
+    { type: "Filled" },
+  );
+  assert.equal(await generatedAccount.inputValue("#pass"), signedUp);
+  console.log("Signed up with a generated password and saved it: OK");
 
   // Locking the vault stops the extension.
   await app.getByRole("button", { name: "Verrouiller", exact: true }).click();

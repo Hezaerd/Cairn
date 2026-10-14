@@ -67,7 +67,7 @@ The add and edit dialogs can generate a password. Rust generates it, in `crates/
 - The window keeps the options in its local storage so the next password uses them. It doesn't keep the passwords: the preview is cleared when the popover closes, and nothing logs them.
 - Generating doesn't open the vault or count as activity for the idle lock.
 
-The browser extension doesn't generate passwords.
+The browser extension generates passwords for sign-up forms with the same options and method. See [generating passwords](browser-bridge.md#generating-passwords).
 
 ## Site icons
 

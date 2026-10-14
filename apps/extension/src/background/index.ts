@@ -20,13 +20,15 @@ import {
 } from "@cairn/contracts";
 import { CairnClientError } from "@cairn/contracts/errors";
 import { fillTab, tellPage } from "./fill";
+import { forgetGenerated, generate, lastGenerated } from "./generated";
 import { forget, forgetSaved, offer, offered, save, shouldOffer, submitted } from "./saving";
 import {
   closePicker,
   forgetLogins,
   injectOpenTabs,
   openPicker,
-  pickerOrigin,
+  pickerFor,
+  type OpenPicker,
   suggestions,
   suggestionsAllowed,
   syncContentScript,
@@ -147,7 +149,7 @@ const handlePopup = (request: PopupRequest) =>
 const formFound = (tabId: number, url: URL) =>
   Effect.gen(function* () {
     if (!(yield* Effect.promise(() => suggestionsAllowed(url))))
-      return { type: "None" } satisfies PageResult;
+      return { type: "Off" } satisfies PageResult;
 
     const logins = yield* suggestions(tabId, url.origin);
 
@@ -161,10 +163,13 @@ const formFound = (tabId: number, url: URL) =>
 const handlePage = (request: PageRequest, tabId: number, url: URL) =>
   Match.value(request).pipe(
     Match.when({ type: "FormFound" }, () => formFound(tabId, url)),
-    Match.when({ type: "OpenPicker" }, () =>
+    Match.when({ type: "OpenPicker" }, ({ newPassword }) =>
       Effect.promise(async (): Promise<PageResult> => {
         if (!(await suggestionsAllowed(url))) return { type: "None" };
-        openPicker(tabId, url.origin);
+        openPicker(
+          tabId,
+          newPassword ? { origin: url.origin, newPassword } : { origin: url.origin },
+        );
 
         return { type: "Matches" };
       }),
@@ -220,10 +225,65 @@ const pickerFill = (tabId: number, origin: string, entryId: string) =>
     return { type: "Filled" } satisfies PickerResult;
   });
 
+/**
+ * Fills the tab's last generated password into the sign-up form. The content
+ * script checks the page is still on `origin`.
+ */
+const useGenerated = (tabId: number, origin: string) =>
+  Effect.promise(async (): Promise<PickerResult> => {
+    const kept = lastGenerated(tabId, origin);
+
+    if (!kept) return { type: "Unavailable", code: "NotFound" };
+
+    const filled = await tellPage(tabId, {
+      type: "FillNewPassword",
+      origin,
+      password: kept.password,
+    });
+
+    if (filled !== true) return { type: "NoForm" };
+
+    closePicker(tabId);
+    await tellPage(tabId, { type: "ClosePicker", refocus: false });
+
+    return { type: "Filled" };
+  });
+
+const handleGenerator = (
+  request: PickerRequest,
+  tabId: number,
+  origin: string,
+  maxLength: number,
+) =>
+  Match.value(request).pipe(
+    Match.when({ type: "GetSuggestions" }, () =>
+      Effect.succeed<PickerResult>({ type: "Generator", host: new URL(origin).host, maxLength }),
+    ),
+    Match.when({ type: "Generate" }, ({ options, fresh }) =>
+      generate(
+        tabId,
+        origin,
+        { ...options, length: Math.min(options.length, maxLength) },
+        fresh,
+      ).pipe(Effect.map((generated): PickerResult => ({ type: "Generated", ...generated }))),
+    ),
+    Match.when({ type: "UseGenerated" }, () => useGenerated(tabId, origin)),
+    // A picker on a sign-up form fills only a generated password.
+    Match.when({ type: "Fill" }, () => Effect.succeed<PickerResult>({ type: "NoForm" })),
+    Match.orElse(() => handlePicker(request, tabId, origin)),
+  );
+
 const handlePicker = (request: PickerRequest, tabId: number, origin: string) =>
   Match.value(request).pipe(
     Match.when({ type: "GetSuggestions" }, () => pickerSuggestions(tabId, origin)),
     Match.when({ type: "Fill" }, ({ entryId }) => pickerFill(tabId, origin, entryId)),
+    // Only a picker opened on a sign-up form generates passwords.
+    Match.when({ type: "Generate" }, () =>
+      Effect.succeed<PickerResult>({ type: "Unavailable", code: "Unauthorized" }),
+    ),
+    Match.when({ type: "UseGenerated" }, () =>
+      Effect.succeed<PickerResult>({ type: "Unavailable", code: "Unauthorized" }),
+    ),
     Match.when({ type: "Close" }, () =>
       Effect.promise(async (): Promise<PickerResult> => {
         closePicker(tabId);
@@ -254,6 +314,7 @@ const lockedOr = <A>(program: Effect.Effect<A, CairnClientError, CairnClient>) =
 const saved = (tabId: number) =>
   Effect.sync((): SaveResult => {
     forgetLogins(tabId);
+    forgetGenerated(tabId);
 
     setTimeout(() => {
       forgetSaved(tabId);
@@ -289,16 +350,16 @@ const handleSave = (request: SaveRequest, tabId: number) =>
   );
 
 /**
- * The site whose picker sent a message: the one the tab's own page opened it
- * for, as long as the tab is still there. A page can frame the picker itself,
- * but then it gets nothing until real input in that page opened it.
+ * The picker that sent a message: the one the tab's own page opened, as long
+ * as the tab is still on its site. A page can frame the picker itself, but
+ * then it gets nothing until real input in that page opened it.
  */
 const pickerSite = (sender: chrome.runtime.MessageSender) => {
   const tabId = sender.tab?.id;
-  const origin = tabId === undefined ? undefined : pickerOrigin(tabId);
+  const picker: OpenPicker | undefined = tabId === undefined ? undefined : pickerFor(tabId);
 
-  return tabId !== undefined && origin && website(sender.tab?.url)?.origin === origin
-    ? { tabId, origin }
+  return tabId !== undefined && picker && website(sender.tab?.url)?.origin === picker.origin
+    ? { tabId, picker }
     : null;
 };
 
@@ -353,8 +414,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     }
 
+    const { tabId, picker } = site;
+
     return reply(
-      handlePicker(request.success, site.tabId, site.origin),
+      picker.newPassword
+        ? handleGenerator(request.success, tabId, picker.origin, picker.newPassword.maxLength)
+        : handlePicker(request.success, tabId, picker.origin),
       (code): PickerResult => ({ type: "Unavailable", code }),
       sendResponse,
     );

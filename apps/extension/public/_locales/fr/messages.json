@@ -52,5 +52,20 @@
   "notNow": { "message": "Plus tard" },
   "saved": { "message": "Enregistré dans Cairn." },
   "saveLocked": { "message": "Déverrouille Cairn pour enregistrer cet identifiant." },
-  "saveExpired": { "message": "Cet identifiant n’attend plus d’être enregistré." }
+  "saveExpired": { "message": "Cet identifiant n’attend plus d’être enregistré." },
+  "generatorFor": {
+    "message": "Nouveau mot de passe pour $HOST$",
+    "placeholders": { "host": { "content": "$1" } }
+  },
+  "generatorIcon": { "message": "Générer un mot de passe avec Cairn" },
+  "generatorPreview": { "message": "Mot de passe généré" },
+  "generatorLength": { "message": "Longueur" },
+  "generatorLowercase": { "message": "Minuscules (a–z)" },
+  "generatorUppercase": { "message": "Majuscules (A–Z)" },
+  "generatorDigits": { "message": "Chiffres (0–9)" },
+  "generatorSymbols": { "message": "Symboles (!#$$…)" },
+  "generatorAvoidAmbiguous": { "message": "Éviter les caractères ambigus" },
+  "generatorRegenerate": { "message": "Régénérer" },
+  "generatorUse": { "message": "Utiliser" },
+  "noSignUpForm": { "message": "Aucun formulaire d’inscription trouvé sur cette page." }
 }

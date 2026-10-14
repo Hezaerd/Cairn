@@ -19,8 +19,9 @@ Dev builds of the extension connect to `com.hezaerd.cairn.dev` instead, which th
 1. Open the popup and choose **Pair with Cairn**. The popup shows an eight-digit code, and Cairn comes to the front with the same code. Approve it there if the codes match.
 2. On a website, open the popup. It lists the logins whose site matches the tab. Click one to fill the username and password into the page.
 3. To get suggestions in login fields, turn on **Suggest logins in login fields** in the popup and allow access to websites. Focusing a login field on a site with saved logins then opens a list under it; click one to fill it. A Cairn icon in the field opens the list too, and the toolbar badge shows how many logins the site has.
-4. With suggestions on, logging in or signing up with a login Cairn doesn't have opens a banner at the top right of the next page. **Save** adds it to Cairn under the name you give it. When Cairn has the username with another password, the banner offers **Update** instead.
-5. **Paired browsers** (the globe button in Cairn's header) lists the paired browsers. Removing one revokes it; the extension then shows the pairing code again.
+4. With suggestions on, a sign-up form's password field shows the Cairn icon. Click it to generate a password, adjust it, and choose **Use password** to fill the password and its confirmation. See [generating passwords](#generating-passwords).
+5. With suggestions on, logging in or signing up with a login Cairn doesn't have opens a banner at the top right of the next page. **Save** adds it to Cairn under the name you give it. When Cairn has the username with another password, the banner offers **Update** instead.
+6. **Paired browsers** (the globe button in Cairn's header) lists the paired browsers. Removing one revokes it; the extension then shows the pairing code again.
 
 The popup needs Cairn running with the vault unlocked. The vault locks when Cairn goes to the tray, so the popup asks you to unlock Cairn instead. Pairing needs the vault unlocked too, because the list of paired browsers is encrypted with the vault key.
 
@@ -31,6 +32,17 @@ A login matches a tab when they share the scheme, port, and host. `example.com` 
 Use a wildcard only for a domain you trust as a whole. Any page under it gets the login, so XSS or user content on one subdomain, or a shared host like `*.github.io`, is enough to obtain a fill. Logins saved from the browser keep the exact origin of the form.
 
 The content script fills the login, after checking that the tab is still on the origin it was asked for. It fills the form whose field opened the picker, or else the first form with a visible password field: that password field and the username field before it in the same form. On a page that asks for the username alone, it fills a field marked `autocomplete="username"` or `type="email"`. It skips sign-up and password-change forms, with two password fields or one marked `new-password`. It doesn't submit the form.
+
+## Generating passwords
+
+Generating is part of suggestions and needs the same permissions. It doesn't use the bridge, so it works while Cairn is locked or closed.
+
+- A sign-up form has one password field marked `new-password`, or two password fields that don't say otherwise. A form with a field marked `current-password`, or with only one of two fields marked `new-password`, is a password change, and gets nothing. Password changes aren't supported yet.
+- Focusing the form's password field shows the Cairn icon but doesn't open anything, so the form stays usable if you type your own password. Clicking the icon opens the picker with the generator.
+- The service worker generates the password with WebCrypto's `getRandomValues`, in `packages/client/src/PasswordGenerator.ts`. It uses the same sets, options, and method as the [desktop generator](vault.md#password-generator), and tests check both against the same properties. The length is capped at the fields' `maxlength`, and a field that takes fewer than 8 characters gets no generator.
+- The worker keeps the tab's last generated password in memory for two minutes, for the site it was made on, and drops it when the tab closes, when the login is saved, or when the worker stops. Reopening the generator on that site shows the same password, so a failed sign-up doesn't lose it. The options aren't stored.
+- **Use password** fills what the worker holds, not something the picker sends. The worker accepts it only from a picker opened on a sign-up form, and the content script fills only if the tab is still on that site. Like a fill, the button works only after Chromium reports the picker fully visible for 400 ms.
+- The content script fills the password and its confirmation, and no username. It doesn't mark them as filled, so submitting the form offers to save the login like any typed one.
 
 ## Suggestions
 
@@ -120,5 +132,6 @@ The extension asks for `nativeMessaging`, `activeTab`, and `scripting`. `activeT
 - A page controls its own fields, so it can put any username and password in them before you submit. It can only get them offered for its own origin, and only after real input from you. A click on **Save** or **Update** is the only approval, so read the banner before you click: an update replaces the password of the login it names.
 - Whether the banner opens tells a page whether the username and password it submitted match a login for its own site. Each check needs a real submit from you.
 - Anything that reads the pipe can test password guesses against a `CheckLogin` proof, since the challenge travels with it. `SaveLogin` and `UpdateLogin` carry the password itself, as `Login` does.
-- A submitted password stays in the service worker's memory until it's saved, dismissed, or two minutes pass.
+- A submitted password stays in the service worker's memory until it's saved, dismissed, or two minutes pass. So does a generated one, until the login is saved or two minutes pass.
+- A page sees the icon in its sign-up form too, and reads the generated password from its own fields once you fill it, as it would a typed one.
 - The password crosses the native host and the service worker in memory, and the page receives it in its input field. Strings in JavaScript can't be wiped.
