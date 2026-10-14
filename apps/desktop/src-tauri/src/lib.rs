@@ -10,7 +10,7 @@ pub fn run() {
             app.manage(locale::Locale::detect());
             vault::setup(app)?;
             app.manage(favicon::Downloads::default());
-            app.manage(updater::Pending::default());
+            app.manage(updater::Updates::load(app.handle())?);
             tray::setup(app)?;
             bridge::start(app)
         })
@@ -39,6 +39,8 @@ pub fn run() {
             favicon::favicon_cached,
             favicon::favicon_refresh,
             locale::locale,
+            updater::update_status,
+            updater::update_set_channel,
             updater::update_check,
             updater::update_install,
         ])

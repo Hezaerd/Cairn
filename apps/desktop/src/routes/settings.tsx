@@ -3,6 +3,7 @@ import { ArrowLeft, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/I18nProvider";
 import { ColorSchemePicker } from "@/theme/ColorSchemePicker";
+import { UpdateSettings } from "@/updater/UpdateSettings";
 
 export const Route = createFileRoute("/settings")({ component: Settings });
 
@@ -31,6 +32,14 @@ function Settings() {
                 {t.settings.colorScheme}
               </h3>
               <ColorSchemePicker labelledBy="color-scheme" />
+            </div>
+          </section>
+          <section aria-labelledby="updates" className="grid gap-3">
+            <h2 id="updates" className="text-[11px] text-muted-foreground">
+              {t.settings.updates}
+            </h2>
+            <div className="rounded-lg border bg-muted/50 p-4">
+              <UpdateSettings labelledBy="update-channel" />
             </div>
           </section>
         </div>
