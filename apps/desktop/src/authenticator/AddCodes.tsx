@@ -187,12 +187,7 @@ export function AddCodesDialog({ vault }: { vault: ReturnType<typeof useVault> }
           {t.authenticator.open}
         </Button>
       </DialogTrigger>
-      <DialogContent
-        className="max-h-[calc(100dvh-96px)] overflow-y-auto"
-        onPaste={paste}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={drop}
-      >
+      <DialogContent onPaste={paste} onDragOver={(event) => event.preventDefault()} onDrop={drop}>
         <DialogHeader>
           <DialogTitle>{t.authenticator.title}</DialogTitle>
           <DialogDescription>
@@ -215,7 +210,7 @@ export function AddCodesDialog({ vault }: { vault: ReturnType<typeof useVault> }
                       <strong className="text-xs font-semibold">
                         {account.issuer || t.authenticator.noIssuer}
                       </strong>
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-2xs text-muted-foreground">
                         {account.account || t.common.notSet}
                         {replaces && ` · ${t.authenticator.replaces}`}
                       </span>
@@ -269,10 +264,8 @@ export function AddCodesDialog({ vault }: { vault: ReturnType<typeof useVault> }
                   }}
                 />
               </label>
-              <Field className="gap-2">
-                <FieldLabel htmlFor="otp-links" className="text-xs font-normal">
-                  {t.authenticator.links}
-                </FieldLabel>
+              <Field>
+                <FieldLabel htmlFor="otp-links">{t.authenticator.links}</FieldLabel>
                 <Textarea
                   id="otp-links"
                   rows={3}

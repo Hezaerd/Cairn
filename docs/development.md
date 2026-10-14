@@ -101,6 +101,8 @@ pnpm format
 
 Oxlint and Oxfmt are configured once at the root for every TypeScript package. Anti-slop's generic and Effect rules run as errors. It is vendored in `tools/oxlint/anti-slop`, with its revision in [UPSTREAM.md](../tools/oxlint/anti-slop/UPSTREAM.md). Its Effect service-import rule only checks relative imports, so it misses aliases such as `@cairn/client`.
 
+[`@shadcn/lint`](https://github.com/shadcn-ui/lint) holds the desktop UI to its design system. It reads `apps/desktop/components.json` and the theme in `src/App.css`. It rejects raw colors, arbitrary values like `text-[11px]`, inline styles, classes Tailwind can't generate, and class names it can't read. Outside `src/components/ui`, a kit component's `className` may only carry layout classes such as margins, widths, and positions. When a screen needs something the kit or the theme lacks, add a variant to the component or a token to `App.css`. The extension's pages use their own CSS rather than Tailwind, so these rules don't run there.
+
 ## Tests
 
 ```sh

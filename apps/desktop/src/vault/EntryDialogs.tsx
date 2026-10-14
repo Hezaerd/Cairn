@@ -34,8 +34,8 @@ export function FormField({
   children: ReactNode;
 }) {
   return (
-    <Field className="gap-2 *:data-[slot=input]:h-[34px] *:data-[slot=input]:border-b-muted-foreground">
-      <FieldLabel htmlFor={id} className="w-full text-xs font-normal">
+    <Field>
+      <FieldLabel htmlFor={id} className="w-full">
         {label}
       </FieldLabel>
       {children}
@@ -44,7 +44,7 @@ export function FormField({
 }
 
 function Optional({ children }: { children: ReactNode }) {
-  return <span className="ml-auto text-[11px] text-muted-foreground">{children}</span>;
+  return <span className="ml-auto text-2xs text-muted-foreground">{children}</span>;
 }
 
 /** Without `existing`, the fields describe a new entry. */
@@ -75,7 +75,7 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
           placeholder={t.entry.sitePlaceholder}
           defaultValue={existing?.entry.site}
         />
-        <FieldDescription className="text-[11px]">{t.entry.siteHint}</FieldDescription>
+        <FieldDescription>{t.entry.siteHint}</FieldDescription>
       </FormField>
       <FormField id="entry-username" label={t.entry.username}>
         <Input
@@ -101,7 +101,6 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
             id="entry-password"
             name="password"
             type="password"
-            className="h-[34px] border-b-muted-foreground"
             maxLength={4096}
             autoComplete="new-password"
           />
@@ -131,7 +130,7 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
           autoComplete="off"
           spellCheck={false}
         />
-        <FieldDescription className="text-[11px]">{t.entry.totpHint}</FieldDescription>
+        <FieldDescription>{t.entry.totpHint}</FieldDescription>
         {existing?.entry.hasTotp && (
           <label className="flex items-center gap-2 text-xs">
             <Checkbox name="removeTotp" />
@@ -148,7 +147,7 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
         }
       >
         {notes === null ? (
-          <FieldDescription className="text-[11px]">{t.entry.notesUnchanged}</FieldDescription>
+          <FieldDescription>{t.entry.notesUnchanged}</FieldDescription>
         ) : (
           <Textarea id="entry-notes" name="notes" maxLength={16384} rows={3} defaultValue={notes} />
         )}
@@ -188,7 +187,7 @@ export function EntryDialog({ vault }: { vault: Vault }) {
           {t.add.open}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-96px)] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t.add.title}</DialogTitle>
           <DialogDescription>{t.add.description}</DialogDescription>
@@ -240,7 +239,7 @@ export function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary
 
   return (
     <Dialog open={editing !== null} onOpenChange={(open) => !open && vault.stopEdit()}>
-      <DialogContent className="max-h-[calc(100dvh-96px)] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t.edit.title}</DialogTitle>
           <DialogDescription>{t.edit.description}</DialogDescription>
@@ -306,9 +305,9 @@ export function DetailField({
 }) {
   return (
     <div className="border-t py-4">
-      <dt className="mb-[7px] text-xs text-muted-foreground">{label}</dt>
+      <dt className="mb-1.75 text-xs text-muted-foreground">{label}</dt>
       <dd className={cn("min-h-5 wrap-anywhere", className)}>{children}</dd>
-      {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
+      {hint && <p className="mt-1 text-2xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

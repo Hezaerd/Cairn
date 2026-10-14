@@ -91,7 +91,7 @@ export function OneTimeCode({ id }: { id: string }) {
           {grouped(current.code)}
         </code>
         <span
-          className="flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums"
+          className="flex items-center gap-1.5 text-2xs text-muted-foreground tabular-nums"
           title={t.credentials.codeChanges(seconds)}
         >
           <svg viewBox="0 0 20 20" className="size-4 -rotate-90" aria-hidden>
