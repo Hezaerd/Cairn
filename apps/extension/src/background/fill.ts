@@ -1,47 +1,33 @@
+import { Effect } from "effect";
+import type { PageCommand } from "@cairn/contracts";
+import type { Credential } from "@cairn/client/CairnClient";
+import { CairnClientError } from "@cairn/contracts/errors";
+
 /**
- * Runs in the page through `chrome.scripting.executeScript`, so it must not
- * use anything outside its own body. Fills the first visible password field
- * and the username field before it. On a page that asks for the username
- * first, fills that field alone.
+ * Hands a login to the content script in the tab's top frame, which fills it
+ * only if the page is still on `origin`. Injects the script first: it's
+ * registered only when suggestions are on, and does nothing the second time.
  */
-export function fillLogin(origin: string, username: string, password: string) {
-  if (location.origin !== origin) return false;
+export const fillTab = (tabId: number, origin: string, login: Credential) =>
+  Effect.tryPromise({
+    try: async () => {
+      await chrome.scripting.executeScript({
+        target: { tabId, frameIds: [0] },
+        files: ["content.js"],
+      });
 
-  const usable = (input: HTMLInputElement) =>
-    !input.disabled && !input.readOnly && input.getClientRects().length > 0;
+      const command: PageCommand = {
+        type: "Fill",
+        origin,
+        username: login.username,
+        password: login.password,
+      };
 
-  const inputs = Array.from(document.querySelectorAll("input")).filter(usable);
-  const passwordField = inputs.find((input) => input.type === "password");
+      return (await chrome.tabs.sendMessage(tabId, command, { frameId: 0 })) === true;
+    },
+    catch: () => new CairnClientError({ code: "NotFound" }),
+  });
 
-  const usernameTypes = ["text", "email", "tel", ""];
-
-  const candidates = inputs.filter(
-    (input) =>
-      usernameTypes.includes(input.getAttribute("type")?.toLowerCase() ?? "") &&
-      (!passwordField ||
-        ((!passwordField.form || input.form === passwordField.form) &&
-          input.compareDocumentPosition(passwordField) & Node.DOCUMENT_POSITION_FOLLOWING)),
-  );
-
-  // Without a password field, only a field that says it wants a username counts.
-  const usernameField =
-    candidates.find((input) => /username|email/i.test(input.autocomplete)) ??
-    (passwordField ? candidates.at(-1) : candidates.find((input) => input.type === "email"));
-
-  // Assigning through the prototype setter, then dispatching events, lets
-  // frameworks that track the value notice the change.
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-
-  const fill = (input: HTMLInputElement, value: string) => {
-    input.focus();
-    setter?.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  };
-
-  if (usernameField && username) fill(usernameField, username);
-
-  if (passwordField) fill(passwordField, password);
-
-  return Boolean(passwordField || (usernameField && username));
-}
+/** Sends a command to the content script, ignoring a page that went away. */
+export const tellPage = (tabId: number, command: PageCommand) =>
+  chrome.tabs.sendMessage(tabId, command, { frameId: 0 }).catch(() => undefined);

@@ -1,0 +1,40 @@
+body {
+  width: auto;
+  overflow: hidden;
+  background: #202520;
+}
+.picker {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+.picker h2 {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #899481;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picker .logins {
+  max-height: 260px;
+}
+.picker .detail {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 12px;
+  text-align: left;
+}
+.picker section > button {
+  justify-self: start;
+  margin-top: 0;
+  padding: 6px 12px;
+}
+.picker section {
+  display: grid;
+  gap: 8px;
+}
