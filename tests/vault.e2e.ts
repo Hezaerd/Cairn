@@ -141,7 +141,7 @@ try {
   await page.screenshot({ path: path.join(directory, "settings.png") });
   await page.getByRole("combobox", { name: "Language" }).click();
   await page.screenshot({ path: path.join(directory, "language.png") });
-  await page.getByRole("option", { name: "Windows language" }).click();
+  await page.getByRole("option", { name: "Computer language" }).click();
   await page.getByRole("heading", { name: "Général" }).waitFor();
   assert.equal(existsSync(language), false);
   await page.getByRole("link", { name: "Apparence" }).click();

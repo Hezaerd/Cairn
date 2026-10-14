@@ -118,7 +118,7 @@ export const frFR: Messages = {
     colorScheme: "Jeu de couleurs",
   },
   language: {
-    system: "Langue de Windows",
+    system: "Langue de l'ordinateur",
   },
   theme: {
     light: "Clair",
