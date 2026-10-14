@@ -235,6 +235,20 @@ try {
   await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
   assert.equal(await page.getByText(secret, { exact: true }).count(), 0);
   await page.keyboard.press("Escape");
+
+  // Debug builds never check for updates, but the channel choice is still saved by Rust.
+  await page.getByRole("link", { name: "Paramètres" }).click();
+  await page.getByText("Les versions de développement ne se mettent pas à jour.").waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "Rechercher des mises à jour" }).isDisabled(),
+    true,
+  );
+  const nightly = page.getByRole("button", { name: /^Nightly/ });
+  assert.equal(await nightly.getAttribute("aria-pressed"), "false");
+  await nightly.click();
+  await page.getByRole("button", { name: /^Nightly/, pressed: true }).waitFor();
+  assert.equal(readFileSync(path.join(directory, "data/update-channel"), "utf8"), "nightly");
+  await page.getByRole("link", { name: "Retour aux identifiants" }).click();
   await page.getByRole("button", { name: "Verrouiller", exact: true }).click();
   await page.getByRole("button", { name: "Déverrouiller", exact: true }).waitFor();
   assert.equal(await page.locator("[data-slot=site-icon] img").count(), 0);
@@ -262,6 +276,11 @@ try {
     assert.deepEqual(readFileSync(path.join(directory, "data/favicons.cairn")), cachedIconFile);
   }
 
+  await page.getByRole("link", { name: "Paramètres" }).click();
+  await page.getByRole("button", { name: /^Nightly/, pressed: true }).waitFor();
+  await page.screenshot({ path: path.join(directory, "settings.png") });
+  await page.getByRole("link", { name: "Retour aux identifiants" }).click();
+  await page.getByRole("heading", { name: "Compte de test" }).waitFor();
   await page.screenshot({ path: path.join(directory, "saved.png") });
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await page.screenshot({ path: path.join(directory, "saved-dark.png") });

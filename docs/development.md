@@ -160,9 +160,26 @@ Pushing a `v*` tag runs `.github/workflows/release.yml` on a Windows runner. It 
 
 3. Install the draft's installer, check it, then publish the release.
 
-At launch, release builds check for an update and offer it in a notification. Debug builds skip the check, so the end-to-end tests stay offline.
+### Nightly builds
 
-Installed copies only see a release once it's published and marked latest: the updater reads `https://github.com/Hezaerd/Cairn/releases/latest/download/latest.json`, which needs the repository to be public.
+`.github/workflows/nightly.yml` builds `main` every day at 03:00 UTC, and skips the build when `main` hasn't changed since the last nightly. Run it by hand from the Actions tab to build right away. It replaces a single prerelease tagged `nightly` with the new installer, its `.sig`, and a `latest.json` it writes itself.
+
+A nightly takes the next patch version with a timestamp, such as `0.1.1-nightly.202610130300` after `0.1.0`. That keeps it newer than the stable release it was built after and older than the next one.
+
+### Update channels
+
+Settings → Updates picks the channel and checks on demand. At launch, release builds also check and offer an update in a notification. Debug builds never check, so the end-to-end tests stay offline.
+
+| Channel | Manifest                                                                 |
+| ------- | ------------------------------------------------------------------------ |
+| Stable  | `https://github.com/Hezaerd/Cairn/releases/latest/download/latest.json`  |
+| Nightly | `https://github.com/Hezaerd/Cairn/releases/download/nightly/latest.json` |
+
+The URLs are fixed in `src-tauri/src/updater.rs`; the UI only sends a channel name. The choice is saved in `update-channel` next to the vault. Without it, a stable build starts on stable and a nightly build on nightly.
+
+Stable installs only see a release once it's published and marked latest. GitHub never marks a prerelease as latest, so the nightly never reaches them. Both manifests need the repository to be public.
+
+Updates never go back in version. Switching from nightly to stable keeps the nightly until a newer stable release comes out, so a vault a nightly touched isn't opened by an older Cairn.
 
 The installer isn't Authenticode-signed. SmartScreen warns on the first manual install (More info → Run anyway). Updates are protected by the updater signature instead: the app only installs an update whose `.sig` matches the public key in `tauri.conf.json`.
 
