@@ -146,7 +146,7 @@ Local builds aren't signed for the updater, so they can't be published as update
 
 ## Releases
 
-Pushing a `v*` tag runs `.github/workflows/release.yml` on a Windows runner. It builds the NSIS installer with `src-tauri/tauri.release.conf.json`, signs it for the updater, and attaches the installer, its `.sig`, and `latest.json` to a draft release.
+Pushing a `v*` tag runs `.github/workflows/release.yml`. A Windows job builds the NSIS installer without the signing key. A second job signs it for the updater and attaches the installer, its `.sig`, and `latest.json` to a draft release.
 
 1. Set the same version in `apps/desktop/src-tauri/tauri.conf.json`, `apps/desktop/src-tauri/Cargo.toml`, and `apps/desktop/package.json`, and merge it into `main`.
 2. Tag the merge and push the tag:
@@ -162,7 +162,7 @@ Pushing a `v*` tag runs `.github/workflows/release.yml` on a Windows runner. It 
 
 ### Nightly builds
 
-`.github/workflows/nightly.yml` builds `main` every day at 03:00 UTC, and skips the build when `main` hasn't changed since the last nightly. Run it by hand from the Actions tab to build right away. It replaces a single prerelease tagged `nightly` with the new installer, its `.sig`, and a `latest.json` it writes itself.
+`.github/workflows/nightly.yml` builds `main` every day at 03:00 UTC, and skips the build when `main` hasn't changed since the last nightly. Run it by hand from the Actions tab to build right away. It builds and signs the same way as a release, then replaces a single prerelease tagged `nightly` with the new installer, its `.sig`, and a `latest.json` it writes itself.
 
 A nightly takes the next patch version with a timestamp, such as `0.1.1-nightly.202610130300` after `0.1.0`. That keeps it newer than the stable release it was built after and older than the next one.
 
@@ -183,4 +183,12 @@ Updates never go back in version. Switching from nightly to stable keeps the nig
 
 The installer isn't Authenticode-signed. SmartScreen warns on the first manual install (More info → Run anyway). Updates are protected by the updater signature instead: the app only installs an update whose `.sig` matches the public key in `tauri.conf.json`.
 
-The private key is in `~/.tauri/cairn.key` and in the `TAURI_SIGNING_PRIVATE_KEY` repository secret. Keep a backup of it outside this machine. Without it, installed copies can't accept updates and have to be reinstalled by hand. If the key gets a password, store it as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+The private key is in `~/.tauri/cairn.key` and in the `TAURI_SIGNING_PRIVATE_KEY` secret of the `updater-signing` environment. Keep a backup of it outside this machine. Without it, installed copies can't accept updates and have to be reinstalled by hand. If the key gets a password, store it as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` in the same environment.
+
+The key is trusted for automatic installs, so the workflows keep it away from the build:
+
+- The build job runs `pnpm build` and the npm packages it pulls in. It has no signing key and a read-only token.
+- The signing job installs only `@tauri-apps/cli` at `TAURI_CLI_VERSION`, with install scripts off, and signs the downloaded installer. It's the only job in the `updater-signing` environment. Restrict that environment's deployment branches and tags to `main` and `v*`. When the lockfile moves to another `@tauri-apps/cli`, update `TAURI_CLI_VERSION` in both workflows; the build fails until they match.
+- Every action is pinned to a commit SHA, with its version in a comment.
+
+To sign by hand instead, build with `pnpm build:desktop`, then run `pnpm --filter @cairn/desktop tauri signer sign --private-key-path ~/.tauri/cairn.key --app-version <version> <installer>`. Pass `--app-version` so the signature carries the version, as `tauri build` does.
