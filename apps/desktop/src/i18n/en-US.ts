@@ -96,12 +96,20 @@ export const enUS = {
     refuse: "Refuse",
     paired: (name: string) => `${name} is paired.`,
   },
+  settings: {
+    open: "Settings",
+    title: "Settings",
+    back: "Back to logins",
+    appearance: "Appearance",
+    colorScheme: "Color scheme",
+  },
   theme: {
-    label: "Theme",
-    current: (theme: string) => `Theme: ${theme}`,
     light: "Light",
     dark: "Dark",
     system: "System",
+    useLight: "Use the light theme",
+    useDark: "Use the dark theme",
+    useSystem: "Follow the Windows theme",
   },
   update: {
     available: (version: string) => `Cairn ${version} is available`,
