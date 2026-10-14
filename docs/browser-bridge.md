@@ -51,7 +51,8 @@ Saving is part of suggestions and needs the same permissions.
 ## Pairing and authorization
 
 - The extension creates a P-256 key pair with WebCrypto. The private key is non-extractable, so no script can read it back, and it is stored as a `CryptoKey` in the extension's IndexedDB.
-- **Pair** sends the public key. Cairn shows a code made from the key's SHA-256 and keeps one pending request for two minutes. Approving stores the key in `browsers.cairn`, encrypted with the vault key. Its client ID is the SHA-256 of the key.
+- **Pair** sends the public key. Cairn answers with a random 32-byte nonce, and both sides show a code made from the SHA-256 of the nonce and the key. The browser commits to its key before it sees the nonce, so no one can search for a key offline that gives the same code as yours. Cairn keeps one pending request for two minutes. Approving stores the key in `browsers.cairn`, encrypted with the vault key. Its client ID is the SHA-256 of the key.
+- The same browser asking again replaces its own request with a new code. If another key asks while a request waits, Cairn refuses both, answers `PairingConflict`, and warns you: only one of them can be the browser in front of you. The popup keeps its code only in the service worker's memory, so after the worker stops it offers to pair again.
 - Every vault request first asks for a challenge: 32 random bytes, valid once, for 30 seconds. The extension signs the challenge with the operation, origin, and entry ID. Cairn checks the challenge, the paired key, and the signature before it answers.
 - **ListLogins** returns the ID, name, and username of matching logins, at most 20. **GetLogin** returns the username and password of one login, and only if its site matches the origin in the signed request.
 - `GetLogin`, `SaveLogin`, and `UpdateLogin` follow something you chose, so they restart the vault's idle timer. `ListLogins` and `CheckLogin` run as you browse and don't, so a paired browser can't keep the vault unlocked.
@@ -82,7 +83,7 @@ Saving is part of suggestions and needs the same permissions.
 
   Names and usernames can't contain control characters, so only the last field can contain a newline. `proof` is the unpadded base64url HMAC-SHA256 of the password's UTF-8 bytes, keyed with the challenge's 32 bytes.
 
-- A reply echoes the ID with the reply type for its request, or `type: "Error"` and a code: `InvalidRequest`, `UnsupportedVersion`, `AppUnavailable`, `RequestTimeout`, `ProtocolMismatch`, `VaultLocked`, `NotPaired`, `Unauthorized`, or `NotFound`.
+- A reply echoes the ID with the reply type for its request, or `type: "Error"` and a code: `InvalidRequest`, `UnsupportedVersion`, `AppUnavailable`, `RequestTimeout`, `ProtocolMismatch`, `VaultLocked`, `NotPaired`, `Unauthorized`, `NotFound`, or `PairingConflict`.
 - Unknown fields, operations, and versions are rejected. An invalid request with no usable ID gets an error with a null ID. `tests/fixtures/protocol` holds cases that both the Rust and TypeScript tests check.
 
 Both hops send UTF-8 JSON behind a four-byte little-endian length. Messages over 16 KiB are rejected before allocation. The host keeps stdout for the protocol. The host's pipe round trip times out after 1.5 seconds and the extension's after two.

@@ -102,6 +102,8 @@ export const enUS = {
     approve: "Approve",
     refuse: "Refuse",
     paired: (name: string) => `${name} is paired.`,
+    conflict:
+      "Two browsers asked to pair at the same time, so Cairn refused both. If you asked from only one, something else on this computer tried to pair. Try again from the extension.",
   },
   settings: {
     open: "Settings",
