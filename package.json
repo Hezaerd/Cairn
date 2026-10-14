@@ -13,6 +13,7 @@
     "check:rust": "cargo check --workspace",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm check:rust",
     "build:host": "cargo build -p cairn-native-host",
+    "build:connector": "tsx scripts/build-connector.ts",
     "test:ts": "tsx --test tests/*.test.ts",
     "test:rust": "cargo test --workspace",
     "test": "pnpm test:ts && pnpm test:rust",
@@ -22,7 +23,8 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "test:vault": "tsx tests/vault.e2e.ts",
-    "test:autofill": "tsx tests/autofill.e2e.ts"
+    "test:autofill": "tsx tests/autofill.e2e.ts",
+    "icons": "tsx scripts/icons.ts"
   },
   "devDependencies": {
     "@cairn/client": "workspace:*",

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsAppearanceRouteImport } from './routes/settings/appearance'
+import { Route as SettingsExtensionRouteImport } from './routes/settings/extension'
 import { Route as SettingsGeneralRouteImport } from './routes/settings/general'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
   path: '/appearance',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsExtensionRoute = SettingsExtensionRouteImport.update({
+  id: '/extension',
+  path: '/extension',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsGeneralRoute = SettingsGeneralRouteImport.update({
   id: '/general',
   path: '/general',
@@ -45,12 +51,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/extension': typeof SettingsExtensionRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/extension': typeof SettingsExtensionRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings': typeof SettingsIndexRoute
 }
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/extension': typeof SettingsExtensionRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/': typeof SettingsIndexRoute
 }
@@ -68,15 +77,22 @@ export interface FileRouteTypes {
     | '/'
     | '/settings'
     | '/settings/appearance'
+    | '/settings/extension'
     | '/settings/general'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings/appearance' | '/settings/general' | '/settings'
+  to:
+    | '/'
+    | '/settings/appearance'
+    | '/settings/extension'
+    | '/settings/general'
+    | '/settings'
   id:
     | '__root__'
     | '/'
     | '/settings'
     | '/settings/appearance'
+    | '/settings/extension'
     | '/settings/general'
     | '/settings/'
   fileRoutesById: FileRoutesById
@@ -116,6 +132,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAppearanceRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/extension': {
+      id: '/settings/extension'
+      path: '/extension'
+      fullPath: '/settings/extension'
+      preLoaderRoute: typeof SettingsExtensionRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/general': {
       id: '/settings/general'
       path: '/general'
@@ -128,12 +151,14 @@ declare module '@tanstack/react-router' {
 
 interface SettingsRouteChildren {
   SettingsAppearanceRoute: typeof SettingsAppearanceRoute
+  SettingsExtensionRoute: typeof SettingsExtensionRoute
   SettingsGeneralRoute: typeof SettingsGeneralRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAppearanceRoute: SettingsAppearanceRoute,
+  SettingsExtensionRoute: SettingsExtensionRoute,
   SettingsGeneralRoute: SettingsGeneralRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
