@@ -63,8 +63,16 @@ impl Bridge {
 pub fn start(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(Arc::new(Bridge::default()));
     let runtime = tauri::async_runtime::handle();
-    // Pipe construction requires an entered Tokio reactor.
-    let server = runtime.block_on(async { cairn_local_bridge::BridgeServer::bind() })?;
+    // Pipe construction requires an entered Tokio reactor. Another process
+    // holding the pipe name leaves the browser without Cairn, not Cairn
+    // without a window.
+    let server = match runtime.block_on(async { cairn_local_bridge::BridgeServer::bind() }) {
+        Ok(server) => server,
+        Err(error) => {
+            eprintln!("Cairn bridge unavailable: {error}");
+            return Ok(());
+        }
+    };
     let handle = app.handle().clone();
     tauri::async_runtime::spawn(async move {
         let handler = move |request| {
