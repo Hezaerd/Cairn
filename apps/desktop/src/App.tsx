@@ -1,7 +1,18 @@
 import { useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { Match, Schema } from "effect";
 import { toast } from "sonner";
-import { Eye, EyeOff, KeyRound, LockKeyhole, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  KeyRound,
+  LockKeyhole,
+  Pencil,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +37,6 @@ import {
 import { EntryUpdate, NewEntry, type EntrySummary } from "./vault/VaultClient";
 import { useVault } from "./vault/useVault";
 import { SiteIcon } from "./favicon/SiteIcon";
-import { ThemeToggle } from "./theme/ThemeToggle";
 import { BrowsersDialog, PairingDialog } from "./bridge/Browsers";
 import { useT } from "./i18n/I18nProvider";
 
@@ -284,7 +294,11 @@ function Credentials({ vault }: { vault: Vault }) {
           <span className="text-xs text-muted-foreground">{vault.snapshot.entries.length}</span>
         </div>
         <BrowsersDialog />
-        <ThemeToggle />
+        <Button variant="ghost" size="icon-sm" asChild>
+          <Link to="/settings" aria-label={t.settings.open} title={t.settings.open}>
+            <Settings />
+          </Link>
+        </Button>
         <EntryDialog vault={vault} />
         <Button variant="outline" size="sm" onClick={vault.lock}>
           <LockKeyhole />

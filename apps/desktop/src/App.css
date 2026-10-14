@@ -5,6 +5,10 @@
 
 :root {
   font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+}
+/* `.light` lets a subtree, like a theme preview, keep the light palette inside a dark window. */
+:root,
+.light {
   color-scheme: light;
   --background: #fafafa;
   --foreground: #202020;
