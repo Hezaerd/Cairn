@@ -43,7 +43,9 @@ pnpm dev:extension
 
 4. Reload the extension and open its popup.
 
-The popup shows `Cairn unavailable` when the app is closed and `Connector not installed` when the native host is missing or refused. Once connected, choose **Pair with Cairn** and approve the code in the app; [browser bridge](browser-bridge.md#using-it) covers pairing and filling. The popup only talks to the app when you open it or press a button. Reload the extension after each rebuild.
+The popup shows `Cairn unavailable` when the app is closed and `Connector not installed` when the native host is missing or refused. Once connected, choose **Pair with Cairn** and approve the code in the app; [browser bridge](browser-bridge.md#using-it) covers pairing and filling. The popup only talks to the app when you open it or press a button. With suggestions on, the content script also asks when a page shows a login form. Reload the extension after each rebuild, and reload open pages to get the new content script.
+
+The build makes `content.js` separately, as one classic script without Effect, because content scripts can't load modules and it runs on every page.
 
 Load the extension in each Helium profile you want to test. Running the script again with another extension ID keeps the IDs already registered.
 
@@ -117,7 +119,7 @@ pnpm --filter @cairn/desktop tauri build --debug --no-bundle
 pnpm test:autofill
 ```
 
-It covers pairing and its code, refusal before approval, listing only the logins for the tab's site, filling, refusing another site's login, a page without a form, a locked vault, and removing a paired browser. A browser under automation can't click the toolbar button that grants `activeTab`, so the test loads a copy of the extension with host access to `127.0.0.1` instead. It saves screenshots of the popup and the app next to its data under `.local`.
+It covers pairing and its code, refusal before approval, listing only the logins for the tab's site, filling, refusing another site's login, a page without a form, a locked vault, and removing a paired browser. For suggestions, it covers the picker opening on focus, the badge, refusing clicks on a transparent picker, filling from the picker, reopening and Escape, sign-up forms, and a site without logins. A browser under automation can't click the toolbar button that grants `activeTab` or accept a permission prompt, so the test loads a copy of the extension with host access to `127.0.0.1` instead, which stands in for both. It saves screenshots of the popup, the picker, and the app next to its data under `.local`.
 
 ### Helium end-to-end
 

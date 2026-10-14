@@ -1,4 +1,7 @@
 import { Schema } from "effect";
+import { MAX_PICKER_HEIGHT } from "./picker";
+
+export { MAX_PICKER_HEIGHT, type PageCommand } from "./picker";
 
 export const HOST_NAME = "com.hezaerd.cairn";
 
@@ -218,5 +221,68 @@ export const PopupResult = Schema.Union([
 export type PopupResult = typeof PopupResult.Type;
 
 export const decodePopupResult = Schema.decodeUnknownSync(PopupResult, {
+  onExcessProperty: "error",
+});
+
+/** Messages from the content script in a page's top frame to the service worker. */
+export const PageRequest = Schema.Union([
+  /** The page shows a login form. */
+  Schema.Struct({ type: Schema.Literal("FormFound") }),
+  /** The user focused a login field or clicked its icon, so the picker may open. */
+  Schema.Struct({ type: Schema.Literal("OpenPicker") }),
+  Schema.Struct({ type: Schema.Literal("ClosePicker") }),
+]);
+
+export type PageRequest = typeof PageRequest.Type;
+
+export const decodePageRequest = Schema.decodeUnknownResult(PageRequest, {
+  onExcessProperty: "error",
+});
+
+/**
+ * What the content script may know about the site: whether Cairn has logins
+ * for it, never which ones.
+ */
+export const PageResult = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("Matches") }),
+  Schema.Struct({ type: Schema.Literal("Locked") }),
+  Schema.Struct({ type: Schema.Literal("None") }),
+]);
+
+export type PageResult = typeof PageResult.Type;
+
+/** Messages from the picker frame to the service worker. */
+export const PickerRequest = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("GetSuggestions") }),
+  Schema.Struct({ type: Schema.Literal("Fill"), entryId: EntryId }),
+  Schema.Struct({ type: Schema.Literal("Close") }),
+  Schema.Struct({
+    type: Schema.Literal("Resize"),
+    height: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: MAX_PICKER_HEIGHT })),
+  }),
+]);
+
+export type PickerRequest = typeof PickerRequest.Type;
+
+export const decodePickerRequest = Schema.decodeUnknownResult(PickerRequest, {
+  onExcessProperty: "error",
+});
+
+export const PickerResult = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("Logins"),
+    host: Schema.String,
+    logins: Schema.Array(LoginSummary),
+  }),
+  Schema.Struct({ type: Schema.Literal("Locked") }),
+  Schema.Struct({ type: Schema.Literal("Unavailable"), code: ClientErrorCode }),
+  Schema.Struct({ type: Schema.Literal("Filled") }),
+  Schema.Struct({ type: Schema.Literal("NoForm") }),
+  Schema.Struct({ type: Schema.Literal("Done") }),
+]);
+
+export type PickerResult = typeof PickerResult.Type;
+
+export const decodePickerResult = Schema.decodeUnknownSync(PickerResult, {
   onExcessProperty: "error",
 });

@@ -5,7 +5,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync
 import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:net";
 import path from "node:path";
-import { chromium, type Page } from "playwright";
+import { chromium, type Frame, type Page } from "playwright";
 import { Schema } from "effect";
 import type { PopupRequest } from "@cairn/contracts";
 
@@ -52,27 +52,46 @@ async function freePort() {
   return port;
 }
 
-// A login page on 127.0.0.1. The extension sees it as `http://127.0.0.1:<port>`.
-const site = createHttpServer((request, response) => {
-  response.setHeader("content-type", "text/html; charset=utf-8");
-  response.end(
-    request.url === "/login"
-      ? `<!doctype html><title>Login</title><form>
-          <input type="search" id="search" placeholder="Search">
-          <input type="text" id="user" autocomplete="username">
-          <input type="password" id="pass" autocomplete="current-password">
-        </form>`
-      : `<!doctype html><title>Home</title><p>No form here.</p>`,
-  );
-});
+const loginPage = `<!doctype html><title>Login</title><form>
+  <input type="search" id="search" placeholder="Search">
+  <input type="text" id="user" autocomplete="username">
+  <input type="password" id="pass" autocomplete="current-password">
+</form>`;
 
-site.listen(0, "127.0.0.1");
+const pages = new Map([
+  ["/login", loginPage],
+  ["/signin", loginPage],
+  [
+    "/signup",
+    `<!doctype html><title>Sign up</title><form>
+      <input type="email" id="user" autocomplete="email">
+      <input type="password" id="pass" autocomplete="new-password">
+      <input type="password" id="confirm" autocomplete="new-password">
+    </form>`,
+  ],
+]);
 
-await once(site, "listening");
+/** Login pages on 127.0.0.1. The extension sees one as `http://127.0.0.1:<port>`. */
+async function serve() {
+  const server = createHttpServer((request, response) => {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      pages.get(request.url ?? "") ?? `<!doctype html><title>Home</title><p>No form here.</p>`,
+    );
+  });
 
-const sitePort = Schema.decodeUnknownSync(Address)(site.address()).port;
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  return { server, port: Schema.decodeUnknownSync(Address)(server.address()).port };
+}
+
+const { server: site, port: sitePort } = await serve();
 
 const origin = `http://127.0.0.1:${sitePort}`;
+
+// Another site, with no logins in the vault.
+const { server: otherSite, port: otherPort } = await serve();
 
 // A browser can't click the toolbar button under automation, so `activeTab`
 // is never granted. This copy also gets host access to the test site, which
@@ -87,6 +106,11 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
 assert.deepEqual(manifest.permissions, ["nativeMessaging", "activeTab", "scripting"]);
 
+assert.deepEqual(manifest.optional_host_permissions, ["https://*/*", "http://*/*"]);
+
+assert.equal(manifest.host_permissions, undefined);
+
+// The same grant also stands in for turning suggestions on.
 manifest.host_permissions = ["http://127.0.0.1/*"];
 
 writeFileSync(manifestPath, JSON.stringify(manifest));
@@ -168,6 +192,42 @@ async function open(url: string) {
 
 const tabId = (page: Page, url: string) =>
   page.evaluate(async (url) => (await chrome.tabs.query({ url }))[0]?.id ?? -1, url);
+
+const badge = (page: Page, tabId: number) =>
+  page.evaluate((tabId) => chrome.action.getBadgeText({ tabId }), tabId);
+
+const pickerOf = (page: Page) =>
+  page.frames().find((frame) => frame.url().endsWith("/picker.html"));
+
+/** The picker frame in `page`, once it opens. */
+async function picker(page: Page): Promise<Frame> {
+  for (let poll = 0; poll < 50; poll++) {
+    const frame = pickerOf(page);
+
+    if (frame) return frame;
+
+    await page.waitForTimeout(100);
+  }
+
+  throw new Error("The picker didn't open");
+}
+
+/** Waits long enough for a picker to have opened, then checks it didn't. */
+async function assertNoPicker(page: Page, message: string) {
+  await page.waitForTimeout(1_500);
+  assert.equal(pickerOf(page), undefined, message);
+}
+
+/** Styles the overlay's host element, which a page can reach. */
+const styleOverlay = (page: Page, opacity: string | null) =>
+  page.evaluate((opacity) => {
+    for (const element of document.documentElement.children) {
+      if (!(element instanceof HTMLDivElement)) continue;
+
+      if (opacity === null) element.style.removeProperty("opacity");
+      else element.style.setProperty("opacity", opacity, "important");
+    }
+  }, opacity);
 
 try {
   // Desktop: create a vault with one login for the test site and one elsewhere.
@@ -293,6 +353,57 @@ try {
   });
   console.log("Page without a form: OK");
 
+  // Suggestions: focusing a login field opens the picker under it.
+  await popup.reload();
+  await popup.getByText("Proposer les identifiants dans les champs de connexion").waitFor();
+  const signin = await open(`${origin}/signin`);
+  const signinTab = await tabId(popup, `${origin}/signin`);
+  await signin.click("#user");
+  let frame = await picker(signin);
+  const suggestion = frame.getByRole("button", { name: /Site de test/ });
+  await suggestion.waitFor();
+  assert.equal(await frame.getByRole("button").count(), 1, "Only this site's login is suggested");
+  assert.equal(await badge(popup, signinTab), "1");
+  await signin.screenshot({ path: path.join(directory, "page-picker.png") });
+  console.log("Picker opens on focus, badge counts the site's logins: OK");
+
+  // A picker the page made transparent ignores clicks.
+  await styleOverlay(signin, "0.2");
+  await signin.waitForTimeout(600);
+  await suggestion.click();
+  await signin.waitForTimeout(800);
+  assert.equal(await signin.inputValue("#pass"), "", "A transparent picker must not fill");
+  await styleOverlay(signin, null);
+  await signin.waitForTimeout(600);
+  console.log("Transparent picker refuses clicks: OK");
+
+  await suggestion.click();
+  await signin.waitForFunction(() => document.querySelector<HTMLInputElement>("#pass")?.value);
+  assert.equal(await signin.inputValue("#user"), "synthetic@example.com");
+  assert.equal(await signin.inputValue("#pass"), secret);
+  assert.equal(await signin.inputValue("#search"), "");
+  await assertNoPicker(signin, "The picker closes after filling and stays closed");
+  console.log("Filled from the picker: OK");
+
+  // Clicking the field asks for the picker again; Escape closes it.
+  await signin.click("#user");
+  frame = await picker(signin);
+  await frame.getByRole("button", { name: /Site de test/ }).waitFor();
+  await signin.keyboard.press("Escape");
+  await assertNoPicker(signin, "Escape closes the picker");
+  console.log("Reopen on click, close with Escape: OK");
+
+  const signup = await open(`${origin}/signup`);
+  await signup.click("#user");
+  await assertNoPicker(signup, "No picker on a sign-up form");
+  console.log("Sign-up form is ignored: OK");
+
+  const other = await open(`http://127.0.0.1:${otherPort}/login`);
+  await other.click("#user");
+  await assertNoPicker(other, "No picker on a site without logins");
+  assert.equal(await badge(popup, await tabId(popup, `http://127.0.0.1:${otherPort}/login`)), "");
+  console.log("Site without logins shows nothing: OK");
+
   // Locking the vault stops the extension.
   await app.getByRole("button", { name: "Verrouiller", exact: true }).click();
   assert.deepEqual(await popupMessage(popup, { type: "GetState", tabId: loginTab }), {
@@ -302,6 +413,9 @@ try {
   await popup.reload();
   await popup.getByText("Déverrouille Cairn pour voir tes identifiants.").waitFor();
   await popup.screenshot({ path: path.join(directory, "popup-locked.png") });
+  const lockedPage = await open(`${origin}/signin`);
+  await lockedPage.click("#user");
+  await assertNoPicker(lockedPage, "A locked vault doesn't open the picker on focus");
   console.log("Locked vault: OK");
 
   // Removing the browser in Cairn revokes it.
@@ -323,6 +437,7 @@ try {
 } finally {
   desktop.kill();
   site.close();
+  otherSite.close();
 
   try {
     await browser.close();
