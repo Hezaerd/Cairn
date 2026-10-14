@@ -7,8 +7,9 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            app.manage(locale::Locale::detect());
-            vault::setup(app)?;
+            let directory = vault::directory(app)?;
+            app.manage(locale::Languages::load(&directory));
+            vault::setup(app, directory)?;
             app.manage(favicon::Downloads::default());
             app.manage(updater::Pending::default());
             tray::setup(app)?;
@@ -39,6 +40,7 @@ pub fn run() {
             favicon::favicon_cached,
             favicon::favicon_refresh,
             locale::locale,
+            locale::set_language,
             updater::update_check,
             updater::update_install,
         ])

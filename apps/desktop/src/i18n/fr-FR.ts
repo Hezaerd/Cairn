@@ -109,8 +109,16 @@ export const frFR: Messages = {
     open: "Paramètres",
     title: "Paramètres",
     back: "Retour aux identifiants",
+    sections: "Sections des paramètres",
+    general: "Général",
+    language: "Langue",
+    languageHint: "La langue de la fenêtre et du menu de la zone de notification.",
+    languageFailed: "Impossible d'enregistrer la langue.",
     appearance: "Apparence",
     colorScheme: "Jeu de couleurs",
+  },
+  language: {
+    system: "Langue de Windows",
   },
   theme: {
     light: "Clair",
