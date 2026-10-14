@@ -467,3 +467,129 @@ fn paired_browsers_are_encrypted_persistent_and_need_an_unlocked_vault() {
     reopened.unlock(password()).unwrap();
     assert!(reopened.browsers().unwrap().is_empty());
 }
+
+#[test]
+fn an_older_browser_list_cannot_restore_a_removed_browser() {
+    let (dir, mut vault) = fixture();
+    let list = dir.path().join("browsers.cairn");
+    vault.unlock(password()).unwrap();
+    vault
+        .add_browser("client-a", "Helium", "public-key-a")
+        .unwrap();
+    vault
+        .add_browser("client-b", "Removed", "public-key-b")
+        .unwrap();
+    let before = fs::read(&list).unwrap();
+    vault.remove_browser("client-b").unwrap();
+    fs::write(&list, &before).unwrap();
+    vault.lock();
+    vault.unlock(password()).unwrap();
+    assert_eq!(vault.browser_key("client-b").unwrap(), None);
+    assert!(vault.browsers().unwrap().is_empty());
+
+    // A list next to a vault that never bound one is ignored too.
+    let (dir, mut fresh) = fixture();
+    fs::write(dir.path().join("browsers.cairn"), &before).unwrap();
+    fresh.unlock(password()).unwrap();
+    assert!(fresh.browsers().unwrap().is_empty());
+}
+
+/// Writes a version 1 vault with one entry and one paired browser, as the
+/// previous release did.
+fn legacy_vault(dir: &Path) {
+    let header = Header {
+        version: 1,
+        memory_kib: 65_536,
+        iterations: 3,
+        lanes: 1,
+        salt: random().unwrap(),
+        vault_id: random().unwrap(),
+    };
+    let wrapping_key = derive(PASSWORD, &header).unwrap();
+    let key = random::<32>().unwrap();
+    let (key_nonce, data_nonce, list_nonce) =
+        (random().unwrap(), random().unwrap(), random().unwrap());
+    let entries = serde_json::json!([{
+        "id": "legacy",
+        "name": "Legacy",
+        "site": "https://example.com",
+        "username": "test@example.com",
+        "password": SECRET,
+        "notes": "",
+    }]);
+    let envelope = Envelope {
+        wrapped_key: encrypt(
+            &wrapping_key,
+            &key_nonce,
+            &key,
+            &header.aad(b"cairn-key-v1").unwrap(),
+        )
+        .unwrap(),
+        ciphertext: encrypt(
+            &key,
+            &data_nonce,
+            &serde_json::to_vec(&entries).unwrap(),
+            &header.aad(b"cairn-data-v1").unwrap(),
+        )
+        .unwrap(),
+        key_nonce,
+        data_nonce,
+        header,
+    };
+    fs::write(
+        dir.join("vault.cairn"),
+        serde_json::to_vec(&envelope).unwrap(),
+    )
+    .unwrap();
+    let browsers = serde_json::json!([{
+        "id": "client-a",
+        "name": "Helium",
+        "public_key": "public-key-a",
+        "paired_at": 1,
+    }]);
+    let mut bytes = b"CAIRN-BROWSERS-1".to_vec();
+    bytes.extend(list_nonce);
+    bytes.extend(
+        encrypt(
+            &key,
+            &list_nonce,
+            &serde_json::to_vec(&browsers).unwrap(),
+            &envelope.header.aad(b"cairn-browsers-v1").unwrap(),
+        )
+        .unwrap(),
+    );
+    fs::write(dir.join("browsers.cairn"), bytes).unwrap();
+}
+
+#[test]
+fn version_1_vaults_upgrade_and_keep_their_entries_and_browsers() {
+    let dir = tempfile::tempdir().unwrap();
+    legacy_vault(dir.path());
+    let original = fs::read(dir.path().join("vault.cairn")).unwrap();
+    let legacy_list = fs::read(dir.path().join("browsers.cairn")).unwrap();
+    let mut vault = Vault::open(dir.path()).unwrap();
+    vault.unlock(password()).unwrap();
+    assert_eq!(vault.reveal("legacy").unwrap().password, SECRET);
+    assert_eq!(
+        vault.browser_key("client-a").unwrap().as_deref(),
+        Some("public-key-a")
+    );
+    let upgraded: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join("vault.cairn")).unwrap()).unwrap();
+    assert_eq!(upgraded["header"]["version"], VERSION);
+    assert_eq!(
+        fs::read(dir.path().join("backups/previous.cairn")).unwrap(),
+        original
+    );
+
+    vault.lock();
+    vault.unlock(password()).unwrap();
+    assert_eq!(vault.reveal("legacy").unwrap().password, SECRET);
+    assert_eq!(vault.browsers().unwrap().len(), 1);
+    vault.remove_browser("client-a").unwrap();
+    // The pre-upgrade list is an older copy now, too.
+    fs::write(dir.path().join("browsers.cairn"), legacy_list).unwrap();
+    vault.lock();
+    vault.unlock(password()).unwrap();
+    assert!(vault.browsers().unwrap().is_empty());
+}

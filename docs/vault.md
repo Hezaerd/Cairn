@@ -24,9 +24,9 @@ Cairn stores its data in Tauri's `app_local_data_dir()`:
   backups\previous.cairn
 ```
 
-`vault.cairn` is a versioned JSON envelope. It holds the public key derivation parameters, the wrapped key, nonces, and ciphertext. Names, sites, usernames, passwords, and notes are all inside the ciphertext. Cairn never writes the master password or an unwrapped key to disk.
+`vault.cairn` is a versioned JSON envelope. Version 2 added the paired-browser binding. Cairn still opens version 1 vaults and rewrites them as version 2 when you unlock them, keeping the version 1 file in `backups/previous.cairn`. Older releases can't open a version 2 vault. It holds the public key derivation parameters, the wrapped key, nonces, and ciphertext. Names, sites, usernames, passwords, and notes are all inside the ciphertext. Cairn never writes the master password or an unwrapped key to disk.
 
-`browsers.cairn` lists the browsers paired with the extension: their public keys, names, and pairing dates. It is encrypted with the vault key, under its own header data, so nothing can add a browser without the master password. A damaged file reads as empty, which only means pairing again. See [browser bridge](browser-bridge.md).
+`browsers.cairn` lists the browsers paired with the extension: their public keys, names, and pairing dates. It is encrypted with the vault key, under its own header data, so nothing can add a browser without the master password. The encrypted part of `vault.cairn` records the nonce of the last write to `browsers.cairn`, and Cairn rewrites both on every pairing change. An older copy of the list, which might still hold a removed browser, no longer matches and reads as empty. So does a damaged or missing file, which only means pairing again. This doesn't stop someone with access to your files from rolling back `vault.cairn` and `browsers.cairn` together. See [browser bridge](browser-bridge.md).
 
 `vault.lock` is an OS writer lock, not a key. The directory has the Windows user's normal permissions.
 
@@ -52,7 +52,7 @@ Keys, entries, secret command results, the serialization buffer, and the Argon2 
 
 1. Close Cairn.
 2. Keep a copy of the damaged `vault.cairn`.
-3. Copy `backups/previous.cairn` to `vault.cairn`. You lose the last change.
+3. Copy `backups/previous.cairn` to `vault.cairn`. You lose the last change. If that change paired or removed a browser, you pair your browsers again.
 
 The backup sits on the same drive, so keep separate copies of the encrypted vault. There is no password reset. If you lose the master password, you lose the vault and its backups. When only the backup survives, Cairn shows recovery steps and refuses to create a new vault over it.
 
