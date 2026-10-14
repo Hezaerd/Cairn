@@ -5,6 +5,7 @@
 - The list shows names, sites, and usernames. Search filters them locally.
 - A password or note reaches the UI only when you reveal it, and hides again after 30 seconds, or when you select another entry, search, or open a dialog.
 - The edit dialog leaves the password field empty, and an empty field keeps the stored password. Notes are editable only if you revealed them before opening the editor. Otherwise they stay unchanged.
+- The wand button next to the password field generates a password. See [password generator](#password-generator).
 - Deleting an entry asks for confirmation. `backups/previous.cairn` keeps the version that still holds the entry until the next change.
 - The backend locks after five minutes without activity, when closing the window to the tray, or through the tray's lock action. Activity is listing or revealing in the window, a change from the window or the browser, approving a pairing, or filling a login picked in the extension. The extension's background queries, listing a page's logins for suggestions and checking whether a typed login is new, don't count, so browsing can't keep the vault open. Typing alone doesn't reset the timer either. On lock, the desktop clears the list, the revealed secret, and the entry form. The bridge still answers while Cairn is in the tray, but only with its status: the vault is locked.
 - The WebView runs in private mode with form autofill turned off. No credential goes to browser storage or logs.
@@ -55,6 +56,18 @@ Keys, entries, secret command results, the serialization buffer, and the Argon2 
 3. Copy `backups/previous.cairn` to `vault.cairn`. You lose the last change. If that change paired or removed a browser, you pair your browsers again.
 
 The backup sits on the same drive, so keep separate copies of the encrypted vault. There is no password reset. If you lose the master password, you lose the vault and its backups. When only the backup survives, Cairn shows recovery steps and refuses to create a new vault over it.
+
+## Password generator
+
+The add and edit dialogs can generate a password. Rust generates it, in `crates/vault/src/generator.rs`, with the OS random generator that also makes the vault's keys and nonces.
+
+- Options: a length from 8 to 128, 20 by default, and lowercase letters, uppercase letters, digits, and symbols, all on by default. **Avoid look-alike characters** leaves out `I`, `l`, `1`, `O`, `0`, `o`, and `|`. At least one set stays on, and Rust refuses an empty selection or a length out of range.
+- The password has at least one character from each set that's on. Rust picks those first, fills the rest from all the sets, then shuffles the whole password. It draws each character by rejection sampling, so every character in a set is equally likely.
+- Changing an option generates a new password, and so does **Regenerate**. **Use password** puts it in the password field. It reaches the vault only when you save the entry.
+- The window keeps the options in its local storage so the next password uses them. It doesn't keep the passwords: the preview is cleared when the popover closes, and nothing logs them.
+- Generating doesn't open the vault or count as activity for the idle lock.
+
+The browser extension doesn't generate passwords.
 
 ## Site icons
 

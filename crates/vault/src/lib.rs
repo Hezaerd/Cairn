@@ -1,9 +1,11 @@
 //! Local, single-writer encrypted vault. No browser or IPC dependencies.
 mod browsers;
 mod favicon;
+mod generator;
 mod storage;
 pub use browsers::BrowserSummary;
 pub use favicon::FaviconLookup;
+pub use generator::{PasswordOptions, generate_password};
 
 use argon2::{Algorithm, Argon2, Block, Params, Version};
 use chacha20poly1305::{

@@ -39,7 +39,7 @@ const loadSnapshot = Effect.gen(function* () {
   return { status, entries };
 });
 
-function useRuntime() {
+export function useRuntime() {
   const runtime = useContext(VaultRuntime);
 
   if (!runtime) throw new Error("Vault runtime is missing");

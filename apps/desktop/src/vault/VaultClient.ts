@@ -38,6 +38,18 @@ export const EntryUpdate = Schema.Struct({
 
 export type EntryUpdate = typeof EntryUpdate.Type;
 
+/** Rust checks the same bounds and refuses a selection without any character set. */
+export const PasswordOptions = Schema.Struct({
+  length: Schema.Int.check(Schema.isBetween({ minimum: 8, maximum: 128 })),
+  lowercase: Schema.Boolean,
+  uppercase: Schema.Boolean,
+  digits: Schema.Boolean,
+  symbols: Schema.Boolean,
+  avoidAmbiguous: Schema.Boolean,
+});
+
+export type PasswordOptions = typeof PasswordOptions.Type;
+
 export const ErrorCode = Schema.Literals([
   "Storage",
   "InUse",
@@ -72,5 +84,6 @@ export class VaultClient extends Context.Service<
     readonly update: (id: string, entry: EntryUpdate) => Effect.Effect<void, VaultError>;
     readonly remove: (id: string) => Effect.Effect<void, VaultError>;
     readonly reveal: (id: string) => Effect.Effect<EntrySecret, VaultError>;
+    readonly generate: (options: PasswordOptions) => Effect.Effect<string, VaultError>;
   }
 >()("cairn/VaultClient") {}

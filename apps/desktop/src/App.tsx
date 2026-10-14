@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Match, Schema } from "effect";
 import { toast } from "sonner";
@@ -37,6 +37,7 @@ import {
 import { EntryUpdate, NewEntry, type EntrySummary } from "./vault/VaultClient";
 import { useVault } from "./vault/useVault";
 import { SiteIcon } from "./favicon/SiteIcon";
+import { PasswordGenerator } from "./generator/PasswordGenerator";
 import { BrowsersDialog, PairingDialog } from "./bridge/Browsers";
 import { useT } from "./i18n/I18nProvider";
 
@@ -61,6 +62,7 @@ function Optional({ children }: { children: ReactNode }) {
 function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: string | null } }) {
   const t = useT();
   const notes = existing ? existing.notes : "";
+  const password = useRef<HTMLInputElement>(null);
 
   return (
     <>
@@ -104,14 +106,25 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
           </>
         }
       >
-        <Input
-          id="entry-password"
-          name="password"
-          type="password"
-          required={!existing}
-          maxLength={4096}
-          autoComplete="new-password"
-        />
+        <div className="flex gap-2">
+          <Input
+            ref={password}
+            id="entry-password"
+            name="password"
+            type="password"
+            className="h-[34px] border-b-muted-foreground"
+            required={!existing}
+            maxLength={4096}
+            autoComplete="new-password"
+          />
+          <PasswordGenerator
+            onUse={(generated) => {
+              if (!password.current) return;
+              password.current.value = generated;
+              password.current.focus();
+            }}
+          />
+        </div>
       </FormField>
       <FormField
         id="entry-notes"
