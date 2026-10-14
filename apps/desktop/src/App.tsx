@@ -155,7 +155,7 @@ function EntryDialog({ vault }: { vault: Vault }) {
           {t.add.open}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-32px)] overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-96px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t.add.title}</DialogTitle>
           <DialogDescription>{t.add.description}</DialogDescription>
@@ -198,7 +198,7 @@ function EditDialog({ vault, entry }: { vault: Vault; entry: EntrySummary }) {
 
   return (
     <Dialog open={editing !== null} onOpenChange={(open) => !open && vault.stopEdit()}>
-      <DialogContent className="max-h-[calc(100dvh-32px)] overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-96px)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t.edit.title}</DialogTitle>
           <DialogDescription>{t.edit.description}</DialogDescription>
@@ -541,7 +541,7 @@ export default function App() {
   const t = useT();
 
   return (
-    <main className="flex h-dvh flex-col overflow-hidden" aria-label="Cairn">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Cairn">
       {vault.error && (
         <p className="shrink-0 border-b px-4 py-2.5 text-xs text-destructive" role="alert">
           {t.errors[vault.error]}
