@@ -68,6 +68,16 @@ Cairn ships in English (`en-US`) and French (`fr-FR`) and follows the Windows di
 
 The end-to-end tests select elements by their French text. The vault test sets `CAIRN_TEST_LOCALE=fr-FR`, which only debug builds read in place of the Windows language, and the Helium test launches with `--lang=fr`.
 
+## Icons
+
+`brand/cairn.svg` is the only source for the logo. After editing it, regenerate every icon with:
+
+```sh
+pnpm icons
+```
+
+The script renders through `tauri icon` and writes the app icons to `apps/desktop/src-tauri/icons`, the bare mark in black and white at 16 to 256 pixels to `icons/mark`, and the extension icons to `apps/extension/public/icons`. The app and extension icons put the mark on a dark tile so it shows on light and dark taskbars and toolbars. The tray shows the bare mark, black or white to match the Windows taskbar mode. The title bar uses the SVG directly, in the text color.
+
 ## Routing
 
 Each app has its router in `src/router.ts` and its pages in `src/routes`. Navigate with TanStack's `Link` or `useNavigate`.
