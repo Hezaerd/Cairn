@@ -43,7 +43,12 @@ fn origin(site: &str) -> Option<String> {
     if site.is_empty() {
         return None;
     }
-    let url = Url::parse(site)
+    // A `*.example.com` site, which also matches subdomains, uses the icon of `example.com`.
+    let site = match site.split_once("://") {
+        Some((scheme, rest)) => format!("{scheme}://{}", rest.strip_prefix("*.").unwrap_or(rest)),
+        None => site.strip_prefix("*.").unwrap_or(site).to_owned(),
+    };
+    let url = Url::parse(&site)
         .or_else(|_| Url::parse(&format!("https://{site}")))
         .ok()?;
     // Never send a stored URL path, query, or embedded credentials to a server.
@@ -205,6 +210,13 @@ mod tests {
             origin("example.com/login").as_deref(),
             Some("https://example.com")
         );
+        for site in ["*.example.com", "https://*.example.com/login"] {
+            assert_eq!(
+                origin(site).as_deref(),
+                Some("https://example.com"),
+                "{site}"
+            );
+        }
         for site in [
             "",
             "http://example.com",

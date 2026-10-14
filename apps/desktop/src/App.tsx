@@ -84,6 +84,7 @@ function EntryFields({ existing }: { existing?: { entry: EntrySummary; notes: st
           placeholder={t.entry.sitePlaceholder}
           defaultValue={existing?.entry.site}
         />
+        <FieldDescription className="text-[11px]">{t.entry.siteHint}</FieldDescription>
       </FormField>
       <FormField id="entry-username" label={t.entry.username}>
         <Input

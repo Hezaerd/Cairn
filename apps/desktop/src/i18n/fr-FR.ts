@@ -13,6 +13,7 @@ export const frFR: Messages = {
     namePlaceholder: "Ex. GitHub personnel",
     site: "Site",
     sitePlaceholder: "https://exemple.com",
+    siteHint: "Rempli sur ce site exact. Écris *.exemple.com pour inclure ses sous-domaines.",
     username: "Identifiant",
     password: "Mot de passe",
     keepPassword: "laisser vide pour le conserver",
