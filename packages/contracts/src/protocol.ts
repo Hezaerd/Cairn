@@ -155,9 +155,11 @@ export const ChallengeResponse = Schema.Struct({
   challenge: Challenge,
 });
 
+/** The code comes from the SHA-256 of `nonce` and the browser's key. */
 export const PairingRequestedResponse = Schema.Struct({
   ...header,
   type: Schema.Literal("PairingRequested"),
+  nonce: base64url(32),
 });
 
 export const LoginSummary = Schema.Struct({
@@ -203,6 +205,8 @@ export const ErrorCode = Schema.Literals([
   "NotPaired",
   "Unauthorized",
   "NotFound",
+  /** Another browser asked to pair at the same time, so Cairn refused both. */
+  "PairingConflict",
 ]);
 
 export const ErrorResponse = Schema.Struct({

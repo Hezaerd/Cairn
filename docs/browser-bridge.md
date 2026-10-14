@@ -26,7 +26,9 @@ The popup needs Cairn running with the vault unlocked. The vault locks when Cair
 
 ## Matching sites
 
-A login matches a tab when they share the scheme and port, and the tab's host is the login's host or one of its subdomains. A leading `www.` on the stored site is ignored. A site saved without a scheme means `https`, so a login is offered to a plain `http` page only if its site says `http://`. IP addresses must match exactly.
+A login matches a tab when they share the scheme, port, and host. `example.com` and `www.example.com` count as the same host, but `accounts.example.com` doesn't match either. To include subdomains, write the site as `*.example.com`: it matches `example.com` and every host under it. A wildcard needs a dot after it, so `*.com` matches nothing. A site saved without a scheme means `https`, so a login is offered to a plain `http` page only if its site says `http://`. IP addresses must match exactly.
+
+Use a wildcard only for a domain you trust as a whole. Any page under it gets the login, so XSS or user content on one subdomain, or a shared host like `*.github.io`, is enough to obtain a fill. Logins saved from the browser keep the exact origin of the form.
 
 The content script fills the login, after checking that the tab is still on the origin it was asked for. It fills the form whose field opened the picker, or else the first form with a visible password field: that password field and the username field before it in the same form. On a page that asks for the username alone, it fills a field marked `autocomplete="username"` or `type="email"`. It skips sign-up and password-change forms, with two password fields or one marked `new-password`. It doesn't submit the form.
 
@@ -55,9 +57,11 @@ Saving is part of suggestions and needs the same permissions.
 ## Pairing and authorization
 
 - The extension creates a P-256 key pair with WebCrypto. The private key is non-extractable, so no script can read it back, and it is stored as a `CryptoKey` in the extension's IndexedDB.
-- **Pair** sends the public key. Cairn shows a code made from the key's SHA-256 and keeps one pending request for two minutes. Approving stores the key in `browsers.cairn`, encrypted with the vault key. Its client ID is the SHA-256 of the key.
+- **Pair** sends the public key. Cairn answers with a random 32-byte nonce, and both sides show a code made from the SHA-256 of the nonce and the key. The browser commits to its key before it sees the nonce, so no one can search for a key offline that gives the same code as yours. Cairn keeps one pending request for two minutes. Approving stores the key in `browsers.cairn`, encrypted with the vault key. Its client ID is the SHA-256 of the key.
+- The same browser asking again replaces its own request with a new code. If another key asks while a request waits, Cairn refuses both, answers `PairingConflict`, and warns you: only one of them can be the browser in front of you. The popup keeps its code only in the service worker's memory, so after the worker stops it offers to pair again.
 - Every vault request first asks for a challenge: 32 random bytes, valid once, for 30 seconds. The extension signs the challenge with the operation, origin, and entry ID. Cairn checks the challenge, the paired key, and the signature before it answers.
 - **ListLogins** returns the ID, name, and username of matching logins, at most 20. **GetLogin** returns the username and password of one login, and only if its site matches the origin in the signed request.
+- `GetLogin`, `SaveLogin`, and `UpdateLogin` follow something you chose, so they restart the vault's idle timer. `ListLogins` and `CheckLogin` run as you browse and don't, so a paired browser can't keep the vault unlocked.
 
 ## Protocol
 
@@ -85,7 +89,7 @@ Saving is part of suggestions and needs the same permissions.
 
   Names and usernames can't contain control characters, so only the last field can contain a newline. `proof` is the unpadded base64url HMAC-SHA256 of the password's UTF-8 bytes, keyed with the challenge's 32 bytes.
 
-- A reply echoes the ID with the reply type for its request, or `type: "Error"` and a code: `InvalidRequest`, `UnsupportedVersion`, `AppUnavailable`, `RequestTimeout`, `ProtocolMismatch`, `VaultLocked`, `NotPaired`, `Unauthorized`, or `NotFound`.
+- A reply echoes the ID with the reply type for its request, or `type: "Error"` and a code: `InvalidRequest`, `UnsupportedVersion`, `AppUnavailable`, `RequestTimeout`, `ProtocolMismatch`, `VaultLocked`, `NotPaired`, `Unauthorized`, `NotFound`, or `PairingConflict`.
 - Unknown fields, operations, and versions are rejected. An invalid request with no usable ID gets an error with a null ID. `tests/fixtures/protocol` holds cases that both the Rust and TypeScript tests check.
 
 Both hops send UTF-8 JSON behind a four-byte little-endian length. Messages over 16 KiB are rejected before allocation. The host keeps stdout for the protocol. The host's pipe round trip times out after 1.5 seconds and the extension's after two.
@@ -95,8 +99,10 @@ Both hops send UTF-8 JSON behind a four-byte little-endian length. Messages over
 The desktop app is the only pipe server.
 
 - The endpoint name includes the Windows user SID and session ID.
-- It rejects remote clients and has a protected DACL that grants access to the current user only.
-- It runs at most 16 handlers at once and drops idle peers.
+- It rejects remote clients. Its protected DACL lets the current user read, write, and query it, but not create pipe instances. An `OWNER RIGHTS` entry stops the owner from rewriting the DACL.
+- Cairn creates all 16 instances at startup, with a limit of 16, then removes the create-instance right. It reuses them, so it answers at most 16 requests at once, and no other process can add a server to the pipe while Cairn runs. It drops idle peers.
+- If another process already holds the name, Cairn starts without the bridge.
+- Before writing, the native host checks that the server process is `cairn-desktop.exe`, either beside the host or in `%LOCALAPPDATA%\Cairn`. Otherwise it answers `AppUnavailable`. Debug hosts also accept any program under their own folder, where Cargo puts tests.
 - The native host validates each request before forwarding it, and checks that each reply answers it.
 
 ## Extension permissions
@@ -106,6 +112,7 @@ The extension asks for `nativeMessaging`, `activeTab`, and `scripting`. `activeT
 ## Limits
 
 - Software running as your Windows user can reach the pipe. Without the pairing key, it gets only the status and challenges. With the vault unlocked, it can also ask for a pairing, which you have to approve in Cairn.
+- The native host trusts the server by its executable path, and Cairn installs per user. Software running as you can replace `cairn-desktop.exe` and then serve the pipe, receiving what the browser saves and answering its requests.
 - The pairing key is in the browser profile on disk. Software that can read that profile and drive WebCrypto in the extension's context, or that reads the browser's memory, can use the key while the vault is unlocked. Nothing on a desktop protects an unlocked vault from malware running as you.
 - A click in the popup or the picker is the only approval for a fill. Cairn doesn't ask again.
 - The page owns the picker's host element, so it can cover the picker, make it transparent, or move it under the pointer. The picker ignores clicks unless Chromium reports it fully visible for 400 ms. A script running on the login's own site, through XSS for example, can still read a filled password field.

@@ -198,7 +198,7 @@ function fakeApp() {
     if (request.type === "Pair") {
       pending = request.publicKey;
 
-      return { ...header, type: "PairingRequested" };
+      return { ...header, type: "PairingRequested", nonce: "A".repeat(43) };
     }
 
     if (!challenges.delete(request.challenge)) return error("Unauthorized");
@@ -270,12 +270,12 @@ test("pairing, then signed requests for logins", async () => {
     );
 
   const origin = "https://example.com";
-  assert.deepEqual(await run((c) => c.pairingCode), Option.none());
+  assert.equal(await run((c) => c.hasKey), false);
   assert.deepEqual(await run((c) => c.listLogins(origin)), { code: "NotPaired" });
 
   const code = await run((c) => c.pair("Helium (Windows)"));
   assert.match(String(code), /^\d{4} \d{4}$/);
-  assert.deepEqual(await run((c) => c.pairingCode), Option.some(code));
+  assert.equal(await run((c) => c.hasKey), true);
   // A key the app hasn't approved yet gets nothing.
   assert.deepEqual(await run((c) => c.listLogins(origin)), { code: "NotPaired" });
 
