@@ -1,9 +1,9 @@
 import { useContext, useEffect, useState, type FormEvent } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Effect, Option, Schema } from "effect";
-import { toast } from "sonner";
+import { toast } from "@cairn/ui/components/sonner";
 import { Check, Globe, Pencil, Trash2, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@cairn/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from "@cairn/ui/components/dialog";
+import { Input } from "@cairn/ui/components/input";
 import { useT } from "../i18n/I18nProvider";
 import { VaultRuntime } from "../vault/runtime";
 import type { VaultError } from "../vault/VaultClient";
@@ -96,7 +96,7 @@ export function PairingDialog() {
 
   return (
     <Dialog open={request !== null} onOpenChange={(open) => !open && answer(false)}>
-      <DialogContent>
+      <DialogContent closeLabel={t.common.close}>
         <DialogHeader>
           <DialogTitle>{t.browsers.requestTitle}</DialogTitle>
           <DialogDescription>
@@ -185,6 +185,7 @@ export function BrowsersDialog() {
         </Button>
       </DialogTrigger>
       <DialogContent
+        closeLabel={t.common.close}
         onEscapeKeyDown={(event) => {
           // Escape leaves the name field before it closes the dialog.
           if (editing === null) return;

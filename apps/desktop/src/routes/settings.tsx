@@ -6,7 +6,7 @@ import {
   Settings as SettingsIcon,
   SlidersHorizontal,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@cairn/ui/components/button";
 import { useT } from "@/i18n/I18nProvider";
 
 export const Route = createFileRoute("/settings")({ component: Settings });

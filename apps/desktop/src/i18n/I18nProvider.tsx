@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { Effect } from "effect";
-import { toast } from "sonner";
+import { toast } from "@cairn/ui/components/sonner";
 import { messages, saveLanguage, type Language, type Locale } from "./locale";
 import type { Messages } from "./en-US";
 

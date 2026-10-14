@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { Effect } from "effect";
 import { FolderOpen } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { toast } from "@cairn/ui/components/sonner";
+import { Button } from "@cairn/ui/components/button";
 import { useT } from "@/i18n/I18nProvider";
 import { extensionFolder, openExtensionFolder, type ExtensionFolder } from "./connector";
 

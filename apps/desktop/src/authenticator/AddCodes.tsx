@@ -1,7 +1,7 @@
 import { useState, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { Effect } from "effect";
 import { ImageUp, ScanQrCode } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@cairn/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -10,8 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
+} from "@cairn/ui/components/dialog";
+import { Field, FieldLabel } from "@cairn/ui/components/field";
 import {
   Select,
   SelectContent,
@@ -19,8 +19,8 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@cairn/ui/components/select";
+import { Textarea } from "@cairn/ui/components/textarea";
 import { useT } from "../i18n/I18nProvider";
 import { VaultClient, type EntrySummary, type OtpPreview } from "../vault/VaultClient";
 import { useRuntime, type useVault } from "../vault/useVault";
@@ -187,7 +187,12 @@ export function AddCodesDialog({ vault }: { vault: ReturnType<typeof useVault> }
           {t.authenticator.open}
         </Button>
       </DialogTrigger>
-      <DialogContent onPaste={paste} onDragOver={(event) => event.preventDefault()} onDrop={drop}>
+      <DialogContent
+        closeLabel={t.common.close}
+        onPaste={paste}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={drop}
+      >
         <DialogHeader>
           <DialogTitle>{t.authenticator.title}</DialogTitle>
           <DialogDescription>

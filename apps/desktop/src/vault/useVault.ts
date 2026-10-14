@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Effect } from "effect";
-import { toast } from "sonner";
+import { toast } from "@cairn/ui/components/sonner";
 import {
   VaultClient,
   VaultError,

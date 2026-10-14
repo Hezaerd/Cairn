@@ -1,6 +1,6 @@
 import { invoke, isTauri, type InvokeArgs } from "@tauri-apps/api/core";
 import { Data, Effect, Schema } from "effect";
-import { toast } from "sonner";
+import { toast } from "@cairn/ui/components/sonner";
 import type { Messages } from "../i18n/en-US";
 
 export class UpdateError extends Data.TaggedError("UpdateError") {}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pencil, Timer, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@cairn/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@cairn/ui/components/dialog";
 import { useT } from "../i18n/I18nProvider";
 import { SiteIcon } from "../favicon/SiteIcon";
 import type { EntrySummary } from "../vault/VaultClient";
@@ -55,7 +55,7 @@ function RemoveCodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent closeLabel={t.common.close}>
         <DialogHeader>
           <DialogTitle>{t.authenticator.removeTitle(entry.name)}</DialogTitle>
           <DialogDescription>

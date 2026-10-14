@@ -1,9 +1,9 @@
 import type { FormEvent, ReactNode } from "react";
 import { Match, Schema } from "effect";
-import { toast } from "sonner";
+import { toast } from "@cairn/ui/components/sonner";
 import { Eye, EyeOff, KeyRound, LockKeyhole, Pencil, Timer, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@cairn/ui/components/button";
+import { Input } from "@cairn/ui/components/input";
 import { useVault } from "./vault/useVault";
 import {
   DeleteDialog,

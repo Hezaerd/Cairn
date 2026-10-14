@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Effect } from "effect";
-import { toast } from "sonner";
+import { toast } from "@cairn/ui/components/sonner";
 import { Copy } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@cairn/ui/components/button";
 import { useT } from "../i18n/I18nProvider";
 import { VaultClient, type TotpCode } from "../vault/VaultClient";
 import { useRuntime } from "../vault/useVault";
