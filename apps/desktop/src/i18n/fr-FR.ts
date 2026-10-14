@@ -22,6 +22,19 @@ export const frFR: Messages = {
     notesUnchanged:
       "Les notes restent inchangées. Affiche le mot de passe avant de modifier pour les éditer.",
   },
+  generator: {
+    open: "Générer un mot de passe",
+    title: "Générateur de mots de passe",
+    preview: "Mot de passe généré",
+    length: "Longueur",
+    lowercase: "Minuscules (a–z)",
+    uppercase: "Majuscules (A–Z)",
+    digits: "Chiffres (0–9)",
+    symbols: "Symboles (!#$…)",
+    avoidAmbiguous: "Éviter les caractères ambigus",
+    regenerate: "Régénérer",
+    use: "Utiliser",
+  },
   add: {
     open: "Ajouter un identifiant",
     title: "Nouvel identifiant",

@@ -339,14 +339,76 @@ try {
   await page.getByText(changedSecret, { exact: true }).waitFor();
   await page.getByText("Note modifiée de test", { exact: true }).waitFor();
 
-  // Deleting asks for confirmation and leaves the other entries alone.
+  // The generator fills the password field from Rust and only remembers its options.
   await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
   await page.getByLabel("Nom", { exact: true }).fill("Compte jetable");
-  await page.getByLabel("Mot de passe", { exact: true }).fill("synthetic-disposable-42!");
+  await page.getByRole("button", { name: "Générer un mot de passe" }).click();
+  const preview = page.getByLabel("Mot de passe généré");
+  await page.waitForFunction(() => document.querySelector("output")?.textContent?.length === 20);
+  const first = await preview.textContent();
+  assert.match(first ?? "", /[a-z]/);
+  assert.match(first ?? "", /[A-Z]/);
+  assert.match(first ?? "", /[0-9]/);
+  assert.match(first ?? "", /[^a-zA-Z0-9]/);
+  await page.screenshot({ path: path.join(directory, "generator.png") });
+  await page.getByRole("checkbox", { name: /^Symboles/ }).click();
+  await page.getByRole("checkbox", { name: /^Éviter/ }).click();
+  await page.getByRole("slider", { name: "Longueur" }).focus();
+
+  for (let step = 0; step < 12; step++) await page.keyboard.press("ArrowRight");
+
+  await page.waitForFunction(() => document.querySelector("output")?.textContent?.length === 32);
+  const before = await preview.textContent();
+  await page.getByRole("button", { name: "Régénérer" }).click();
+  await page.waitForFunction((previous) => {
+    const text = document.querySelector("output")?.textContent ?? "";
+
+    return text.length === 32 && text !== previous;
+  }, before);
+  const generated = (await preview.textContent()) ?? "";
+  assert.match(generated, /^[a-kmnp-zA-HJ-NP-Z2-9]{32}$/);
+  await page.screenshot({ path: path.join(directory, "generator-options.png") });
+
+  for (const name of ["Minuscules", "Majuscules"])
+    await page.getByRole("checkbox", { name: new RegExp(`^${name}`) }).click();
+
+  assert.equal(await page.getByRole("checkbox", { name: /^Chiffres/ }).isDisabled(), true);
+  await page.getByRole("checkbox", { name: /^Minuscules/ }).click();
+  await page.getByRole("checkbox", { name: /^Majuscules/ }).click();
+  await page.getByRole("button", { name: "Régénérer" }).click();
+  await page.waitForFunction((previous) => {
+    const text = document.querySelector("output")?.textContent ?? "";
+
+    return text.length === 32 && text !== previous;
+  }, generated);
+  const used = (await preview.textContent()) ?? "";
+  await page.getByRole("button", { name: "Utiliser" }).click();
+  assert.equal(await page.getByLabel("Mot de passe", { exact: true }).inputValue(), used);
   await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   await page.getByRole("button", { name: /Compte jetable/ }).click();
   await page.getByRole("heading", { name: "Compte jetable" }).waitFor();
+  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
+  await page.getByText(used, { exact: true }).waitFor();
+  const remembered = await page.evaluate(() => localStorage.getItem("cairn-password-generator"));
+  assert.deepEqual(JSON.parse(remembered ?? "null"), {
+    length: 32,
+    lowercase: true,
+    uppercase: true,
+    digits: true,
+    symbols: false,
+    avoidAmbiguous: true,
+  });
+  await page.getByRole("button", { name: "Ajouter un identifiant" }).click();
+  await page.getByRole("button", { name: "Générer un mot de passe" }).click();
+  await page.waitForFunction(() => document.querySelector("output")?.textContent?.length === 32);
+  assert.equal(await page.getByRole("checkbox", { name: /^Symboles/ }).isChecked(), false);
+  await page.keyboard.press("Escape");
+  await page.getByText("Générateur de mots de passe").waitFor({ state: "hidden" });
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog", { name: "Nouvel identifiant" }).waitFor({ state: "hidden" });
+
+  // Deleting asks for confirmation and leaves the other entries alone.
   await page.getByRole("button", { name: "Supprimer l'identifiant" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Annuler" }).click();
   await page.getByRole("heading", { name: "Compte jetable" }).waitFor();
@@ -370,7 +432,7 @@ try {
   await page.getByText(changedSecret, { exact: true }).waitFor({ state: "hidden" });
   const storage = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
 
-  for (const value of [secret, changedSecret, master]) assert.ok(!storage.includes(value));
+  for (const value of [secret, changedSecret, master, used]) assert.ok(!storage.includes(value));
 
   for (const filename of [file, path.join(directory, "data/backups/previous.cairn")]) {
     const disk = readFileSync(filename, "utf8");
@@ -400,7 +462,7 @@ try {
   assert.equal(readFileSync(file, "utf8"), "corrupted-test-vault");
   assert.deepEqual(app.errors, []);
   console.log(
-    `Native vault E2E passed: create, save, reveal, edit, delete, close-to-tray, second-launch restore, lock, wrong password, restart, auto-hide, encrypted storage and corruption. Artifacts: ${directory}`,
+    `Native vault E2E passed: create, save, reveal, edit, password generator, delete, close-to-tray, second-launch restore, lock, wrong password, restart, auto-hide, encrypted storage and corruption. Artifacts: ${directory}`,
   );
 } finally {
   await stopApp(app);

@@ -40,6 +40,7 @@ pub fn run() {
             vault::update_entry,
             vault::delete_entry,
             vault::reveal_password,
+            vault::generate_password,
             bridge::pairing_request,
             bridge::answer_pairing,
             bridge::list_browsers,

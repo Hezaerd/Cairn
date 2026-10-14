@@ -1,5 +1,6 @@
 use cairn_vault::{
-    EntrySecret, EntrySummary, EntryUpdate, NewEntry, Vault, VaultError, VaultStatus,
+    EntrySecret, EntrySummary, EntryUpdate, NewEntry, PasswordOptions, Vault, VaultError,
+    VaultStatus,
 };
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State, WebviewWindow};
@@ -174,4 +175,17 @@ pub async fn reveal_password(
         vault.reveal(&id)
     })
     .await
+}
+
+/// Generating doesn't read the vault, so it neither needs the session nor counts as activity.
+/// The password goes back to the window only, and reaches the vault once the entry is saved.
+#[tauri::command]
+pub fn generate_password(
+    window: WebviewWindow,
+    options: PasswordOptions,
+) -> Result<String, VaultError> {
+    if window.label() != "main" {
+        return Err(VaultError::Locked);
+    }
+    cairn_vault::generate_password(&options).map(|password| String::clone(&password))
 }

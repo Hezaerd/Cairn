@@ -38,5 +38,6 @@ export const VaultClientLive = Layer.succeed(
     update: (id, entry) => request("update_entry", Schema.Null, { id, entry }).pipe(Effect.asVoid),
     remove: (id) => request("delete_entry", Schema.Null, { id }).pipe(Effect.asVoid),
     reveal: (id) => request("reveal_password", EntrySecret, { id }),
+    generate: (options) => request("generate_password", Schema.String, { options }),
   }),
 );
