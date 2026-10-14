@@ -29,11 +29,25 @@ pub fn client_id(encoded: &str) -> Option<String> {
     Some(URL_SAFE_NO_PAD.encode(Sha256::digest(bytes)))
 }
 
-/// Eight digits shown in both the popup and the app, so you can check that
-/// the browser asking to pair is the one in front of you.
-pub fn pairing_code(encoded: &str) -> Option<String> {
+/// Random bytes the app mixes into a pairing code. The browser sends its key
+/// before it learns them, so no key can be searched for offline to match a
+/// code someone else is looking at.
+pub fn pairing_nonce() -> Option<String> {
+    let mut bytes = [0u8; 32];
+    getrandom::fill(&mut bytes).ok()?;
+    Some(URL_SAFE_NO_PAD.encode(bytes))
+}
+
+/// Eight digits from the SHA-256 of the nonce and the key, shown in both the
+/// popup and the app, so you can check that the browser asking to pair is
+/// the one in front of you.
+pub fn pairing_code(encoded: &str, nonce: &str) -> Option<String> {
     let (bytes, _) = public_key(encoded)?;
-    let digest = Sha256::digest(bytes);
+    let nonce = URL_SAFE_NO_PAD.decode(nonce).ok()?;
+    let digest = Sha256::new()
+        .chain_update(nonce)
+        .chain_update(bytes)
+        .finalize();
     let value = u32::from_be_bytes([digest[0], digest[1], digest[2], digest[3]]) % 100_000_000;
     Some(format!("{:04} {:04}", value / 10_000, value % 10_000))
 }
@@ -115,8 +129,14 @@ mod tests {
     fn keys_ids_and_codes() {
         let (_, public) = key_pair();
         assert_eq!(client_id(&public).unwrap().len(), 43);
-        let code = pairing_code(&public).unwrap();
+        let nonce = pairing_nonce().unwrap();
+        let code = pairing_code(&public, &nonce).unwrap();
         assert_eq!(code.len(), 9);
+        // The same key gives another code with another nonce.
+        let codes: std::collections::HashSet<_> = (0..4)
+            .map(|_| pairing_code(&public, &pairing_nonce().unwrap()).unwrap())
+            .collect();
+        assert!(codes.len() > 1);
         assert!(client_id("AAAA").is_none());
         // A compressed point is valid P-256 but not what WebCrypto exports.
         let compressed = URL_SAFE_NO_PAD.encode(
@@ -145,7 +165,11 @@ mod tests {
             signature
         ));
         assert_eq!(client_id(key).as_deref(), fixture["clientId"].as_str());
-        assert_eq!(pairing_code(key).as_deref(), fixture["code"].as_str());
+        let nonce = fixture["nonce"].as_str().unwrap();
+        assert_eq!(
+            pairing_code(key, nonce).as_deref(),
+            fixture["code"].as_str()
+        );
     }
 
     #[test]

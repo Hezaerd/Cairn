@@ -7,8 +7,6 @@ export interface KeyPair {
   readonly publicKey: string;
   /** SHA-256 of the raw public key, base64url. */
   readonly clientId: string;
-  /** The code Cairn shows when it asks you to approve this browser. */
-  readonly code: string;
   readonly sign: (message: string) => Effect.Effect<string, CairnClientError>;
 }
 
@@ -57,13 +55,32 @@ export const passwordProof = (challenge: string, password: string) =>
     catch: keyError,
   });
 
-/** Eight digits from the key's SHA-256. Must match `pairing_code` in the desktop app. */
-export function pairingCode(digest: Uint8Array) {
+/** Eight digits from a digest's first four bytes. */
+export function pairingDigits(digest: Uint8Array) {
   const value = new DataView(digest.buffer, digest.byteOffset, 4).getUint32(0) % 100_000_000;
   const digits = value.toString().padStart(8, "0");
 
   return `${digits.slice(0, 4)} ${digits.slice(4)}`;
 }
+
+/**
+ * The code Cairn shows when it asks you to approve this browser: digits from
+ * the SHA-256 of Cairn's nonce and the raw public key. Must match
+ * `pairing_code` in the desktop app.
+ */
+export const pairingCode = (publicKey: string, nonce: string) =>
+  Effect.tryPromise({
+    try: async () => {
+      const nonceBytes = fromBase64url(nonce);
+      const keyBytes = fromBase64url(publicKey);
+      const input = new Uint8Array(nonceBytes.length + keyBytes.length);
+      input.set(nonceBytes);
+      input.set(keyBytes, nonceBytes.length);
+
+      return pairingDigits(new Uint8Array(await crypto.subtle.digest("SHA-256", input)));
+    },
+    catch: keyError,
+  });
 
 /** The private key can't be exported: WebCrypto only lets this extension sign with it. */
 export const generateKeys = Effect.tryPromise({
@@ -81,7 +98,6 @@ export const keyPair = (keys: CryptoKeyPair) =>
       return {
         publicKey: base64url(raw),
         clientId: base64url(digest),
-        code: pairingCode(digest),
         sign: (message) =>
           Effect.tryPromise({
             try: async () =>
