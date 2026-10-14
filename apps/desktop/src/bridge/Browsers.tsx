@@ -52,6 +52,14 @@ export function PairingDialog() {
       if (!disposed && Option.isSome(next)) setRequest(next.value);
     });
 
+    // A second browser asked while one waited; Cairn refused both.
+    const conflict = listen("pairing-conflict", () => {
+      if (disposed) return;
+
+      setRequest(null);
+      toast.warning(t.browsers.conflict);
+    });
+
     run(
       Effect.gen(function* () {
         return yield* (yield* BrowserService).pending;
@@ -63,10 +71,12 @@ export function PairingDialog() {
 
     return () => {
       disposed = true;
-      void subscription.then(
-        (unlisten) => unlisten(),
-        () => {},
-      );
+
+      for (const listener of [subscription, conflict])
+        void listener.then(
+          (unlisten) => unlisten(),
+          () => {},
+        );
     };
   }, []);
 

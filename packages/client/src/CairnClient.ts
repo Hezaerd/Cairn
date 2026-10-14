@@ -9,7 +9,7 @@ import {
   type StatusResponse,
 } from "@cairn/contracts";
 import { CairnClientError } from "@cairn/contracts/errors";
-import { BrowserKey, passwordProof, type KeyPair } from "./BrowserKey";
+import { BrowserKey, pairingCode, passwordProof, type KeyPair } from "./BrowserKey";
 import { NativeTransport } from "./NativeTransport";
 
 export interface Credential {
@@ -21,9 +21,12 @@ export class CairnClient extends Context.Service<
   CairnClient,
   {
     readonly getStatus: Effect.Effect<StatusResponse, CairnClientError>;
-    /** The code of this browser's key, if it has one. Having a key doesn't mean Cairn approved it. */
-    readonly pairingCode: Effect.Effect<Option.Option<string>, CairnClientError>;
-    /** Asks Cairn to pair this browser and returns the code to approve there. */
+    /** Whether this browser has a key. Having one doesn't mean Cairn approved it. */
+    readonly hasKey: Effect.Effect<boolean, CairnClientError>;
+    /**
+     * Asks Cairn to pair this browser and returns the code to approve there.
+     * The code holds a nonce from Cairn, so each request has its own.
+     */
     readonly pair: (name: string) => Effect.Effect<string, CairnClientError>;
     readonly listLogins: (
       origin: string,
@@ -91,16 +94,17 @@ export const CairnClientLive = Layer.effect(
 
     return CairnClient.of({
       getStatus: send({ ...header(), type: "GetStatus" }, "Status"),
-      pairingCode: keys.load.pipe(Effect.map(Option.map((key) => key.code))),
+      hasKey: keys.load.pipe(Effect.map(Option.isSome)),
       pair: (name) =>
         Effect.gen(function* () {
           const key = Option.getOrUndefined(yield* keys.load) ?? (yield* keys.create);
-          yield* send(
+
+          const { nonce } = yield* send(
             { ...header(), type: "Pair", publicKey: key.publicKey, name },
             "PairingRequested",
           );
 
-          return key.code;
+          return yield* pairingCode(key.publicKey, nonce);
         }),
       listLogins: (origin) =>
         Effect.gen(function* () {
