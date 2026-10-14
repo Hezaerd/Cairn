@@ -158,7 +158,6 @@ export const frFR: Messages = {
     home: "Retour à l'accueil",
   },
   browsers: {
-    open: "Navigateurs associés",
     title: "Navigateurs associés",
     description:
       "Ces navigateurs peuvent remplir tes identifiants tant que le coffre est déverrouillé.",

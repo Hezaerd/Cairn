@@ -688,12 +688,13 @@ try {
   // Removing the browser in Cairn revokes it.
   await app.getByLabel("Mot de passe maître", { exact: true }).fill(master);
   await app.getByRole("button", { name: "Déverrouiller", exact: true }).click();
-  await app.getByRole("button", { name: "Navigateurs associés" }).click();
-  const browsers = app.getByRole("dialog", { name: "Navigateurs associés" });
+  await app.getByRole("link", { name: "Paramètres" }).click();
+  await app.getByRole("link", { name: "Extension de navigateur" }).click();
+  const browsers = app.getByRole("region", { name: "Navigateurs associés" });
   await browsers.waitFor();
   await app.screenshot({ path: path.join(directory, "desktop-browsers.png") });
 
-  // A name you give shows instead of the browser's own, and Escape only leaves the field.
+  // A name you give shows instead of the browser's own, and Escape leaves the field.
   await browsers.getByRole("button", { name: /^Renommer / }).click();
   await browsers.getByLabel("Nom du navigateur").fill("Profil de test");
   await app.keyboard.press("Escape");
@@ -707,7 +708,6 @@ try {
 
   await browsers.getByRole("button", { name: "Retirer Profil de test" }).click();
   await browsers.getByText("Aucun navigateur associé.", { exact: false }).waitFor();
-  await app.keyboard.press("Escape");
   assert.equal((await popupMessage(popup, { type: "GetState", tabId: loginTab })).type, "Pairing");
   console.log("Removed browser is refused: OK");
 

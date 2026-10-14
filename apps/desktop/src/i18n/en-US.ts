@@ -153,7 +153,6 @@ export const enUS = {
     home: "Back to home",
   },
   browsers: {
-    open: "Paired browsers",
     title: "Paired browsers",
     description: "These browsers can fill your logins while the vault is unlocked.",
     empty: "No browser is paired. Open the Cairn extension and choose Pair with Cairn.",
