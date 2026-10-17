@@ -219,6 +219,12 @@ export const frFR: Messages = {
     dev: "Les versions de développement n'incluent pas l'extension. Installe-la avec les scripts de développement décrits dans docs/development.md.",
     missing: "Le dossier de l'extension est introuvable. Réinstalle Cairn pour le restaurer.",
   },
+  startup: {
+    title: "Lancer avec Windows",
+    hint: "Cairn attend dans la zone de notification à l'ouverture de session, coffre verrouillé.",
+    failed: "Impossible de modifier le lancement au démarrage.",
+    disabled: "Les versions de développement ne se lancent pas avec Windows.",
+  },
   update: {
     available: (version) => `Cairn ${version} est disponible`,
     description: "Cairn se fermera pendant l'installation.",

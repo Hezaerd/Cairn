@@ -213,6 +213,12 @@ export const enUS = {
     dev: "Development builds don't ship the extension. Set it up with the dev scripts in docs/development.md.",
     missing: "The extension folder is missing. Reinstall Cairn to restore it.",
   },
+  startup: {
+    title: "Start with Windows",
+    hint: "Cairn waits in the tray when you sign in, with the vault locked.",
+    failed: "Couldn't change the startup setting.",
+    disabled: "Development builds don't start with Windows.",
+  },
   update: {
     available: (version: string) => `Cairn ${version} is available`,
     description: "Cairn will close during the installation.",

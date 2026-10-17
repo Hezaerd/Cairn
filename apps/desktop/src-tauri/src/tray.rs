@@ -112,6 +112,15 @@ pub fn restore(app: &tauri::AppHandle) {
     }
 }
 
+/// The window starts hidden; a launch at sign-in leaves it in the tray.
+pub fn open_at_launch(app: &tauri::AppHandle, open: bool) {
+    if open {
+        restore(app);
+    } else {
+        app.state::<Hidden>().0.store(true, Ordering::SeqCst);
+    }
+}
+
 fn lock(app: &tauri::AppHandle) {
     let store = app.state::<crate::vault::Store>();
     // Even a poisoned store must drop its session before the window is hidden.
