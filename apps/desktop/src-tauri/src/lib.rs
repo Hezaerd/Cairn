@@ -12,6 +12,7 @@ pub fn run() {
             app.manage(favicon::Downloads::default());
             app.manage(updater::Updates::load(app.handle())?);
             tray::setup(app)?;
+            tray::open_at_launch(app.handle(), !startup::launched_at_sign_in());
             bridge::start(app)
         })
         .on_window_event(|window, event| {
@@ -60,6 +61,8 @@ pub fn run() {
             updater::update_install,
             connector::connector_extension_folder,
             connector::connector_open_extension_folder,
+            startup::startup_status,
+            startup::startup_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cairn");
@@ -69,6 +72,7 @@ mod bridge;
 mod connector;
 mod favicon;
 mod locale;
+mod startup;
 mod tray;
 mod updater;
 mod vault;

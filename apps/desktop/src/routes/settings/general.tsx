@@ -18,6 +18,7 @@ import {
 } from "@cairn/ui/components/card";
 import { useLanguage, useT } from "@/i18n/I18nProvider";
 import { Locale, localeNames, locales } from "@/i18n/locale";
+import { StartupSetting } from "@/startup/StartupSetting";
 import { UpdateSettings } from "@/updater/UpdateSettings";
 
 export const Route = createFileRoute("/settings/general")({ component: General });
@@ -64,6 +65,7 @@ function General() {
             </SelectContent>
           </Select>
         </Card>
+        <StartupSetting />
       </Section>
       <Section aria-labelledby="updates">
         <SectionTitle id="updates">{t.settings.updates}</SectionTitle>

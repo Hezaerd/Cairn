@@ -17,7 +17,7 @@ pnpm build:host
 pnpm dev:desktop
 ```
 
-Create a vault with a master password of at least 12 characters. Closing the window locks the vault and hides Cairn in the system tray; its status server keeps running. Click the tray icon or launch Cairn again to restore the window. Right-click the icon for **Open Cairn**, **Lock vault**, and **Quit**. Only **Quit** exits the app. Minimizing keeps the normal Windows behavior.
+Create a vault with a master password of at least 12 characters. Closing the window locks the vault and hides Cairn in the system tray; its status server keeps running. Click the tray icon or launch Cairn again to restore the window. Right-click the icon for **Open Cairn**, **Lock vault**, and **Quit**. Only **Quit** exits the app. Minimizing keeps the normal Windows behavior. **Start with Windows** in the general settings adds Cairn to the current user's `Run` key with `--autostart`, which starts it in the tray with the vault locked so the extension can reach it. Turning it off in Task Manager shows as off in Cairn, and turning it on in Cairn clears that choice. The uninstaller removes the entry. Debug builds don't offer the setting, so the end-to-end tests never register themselves.
 
 The desktop app and the extension's popup, picker, and save banner use the shadcn/ui components in `packages/ui/src/components`, with Tailwind CSS 4 and the Windows-style tokens in `packages/ui/src/styles.css`. An app's stylesheet imports only `@cairn/ui/styles.css`, which imports Tailwind and tells it to scan the shared components. Each app's `components.json` points shadcn at the package's components and stylesheet. Import a component as `@cairn/ui/components/button`. Add one with:
 
