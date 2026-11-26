@@ -362,3 +362,23 @@ fn launch_installer(bytes: &[u8]) -> io::Result<()> {
 fn launch_installer(_: &[u8]) -> io::Result<()> {
     Err(io::ErrorKind::Unsupported.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Channel, Updates};
+
+    #[test]
+    fn preserves_and_persists_the_previous_channel() {
+        let directory = tempfile::tempdir().unwrap();
+        let file = directory.path().join("update-channel");
+        std::fs::write(&file, "nightly\r\n").unwrap();
+        let updates = Updates::load(directory.path());
+        assert_eq!(updates.status().channel, Channel::Nightly);
+        updates.set_channel(Channel::Stable).unwrap();
+        assert_eq!(std::fs::read_to_string(file).unwrap(), "stable");
+        assert_eq!(
+            Updates::load(directory.path()).status().channel,
+            Channel::Stable
+        );
+    }
+}
