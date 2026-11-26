@@ -8,6 +8,7 @@
     "dev:extension": "pnpm --filter @cairn/extension dev",
     "build": "pnpm -r build",
     "build:desktop": "pnpm --filter @cairn/desktop tauri build",
+    "build:desktop-rune": "pwsh -NoProfile -File apps/desktop-rune/packaging/build.ps1",
     "build:extension": "pnpm --filter @cairn/extension build",
     "typecheck": "pnpm -r typecheck",
     "check:rust": "cargo check --workspace",

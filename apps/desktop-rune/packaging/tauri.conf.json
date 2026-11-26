@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cairn",
+  "identifier": "com.hezaerd.cairn",
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Hezaerd",
+    "windows": {
+      "allowDowngrades": false,
+      "webviewInstallMode": { "type": "skip" },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}
