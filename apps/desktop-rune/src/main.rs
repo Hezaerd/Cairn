@@ -30,6 +30,16 @@ fn data_directory() -> io::Result<PathBuf> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(debug_assertions)]
+    if std::env::args().nth(1).as_deref() == Some("--test-install-update") {
+        let updates = cairn_desktop_rune::updater::Updates::load(&data_directory()?);
+        let runtime = tokio::runtime::Runtime::new()?;
+        return runtime.block_on(async {
+            println!("Found update {:?}", updates.check().await?);
+            Ok(updates.install().await?)
+        });
+    }
+
     let headless = cfg!(debug_assertions)
         && std::env::args().skip(1).any(|arg| {
             matches!(
@@ -53,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_or_else(Locale::detect, |app| app.language().locale),
     );
     if !headless && let Some(app) = state.core() {
-        app.start_bridge(env!("CARGO_PKG_VERSION"));
+        app.start_bridge(env!("CAIRN_VERSION"));
     }
     let mut shell = app::build(state);
     let _tray = if headless {
