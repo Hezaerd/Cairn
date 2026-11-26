@@ -1,5 +1,6 @@
 use std::{
     path::PathBuf,
+    sync::Mutex,
     time::{Duration, Instant},
 };
 
@@ -12,8 +13,13 @@ use crate::{
     i18n,
 };
 
+pub static LOCALE_TEST: Mutex<()> = Mutex::new(());
+
 #[test]
 fn relocked_vault_masks_passwords_and_reports_errors() {
+    let _locale = LOCALE_TEST
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../.local/rune-unit")
         .join(format!(

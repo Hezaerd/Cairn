@@ -5,6 +5,7 @@ mod authenticator;
 mod generator;
 mod i18n;
 mod lock;
+mod settings;
 mod site_icon;
 mod theme;
 mod title_bar;

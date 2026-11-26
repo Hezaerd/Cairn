@@ -7,6 +7,7 @@ edition = "2024"
 base64 = "0.22"
 cairn-app = { path = "../../crates/app" }
 cairn-vault = { path = "../../crates/vault" }
+chrono = "0.4"
 dirs = "6"
 image = { version = "0.25", default-features = false, features = ["png"] }
 rune = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d", default-features = false, features = ["accessibility", "native-file-dialog"] }
