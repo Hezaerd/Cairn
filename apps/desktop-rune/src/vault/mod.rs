@@ -19,6 +19,8 @@ use crate::{generator::Preferences, i18n::t, site_icon::SiteIcons};
 const SECRET_LIFETIME: Duration = Duration::from_secs(30);
 const JOB_POLL: Duration = Duration::from_millis(16);
 
+pub use workspace::add_button;
+
 pub struct Vault {
     pub preferences: Preferences,
     selection_path: PathBuf,
@@ -30,6 +32,7 @@ pub struct Vault {
 struct Session {
     search: TextEdit,
     entries: Vec<Login>,
+    code_count: usize,
     matches: Vec<usize>,
     selected: Option<String>,
     revealed: Option<Reveal>,
@@ -92,7 +95,10 @@ impl Session {
     }
 
     fn replace(&mut self, entries: Vec<EntrySummary>) {
-        self.icons.retain(&entries);
+        if !self.refresh {
+            self.icons.retain(&entries);
+        }
+        self.code_count = entries.iter().filter(|entry| entry.has_totp).count();
         self.entries = entries
             .into_iter()
             .filter(|entry| entry.has_password)
@@ -195,6 +201,18 @@ impl Vault {
             self.session.selected = Some(id.to_owned());
             let _ = fs::write(&self.selection_path, id);
         }
+    }
+
+    pub fn counts(&self) -> (usize, usize) {
+        (self.session.entries.len(), self.session.code_count)
+    }
+
+    pub fn clear_reveal(&mut self) {
+        self.session.clear_reveal();
+    }
+
+    pub fn icons(&self) -> &SiteIcons {
+        &self.session.icons
     }
 
     pub fn refresh(&mut self) {

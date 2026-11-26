@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$Executable,
-    [Parameter(Mandatory)][string]$Directory
+    [Parameter(Mandatory)][string]$Directory,
+    [Parameter(Mandatory)][string]$Picture
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,7 +20,10 @@ public static class CairnWindow {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();
     [DllImport("user32.dll")] private static extern IntPtr SendMessageW(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", EntryPoint = "SendMessageW", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessageText(IntPtr window, uint message, IntPtr wParam, string text);
     [DllImport("user32.dll")] private static extern int GetMenuItemCount(IntPtr menu);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetMenuStringW(IntPtr menu, uint item, StringBuilder name, int capacity, uint flags);
     [DllImport("user32.dll")] private static extern bool GetMenuItemRect(IntPtr window, IntPtr menu, uint item, out Rect bounds);
@@ -27,6 +31,10 @@ public static class CairnWindow {
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect { public int Left, Top, Right, Bottom; }
+
+    public static bool SetEditText(IntPtr window, string text) {
+        return SendMessageText(window, 0x000C, IntPtr.Zero, text) != IntPtr.Zero;
+    }
 
     public static void TypeFixture(string text) {
         foreach (char character in text) {
@@ -195,6 +203,57 @@ function Wait-Unlocked {
     Find-Control $labels.'credentials.empty' | Out-Null
 }
 
+function Get-Rfc6238Code([long]$UnixSeconds) {
+    $counter = [BitConverter]::GetBytes([long][Math]::Floor($UnixSeconds / 30))
+    if ([BitConverter]::IsLittleEndian) { [Array]::Reverse($counter) }
+    $seed = [Text.Encoding]::ASCII.GetBytes('12345678901234567890')
+    $hmac = [Security.Cryptography.HMACSHA1]::new($seed)
+    try { $hash = $hmac.ComputeHash($counter) } finally { $hmac.Dispose() }
+    $offset = $hash[$hash.Length - 1] -band 15
+    $value = (([int]$hash[$offset] -band 127) -shl 24) -bor
+        ([int]$hash[$offset + 1] -shl 16) -bor
+        ([int]$hash[$offset + 2] -shl 8) -bor [int]$hash[$offset + 3]
+    '{0:D8}' -f ($value % 100000000)
+}
+
+function Import-AuthenticatorQr {
+    if ((Get-Rfc6238Code 59) -cne '94287082') { throw 'The test oracle failed the RFC 6238 appendix B vector' }
+    Press $labels.'views.authenticator'
+    Press $labels.'authenticator.open'
+    Press $labels.'authenticator.choose'
+    $dialog = Wait-For 'native QR file picker' {
+        $window = [CairnWindow]::FindClass([IntPtr]::Zero, '#32770', $app.Id)
+        if ($window -ne [IntPtr]::Zero -and [CairnWindow]::IsWindowVisible($window)) { $window }
+    }
+    $root = [Windows.Automation.AutomationElement]::FromHandle($dialog)
+    $editClass = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::ClassNameProperty, 'Edit')
+    [CairnWindow]::SetForegroundWindow($dialog) | Out-Null
+    $filename = Wait-For 'native file name field' {
+        foreach ($field in $root.FindAll($scope, $editClass)) {
+            if ($field.Current.AutomationId -eq '1148') { return $field }
+        }
+    }
+    $editWindow = [IntPtr]$filename.Current.NativeWindowHandle
+    if (![CairnWindow]::SetEditText($editWindow, $Picture)) { throw 'Could not set the QR file name' }
+    [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    Press $labels.'authenticator.addOne'
+    Find-Control 'RFC6238' | Out-Null
+    $sequence = [CairnWindow]::GetClipboardSequenceNumber()
+    $start = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    Press $labels.'credentials.copyCode'
+    $actual = Wait-For 'authenticator code on the clipboard' {
+        if ([CairnWindow]::GetClipboardSequenceNumber() -ne $sequence) {
+            $text = [Windows.Forms.Clipboard]::GetText()
+            if ($text -match '^[0-9]{8}$') { $text }
+        }
+    }
+    $end = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $expected = ($start..$end) | ForEach-Object { Get-Rfc6238Code $_ }
+    if ($actual -cnotin $expected) { throw 'The clipboard code did not match RFC 6238' }
+    Press $labels.'credentials.title'
+}
+
 function Close-ToTray {
     $window = Main-Window $app
     if ($window -eq [IntPtr]::Zero -or !$app.CloseMainWindow()) { throw 'No Cairn window to close' }
@@ -234,6 +293,13 @@ try {
         throw 'The vault on disk is not an encrypted envelope'
     }
     'Create, confirmation, UI Automation password fields, and encryption passed'
+
+    Import-AuthenticatorQr
+    $ciphertext = [IO.File]::ReadAllText($vault)
+    if ($ciphertext.Contains('GEZDGNBVGY3TQOJQ') -or $ciphertext.Contains('RFC6238')) {
+        throw 'The authenticator fixture is visible on disk'
+    }
+    'Native QR picker, import, and RFC 6238 clipboard comparison passed'
 
     Press $labels.'toolbar.lock'
     Wait-Locked

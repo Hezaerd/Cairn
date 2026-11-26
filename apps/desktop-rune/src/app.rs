@@ -2,14 +2,15 @@ use std::{path::Path, time::Duration};
 
 use cairn_app::{App as Core, AppEvent};
 use cairn_vault::{VaultError, VaultStatus};
-use rune::{App, AppSpec, Cx, El, Tx, col};
+use rune::{App, AppSpec, Cx, El, Tx, col, el, row};
+use rune_kit::{Button, ButtonVariant, Kit};
 use tokio::{
     runtime::{Handle, Runtime},
     sync::{mpsc, oneshot},
 };
 use zeroize::Zeroizing;
 
-use crate::{i18n::t, lock, theme, title_bar, vault};
+use crate::{authenticator, i18n::t, lock, theme, title_bar, vault};
 
 pub struct State {
     pub(crate) core: Option<Core>,
@@ -18,6 +19,7 @@ pub struct State {
     pub status: Result<VaultStatus, VaultError>,
     pub form: lock::Form,
     pub vault: vault::Vault,
+    pub(crate) authenticator: authenticator::Screen,
     pending: Option<Pending>,
     hidden: bool,
     pub caption_font: Option<&'static str>,
@@ -50,6 +52,7 @@ impl State {
             status,
             form: lock::Form::default(),
             vault: vault::Vault::new(directory),
+            authenticator: authenticator::Screen::default(),
             pending: None,
             hidden,
             caption_font,
@@ -116,6 +119,7 @@ impl State {
         }
         self.form = lock::Form::default();
         self.vault.clear();
+        self.authenticator = authenticator::Screen::default();
         tx.clear_secret_clipboard();
         self.focus_master(tx);
     }
@@ -147,6 +151,7 @@ impl State {
             while let Ok(event) = events.try_recv() {
                 if matches!(event, AppEvent::VaultChanged) {
                     self.vault.refresh();
+                    self.authenticator.invalidate();
                 }
                 if matches!(event, AppEvent::VaultLocked)
                     && self.status == Ok(VaultStatus::Unlocked)
@@ -154,6 +159,7 @@ impl State {
                     self.status = Ok(VaultStatus::Locked);
                     self.form = lock::Form::default();
                     self.vault.clear();
+                    self.authenticator = authenticator::Screen::default();
                     tx.clear_secret_clipboard();
                     changed = true;
                 }
@@ -190,6 +196,7 @@ impl State {
         if self.status == Ok(VaultStatus::Unlocked) {
             tx.wake_after(Duration::from_millis(250));
             if let Some(core) = &self.core {
+                changed |= self.authenticator.poll(core, &self.runtime, clock, tx);
                 match self.vault.poll(core, &self.runtime, clock, tx) {
                     Ok(updated) => changed |= updated,
                     Err(error) => {
@@ -233,12 +240,30 @@ pub fn build(state: State) -> App<State> {
 fn view(state: &State, cx: &mut Cx<State>) -> El {
     let kit = theme::kit(cx.system_dark());
     let body = match state.status {
-        Ok(VaultStatus::Unlocked) => vault::view(
-            state,
-            &kit,
-            cx.layout_size("root")
-                .is_some_and(|[width, _]| width < 680.0),
-        ),
+        Ok(VaultStatus::Unlocked) => {
+            let compact = cx
+                .layout_size("root")
+                .is_some_and(|[width, _]| width < 680.0);
+            let codes = state.authenticator.is_open();
+            let (action, body) = if codes {
+                (
+                    authenticator::add_button(state, &kit),
+                    authenticator::view(state, &kit, compact),
+                )
+            } else {
+                (
+                    vault::add_button(state, &kit),
+                    vault::view(state, &kit, compact),
+                )
+            };
+            col()
+                .key("workspace")
+                .w_full()
+                .grow(1.0)
+                .min_h(0.0)
+                .child(workspace_bar(state, action, &kit))
+                .child(body)
+        }
         Ok(VaultStatus::Recovery) => lock::recovery(&kit).key("recovery"),
         Ok(VaultStatus::Missing | VaultStatus::Locked) => {
             lock::view(state, &kit).key("lock-screen")
@@ -252,4 +277,47 @@ fn view(state: &State, cx: &mut Cx<State>) -> El {
         .fill(kit.c.page)
         .child(title_bar::view(state, cx, &kit))
         .child(body)
+}
+
+fn workspace_bar(state: &State, action: El, kit: &Kit) -> El {
+    let codes = state.authenticator.is_open();
+    let (login_count, code_count) = state.vault.counts();
+    let tab = |name, count, open| {
+        Button::new(format!("{name}  {count}"))
+            .variant(if codes == open {
+                ButtonVariant::Outline
+            } else {
+                ButtonVariant::Ghost
+            })
+            .on_press(move |state: &mut State| {
+                if state.authenticator.is_open() != open {
+                    state.vault.clear_reveal();
+                    state.authenticator.set_open(open);
+                }
+            })
+            .build(kit)
+            .label(name)
+            .h(32.0)
+    };
+    row()
+        .w_full()
+        .h(48.0)
+        .px(12.0)
+        .gap(8.0)
+        .center_y()
+        .border_sides([0.0, 0.0, 1.0, 0.0], kit.c.border_muted)
+        .child(tab(t!("credentials.title"), login_count, false).key("nav-logins"))
+        .child(el().w(1.0).h(20.0).fill(kit.c.border_muted))
+        .child(tab(t!("views.authenticator"), code_count, true).key("nav-authenticator"))
+        .child(el().grow(1.0))
+        .child(action)
+        .child(
+            Button::new(t!("toolbar.lock"))
+                .variant(ButtonVariant::Outline)
+                .icon(kit.glyph.lock)
+                .on_press_tx(State::lock)
+                .build(kit)
+                .key("lock")
+                .h(32.0),
+        )
 }

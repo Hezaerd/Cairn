@@ -25,7 +25,7 @@ impl Drop for SiteIcon {
 
 impl SiteIcons {
     pub fn load(&mut self, core: App, runtime: &Handle, id: String, site: String) {
-        if site.is_empty() || self.0.contains_key(&id) {
+        if site.is_empty() || self.0.get(&id).is_some_and(|icon| icon.site == site) {
             return;
         }
         let (send, updates) = mpsc::unbounded_channel();
@@ -59,7 +59,6 @@ impl SiteIcons {
     pub fn retain(&mut self, entries: &[EntrySummary]) {
         let sites: HashMap<_, _> = entries
             .iter()
-            .filter(|entry| entry.has_password)
             .map(|entry| (&entry.id, &entry.site))
             .collect();
         self.0.retain(|id, icon| sites.get(id) == Some(&&icon.site));
@@ -82,7 +81,12 @@ impl SiteIcons {
         } else {
             (16.0, 14.0, 11.0)
         };
-        let face = match self.0.get(&entry.id).and_then(|icon| icon.pixels.as_ref()) {
+        let pixels = self
+            .0
+            .get(&entry.id)
+            .filter(|icon| icon.site == entry.site)
+            .and_then(|icon| icon.pixels.as_ref());
+        let face = match pixels {
             Some(pixels) => el()
                 .key("cached-site-icon")
                 .size(image_size, image_size)
