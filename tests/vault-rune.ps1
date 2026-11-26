@@ -163,6 +163,29 @@ function Unlock([string]$Password) {
     Press $labels.'auth.unlock'
 }
 
+function Find-InWindow([string]$Name) {
+    $window = Main-Window $app
+    if ($window -ne [IntPtr]::Zero) {
+        Find-Name ([Windows.Automation.AutomationElement]::FromHandle($window)) $Name
+    }
+}
+
+function Enter-Text([string]$Name, [string]$Text) {
+    $field = Find-Control $Name ([Windows.Automation.ControlType]::Edit)
+    Click $field
+    Wait-For "$Name keyboard focus" { $field.Current.HasKeyboardFocus } | Out-Null
+    [CairnWindow]::TypeFixture($Text)
+}
+
+function Assert-SecretHidden {
+    if ((Find-InWindow $loginPassword) -or (Find-InWindow $loginNotes)) {
+        throw 'The login password or notes were exposed before reveal'
+    }
+}
+
+function Assert-HiddenWindow([string]$Name) {
+    Wait-For "$Name to close" { !(Find-InWindow $Name) } | Out-Null
+}
 function Wait-Locked {
     Find-Control $labels.'auth.lockedTitle' | Out-Null
     Find-Control $labels.'auth.masterPassword' ([Windows.Automation.ControlType]::Edit) | Out-Null
@@ -248,6 +271,147 @@ try {
     Wait-Exit $app
     if ([IO.File]::ReadAllText($vault) -cne $ciphertext) { throw 'Unlocking rewrote the vault' }
     'Restart and locked autostart passed'
+
+    $app = Start-Cairn
+    Wait-Locked
+    Unlock $master
+    Wait-Unlocked
+
+    $loginPassword = 'synthetic login password'
+    $loginNotes = 'synthetic private notes'
+    Press $labels.'add.open'
+    Enter-Text $labels.'entry.name' 'atlas fixture'
+    Enter-Password $labels.'entry.password' $loginPassword
+    Enter-Text $labels.'entry.notes' $loginNotes
+    Press $labels.'common.save'
+    Assert-HiddenWindow $labels.'add.title'
+    Find-Control 'atlas fixture' | Out-Null
+    Assert-SecretHidden
+    Press $labels.'credentials.showPassword'
+    Find-Control $loginPassword | Out-Null
+    Find-Control $loginNotes | Out-Null
+    Press $labels.'credentials.hidePassword'
+    Wait-For 'password hidden' { !(Find-InWindow $loginPassword) } | Out-Null
+    Assert-SecretHidden
+
+    Press $labels.'credentials.copyPassword'
+    Wait-For 'password copied to clipboard' { [Windows.Forms.Clipboard]::GetText() -ceq $loginPassword } | Out-Null
+    Assert-SecretHidden
+    Press $labels.'edit.open'
+    Find-Control $labels.'entry.notesUnchanged' | Out-Null
+    Enter-Text $labels.'entry.name' ' updated'
+    Press $labels.'common.save'
+    Assert-HiddenWindow $labels.'edit.title'
+    Find-Control 'atlas fixture updated' | Out-Null
+    Press $labels.'credentials.showPassword'
+    Find-Control $loginPassword | Out-Null
+    Find-Control $loginNotes | Out-Null
+    Press $labels.'edit.open'
+    Find-Control $labels.'entry.notes' ([Windows.Automation.ControlType]::Edit) | Out-Null
+    $changedPassword = 'synthetic changed password'
+    Enter-Password $labels.'entry.password' $changedPassword
+    Press $labels.'common.save'
+    Assert-HiddenWindow $labels.'edit.title'
+    Assert-SecretHidden
+    Press $labels.'credentials.showPassword'
+    Find-Control $changedPassword | Out-Null
+    Find-Control $loginNotes | Out-Null
+    'Saved login, hidden and revealed details, copy, and both edit paths passed'
+
+    Press $labels.'add.open'
+    Enter-Text $labels.'entry.name' 'generator fixture'
+    Press $labels.'generator.open'
+    Find-Control $labels.'generator.title' | Out-Null
+    $slider = Find-Control $labels.'generator.length' ([Windows.Automation.ControlType]::Slider)
+    $range = $slider.GetCurrentPattern([Windows.Automation.RangeValuePattern]::Pattern)
+    if ($range.Current.Value -ne 20) { throw 'Unexpected default generator length' }
+    $range.SetValue(32)
+    $symbols = Find-Control $labels.'generator.symbols' ([Windows.Automation.ControlType]::CheckBox)
+    $symbols.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Toggle()
+    $ambiguous = Find-Control $labels.'generator.avoidAmbiguous' ([Windows.Automation.ControlType]::CheckBox)
+    $ambiguous.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Toggle()
+    Press $labels.'generator.regenerate'
+    Press $labels.'generator.use'
+    Assert-HiddenWindow $labels.'generator.title'
+    Press $labels.'common.save'
+    Assert-HiddenWindow $labels.'add.title'
+    Enter-Text $labels.'credentials.search' 'generator'
+    Press $labels.'credentials.showPassword'
+    $generated = Wait-For '32 generated characters in revealed details' {
+        $window = [Windows.Automation.AutomationElement]::FromHandle((Main-Window $app))
+        $nodes = $window.FindAll($scope, [Windows.Automation.Condition]::TrueCondition)
+        foreach ($node in $nodes) {
+            if ($node.Current.Name -cmatch '^[a-kmnp-zA-HJ-NP-Z2-9]{32}$') { return $node.Current.Name }
+        }
+    }
+    if ($generated -cnotmatch '[a-z]' -or $generated -cnotmatch '[A-Z]' -or $generated -notmatch '[0-9]') {
+        throw 'Generated password lacked an enabled character group'
+    }
+    $preferences = Join-Path $env:CAIRN_TEST_DATA_DIR 'password-generator.json'
+    if ([IO.File]::ReadAllText($preferences).Contains($generated)) { throw 'Generated password persisted in settings' }
+    Press $labels.'remove.open'
+    Press $labels.'common.cancel'
+    Find-Control 'generator fixture' | Out-Null
+    Press $labels.'remove.open'
+    Press $labels.'remove.confirm'
+    Find-Control $labels.'credentials.notFound' | Out-Null
+    'Generator options, using a generated password, and delete confirmation passed'
+
+    $search = Find-Control $labels.'credentials.search' ([Windows.Automation.ControlType]::Edit)
+    Click $search
+    Wait-For 'search keyboard focus' { $search.Current.HasKeyboardFocus } | Out-Null
+    [Windows.Forms.SendKeys]::SendWait('^{a}{BACKSPACE}')
+    Find-Control 'atlas fixture updated' | Out-Null
+    Press $labels.'credentials.copyPassword'
+    Wait-For 'updated password on the clipboard' { [Windows.Forms.Clipboard]::GetText() -ceq $changedPassword } | Out-Null
+    Press $labels.'toolbar.lock'
+    Wait-Locked
+    Wait-For 'lock to clear the copied password' { [Windows.Forms.Clipboard]::GetText() -cne $changedPassword } | Out-Null
+    Tray-Click $labels.'tray.quit'
+    Wait-Exit $app
+    $app = Start-Cairn
+    Wait-Locked
+    Unlock $master
+    Find-Control 'atlas fixture updated' | Out-Null
+    Assert-SecretHidden
+    Press $labels.'add.open'
+    Press $labels.'generator.open'
+    $slider = Find-Control $labels.'generator.length' ([Windows.Automation.ControlType]::Slider)
+    $range = $slider.GetCurrentPattern([Windows.Automation.RangeValuePattern]::Pattern)
+    if ($range.Current.Value -ne 32) { throw 'Generator length did not persist after restart' }
+    $symbols = Find-Control $labels.'generator.symbols' ([Windows.Automation.ControlType]::CheckBox)
+    if ($symbols.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne 'Off') {
+        throw 'Generator character groups did not persist after restart'
+    }
+    [Windows.Forms.SendKeys]::SendWait('{ESC}')
+    Assert-HiddenWindow $labels.'generator.title'
+    Find-Control $labels.'add.title' | Out-Null
+    [Windows.Forms.SendKeys]::SendWait('{ESC}')
+    Assert-HiddenWindow $labels.'add.title'
+    Tray-Click $labels.'tray.quit'
+    Wait-Exit $app
+    foreach ($file in @($vault, (Join-Path $env:CAIRN_TEST_DATA_DIR 'backups/previous.cairn'))) {
+        $data = [IO.File]::ReadAllText($file)
+        foreach ($value in @($loginPassword, $changedPassword, $loginNotes, $generated, 'atlas fixture')) {
+            if ($data.Contains($value)) { throw 'Login data appeared in plaintext on disk' }
+        }
+    }
+    'Lock cleared the clipboard and settings and entries survived restart'
+    $scriptPath = Join-Path $Directory 'unlock.json'
+    $tree = Join-Path $Directory 'unlocked-tree.json'
+    @(
+        @{ t = 0.05; type = 'tap'; key = 'master' }
+        @{ t = 0.10; type = 'type'; text = $master }
+        @{ t = 1.65; type = 'key'; name = 'Enter' }
+    ) | ConvertTo-Json | Set-Content -Encoding ASCII -LiteralPath $scriptPath
+    & $Executable --script $scriptPath --realtime --tree $tree --fps 12 --at 14.0 --settle
+    if ($LASTEXITCODE -ne 0 -or !(Test-Path $tree)) { throw 'Rune element tree capture failed' }
+    $data = [IO.File]::ReadAllText($tree)
+    if (!$data.Contains('atlas fixture updated')) { throw 'The tree did not capture the unlocked login' }
+    if ($data.Contains($changedPassword) -or $data.Contains($loginNotes)) {
+        throw 'Hidden login secrets appeared in the element tree'
+    }
+    'Unlocked element tree kept the saved password and notes hidden'
 
     $corrupt = 'damaged synthetic vault bytes'
     [IO.File]::WriteAllText($vault, $corrupt)
