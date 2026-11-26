@@ -207,3 +207,44 @@ fn reveal_is_explicit_and_hides_on_toggle_expiry_and_search() {
         assert_hidden(&view);
     }
 }
+
+#[test]
+fn logins_are_listed_alphabetically_ignoring_case_then_by_username() {
+    let mut session = super::Session::default();
+    session.replace(
+        [
+            ("github.com", "zed"),
+            ("x.com", "hez"),
+            ("account.samsung.com", "hez"),
+            ("Orange Localhost", "admin"),
+            ("github.com", "amy"),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(id, (name, username))| cairn_vault::EntrySummary {
+            id: id.to_string(),
+            name: name.into(),
+            site: String::new(),
+            username: username.into(),
+            has_password: true,
+            has_totp: false,
+        })
+        .collect(),
+    );
+    let listed: Vec<_> = (0..session.matches.len())
+        .map(|index| {
+            let entry = session.entry(index);
+            (entry.name.as_str(), entry.username.as_str())
+        })
+        .collect();
+    assert_eq!(
+        listed,
+        [
+            ("account.samsung.com", "hez"),
+            ("github.com", "amy"),
+            ("github.com", "zed"),
+            ("Orange Localhost", "admin"),
+            ("x.com", "hez"),
+        ]
+    );
+}

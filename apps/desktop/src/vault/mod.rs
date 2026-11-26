@@ -104,6 +104,7 @@ impl Session {
             .filter(|entry| entry.has_password)
             .map(Login::from)
             .collect();
+        self.entries.sort_by(|a, b| a.terms.cmp(&b.terms));
         self.filter();
         if self.revealed.as_ref().map(|reveal| reveal.id.as_str())
             != self.selected().map(|entry| entry.id.as_str())
