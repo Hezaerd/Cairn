@@ -1,5 +1,5 @@
 [workspace]
-members = ["apps/desktop/src-tauri", "crates/protocol", "crates/local-bridge", "crates/native-host", "crates/vault", "crates/favicon", "crates/app"]
+members = ["apps/desktop/src-tauri", "apps/desktop-rune", "crates/protocol", "crates/local-bridge", "crates/native-host", "crates/vault", "crates/favicon", "crates/app"]
 resolver = "3"
 
 [profile.release]
@@ -8,3 +8,13 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+[patch.crates-io]
+wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d" }
+naga = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d" }
+winit = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d" }
+sctk-adwaita = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d" }
+parley_engine = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d" }
+accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d" }
+accesskit_atspi_common = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d" }
+accesskit_macos = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d" }
