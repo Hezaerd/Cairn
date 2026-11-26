@@ -152,7 +152,7 @@ mod tests {
     fn webcrypto_signatures_verify() {
         // Made by WebCrypto in Node; tests/pairing.test.ts checks the same file.
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../../tests/fixtures/protocol/signature.json"
+            "../../../../tests/fixtures/protocol/signature.json"
         ))
         .unwrap();
         let key = fixture["publicKey"].as_str().unwrap();

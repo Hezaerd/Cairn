@@ -1,19 +1,52 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    use tauri::Manager;
+    use cairn_app::{App, AppEvent, startup};
+    use tauri::{Emitter, Manager};
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("error starting Cairn's runtime");
+    let background = runtime.handle().clone();
+    tauri::async_runtime::set(background.clone());
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             tray::restore(app);
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
-            app.manage(locale::Languages::load(&vault::data_directory(app.handle())?));
-            vault::setup(app)?;
-            app.manage(favicon::Downloads::default());
-            app.manage(updater::Updates::load(app.handle())?);
+        .setup(move |app| {
+            let directory = data_directory(app.handle())?;
+            let (cairn, mut events) = App::open(&directory, background.clone())?;
+            app.manage(cairn);
+            app.manage(updater::Updates::load(app.handle(), &directory));
             tray::setup(app)?;
-            tray::open_at_launch(app.handle(), !startup::launched_at_sign_in());
-            bridge::start(app)
+
+            let hidden = startup::launched_at_sign_in();
+            if hidden {
+                app.state::<App>().set_hidden(true);
+            } else {
+                tray::restore(app.handle());
+            }
+
+            let handle = app.handle().clone();
+            background.spawn(async move {
+                while let Some(event) = events.recv().await {
+                    let _ = match event {
+                        AppEvent::VaultLocked => handle.emit_to("main", "vault-locked", ()),
+                        AppEvent::VaultChanged => handle.emit_to("main", "vault-changed", ()),
+                        AppEvent::PairingRequested(request) => {
+                            tray::restore(&handle);
+                            handle.emit_to("main", "pairing-requested", request)
+                        }
+                        AppEvent::PairingConflict => {
+                            tray::restore(&handle);
+                            handle.emit_to("main", "pairing-conflict", ())
+                        }
+                    };
+                }
+            });
+            app.state::<App>().start_bridge(env!("CARGO_PKG_VERSION"));
+            Ok(())
         })
         .on_window_event(|window, event| {
             if window.label() != "main" {
@@ -32,47 +65,51 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            vault::vault_status,
-            vault::create_vault,
-            vault::unlock_vault,
-            vault::lock_vault,
-            vault::list_entries,
-            vault::save_entry,
-            vault::update_entry,
-            vault::delete_entry,
-            vault::reveal_password,
-            vault::generate_password,
-            authenticator::totp_code,
-            authenticator::read_otp,
-            authenticator::import_otp,
-            authenticator::scan_qr,
-            bridge::pairing_request,
-            bridge::answer_pairing,
-            bridge::list_browsers,
-            bridge::rename_browser,
-            bridge::remove_browser,
-            favicon::favicon_cached,
-            favicon::favicon_refresh,
-            locale::locale,
-            locale::set_language,
+            commands::vault_status,
+            commands::create_vault,
+            commands::unlock_vault,
+            commands::lock_vault,
+            commands::list_entries,
+            commands::save_entry,
+            commands::update_entry,
+            commands::delete_entry,
+            commands::reveal_password,
+            commands::generate_password,
+            commands::totp_code,
+            commands::read_otp,
+            commands::import_otp,
+            commands::scan_qr,
+            commands::pairing_request,
+            commands::answer_pairing,
+            commands::list_browsers,
+            commands::rename_browser,
+            commands::remove_browser,
+            commands::favicon_cached,
+            commands::favicon_refresh,
+            commands::locale,
+            commands::set_language,
             updater::update_status,
             updater::update_set_channel,
             updater::update_check,
             updater::update_install,
-            connector::connector_extension_folder,
-            connector::connector_open_extension_folder,
-            startup::startup_status,
-            startup::startup_set,
+            commands::connector_extension_folder,
+            commands::connector_open_extension_folder,
+            commands::startup_status,
+            commands::startup_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Cairn");
 }
-mod authenticator;
-mod bridge;
-mod connector;
-mod favicon;
-mod locale;
-mod startup;
+mod commands;
 mod tray;
 mod updater;
-mod vault;
+
+fn data_directory(app: &tauri::AppHandle) -> tauri::Result<std::path::PathBuf> {
+    use tauri::Manager;
+    let directory = app.path().app_local_data_dir()?;
+    #[cfg(debug_assertions)]
+    let directory = std::env::var_os("CAIRN_TEST_DATA_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or(directory);
+    Ok(directory)
+}

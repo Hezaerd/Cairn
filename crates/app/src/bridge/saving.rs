@@ -151,7 +151,7 @@ mod tests {
     fn webcrypto_proofs_verify() {
         // Made by WebCrypto in Node; tests/pairing.test.ts checks the same file.
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../../tests/fixtures/protocol/proof.json"
+            "../../../../tests/fixtures/protocol/proof.json"
         ))
         .unwrap();
         let challenge = fixture["challenge"].as_str().unwrap();

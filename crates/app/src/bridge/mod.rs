@@ -5,7 +5,7 @@ mod auth;
 mod saving;
 mod sites;
 
-use crate::vault::{Store, run};
+use crate::{App, AppEvent};
 use cairn_protocol::{
     ErrorCode, LoginSummary, MAX_MESSAGE_BYTES, Request, Response, VERSION, signed_message,
 };
@@ -14,10 +14,9 @@ use cairn_vault::{
 };
 use serde::Serialize;
 use std::{
-    sync::{Arc, Mutex},
+    sync::Mutex,
     time::{Duration, Instant},
 };
-use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use zeroize::Zeroizing;
 
 const PAIRING_LIFETIME: Duration = Duration::from_secs(120);
@@ -32,8 +31,8 @@ struct Pending {
 
 #[derive(Clone, Serialize)]
 pub struct PairingRequest {
-    name: String,
-    code: String,
+    pub name: String,
+    pub code: String,
 }
 
 #[derive(Default)]
@@ -60,41 +59,43 @@ impl Bridge {
     }
 }
 
-pub fn start(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    app.manage(Arc::new(Bridge::default()));
-    let runtime = tauri::async_runtime::handle();
-    // Pipe construction requires an entered Tokio reactor. Another process
-    // holding the pipe name leaves the browser without Cairn, not Cairn
-    // without a window.
-    let server = match runtime.block_on(async { cairn_local_bridge::BridgeServer::bind() }) {
-        Ok(server) => server,
-        Err(error) => {
-            eprintln!("Cairn bridge unavailable: {error}");
-            return Ok(());
-        }
-    };
-    let handle = app.handle().clone();
-    tauri::async_runtime::spawn(async move {
-        let handler = move |request| {
-            let handle = handle.clone();
-            async move {
-                tauri::async_runtime::spawn_blocking(move || answer(&handle, request))
-                    .await
-                    .unwrap_or_else(|_| Response::error(None, ErrorCode::AppUnavailable))
+impl App {
+    pub fn start_bridge(&self, version: &'static str) {
+        let server = {
+            let _entered = self.runtime.enter();
+            cairn_local_bridge::BridgeServer::bind()
+        };
+        let server = match server {
+            Ok(server) => server,
+            Err(error) => {
+                eprintln!("Cairn bridge unavailable: {error}");
+                return;
             }
         };
-        if let Err(error) = server.run(handler).await {
-            eprintln!("Cairn bridge stopped: {error}");
-        }
-    });
-    Ok(())
+        let app = self.clone();
+        self.runtime.spawn(async move {
+            let handler = move |request| {
+                let app = app.clone();
+                async move {
+                    let runtime = app.runtime.clone();
+                    runtime
+                        .spawn_blocking(move || answer(&app, request, version))
+                        .await
+                        .unwrap_or_else(|_| Response::error(None, ErrorCode::AppUnavailable))
+                }
+            };
+            if let Err(error) = server.run(handler).await {
+                eprintln!("Cairn bridge stopped: {error}");
+            }
+        });
+    }
 }
 
-fn answer(app: &AppHandle, request: Request) -> Response {
+fn answer(app: &App, request: Request, version: &str) -> Response {
     let id = request.id().to_owned();
-    let bridge = app.state::<Arc<Bridge>>();
+    let bridge = &app.state.bridge;
     let result = match &request {
-        Request::GetStatus { .. } => return Response::status(&request, env!("CARGO_PKG_VERSION")),
+        Request::GetStatus { .. } => return Response::status(&request, version),
         Request::GetChallenge { .. } => bridge
             .challenges
             .issue()
@@ -106,7 +107,7 @@ fn answer(app: &AppHandle, request: Request) -> Response {
             .ok_or(ErrorCode::AppUnavailable),
         Request::Pair {
             public_key, name, ..
-        } => pair(app, &bridge, public_key, name).map(|nonce| Response::PairingRequested {
+        } => pair(app, bridge, public_key, name).map(|nonce| Response::PairingRequested {
             version: VERSION,
             request_id: id.clone(),
             nonce,
@@ -115,37 +116,31 @@ fn answer(app: &AppHandle, request: Request) -> Response {
         | Request::GetLogin { .. }
         | Request::CheckLogin { .. }
         | Request::SaveLogin { .. }
-        | Request::UpdateLogin { .. } => authenticated(app, &bridge, &request),
+        | Request::UpdateLogin { .. } => authenticated(app, bridge, &request),
     };
     result.unwrap_or_else(|code| Response::error(Some(id), code))
 }
 
 /// Runs `operation` on the unlocked vault. The vault counts as locked while
 /// Cairn is hidden in the tray.
-fn with_vault<T>(
-    app: &AppHandle,
+fn with_unlocked_vault<T>(
+    app: &App,
     operation: impl FnOnce(&mut Vault) -> Result<T, ErrorCode>,
 ) -> Result<T, ErrorCode> {
-    let store = app.state::<Store>();
-    let mut vault = store.lock().map_err(|_| ErrorCode::AppUnavailable)?;
-    if vault.expire() {
-        let _ = app.emit_to("main", "vault-locked", ());
-    }
-    if app.state::<crate::tray::Hidden>().get()
-        || !matches!(vault.status(), Ok(VaultStatus::Unlocked))
-    {
+    let mut vault = app
+        .state
+        .vault
+        .lock()
+        .map_err(|_| ErrorCode::AppUnavailable)?;
+    app.expire(&mut vault);
+    if app.hidden() || !matches!(vault.status(), Ok(VaultStatus::Unlocked)) {
         return Err(ErrorCode::VaultLocked);
     }
     operation(&mut vault)
 }
 
 /// Starts a pairing and returns the nonce the browser mixes into its code.
-fn pair(
-    app: &AppHandle,
-    bridge: &Bridge,
-    public_key: &str,
-    name: &str,
-) -> Result<String, ErrorCode> {
+fn pair(app: &App, bridge: &Bridge, public_key: &str, name: &str) -> Result<String, ErrorCode> {
     let nonce = auth::pairing_nonce().ok_or(ErrorCode::AppUnavailable)?;
     let (Some(client_id), Some(code)) = (
         auth::client_id(public_key),
@@ -153,7 +148,7 @@ fn pair(
     ) else {
         return Err(ErrorCode::InvalidRequest);
     };
-    with_vault(app, |_| Ok(()))?;
+    with_unlocked_vault(app, |_| Ok(()))?;
     let request = PairingRequest {
         name: name.trim().to_owned(),
         code,
@@ -165,21 +160,15 @@ fn pair(
         created: Instant::now(),
     }) {
         if code == ErrorCode::PairingConflict {
-            crate::tray::restore(app);
-            let _ = app.emit_to("main", "pairing-conflict", ());
+            app.emit(AppEvent::PairingConflict);
         }
         return Err(code);
     }
-    crate::tray::restore(app);
-    let _ = app.emit_to("main", "pairing-requested", request);
+    app.emit(AppEvent::PairingRequested(request));
     Ok(nonce)
 }
 
-fn authenticated(
-    app: &AppHandle,
-    bridge: &Bridge,
-    request: &Request,
-) -> Result<Response, ErrorCode> {
+fn authenticated(app: &App, bridge: &Bridge, request: &Request) -> Result<Response, ErrorCode> {
     let (Some(auth), Some(message)) = (request.auth(), signed_message(request)) else {
         return Err(ErrorCode::InvalidRequest);
     };
@@ -195,7 +184,7 @@ fn authenticated(
     if !bridge.challenges.take(auth.challenge) {
         return Err(ErrorCode::Unauthorized);
     }
-    with_vault(app, |vault| {
+    with_unlocked_vault(app, |vault| {
         let key = vault
             .browser_key(auth.client_id)
             .map_err(|_| ErrorCode::VaultLocked)?
@@ -352,18 +341,18 @@ fn site_entries(vault: &mut Vault, origin: &url::Url) -> Result<Vec<EntrySummary
 /// Writes a change from the browser and tells the window to show it. A failed
 /// write locks the vault, as it does from the window.
 fn commit(
-    app: &AppHandle,
+    app: &App,
     vault: &mut Vault,
     change: impl FnOnce(&mut Vault) -> Result<(), VaultError>,
 ) -> Result<(), ErrorCode> {
     match change(vault) {
         Ok(()) => {
-            let _ = app.emit_to("main", "vault-changed", ());
+            app.emit(AppEvent::VaultChanged);
             Ok(())
         }
         Err(error) => {
             if !matches!(vault.status(), Ok(VaultStatus::Unlocked)) {
-                let _ = app.emit_to("main", "vault-locked", ());
+                app.emit(AppEvent::VaultLocked);
             }
             Err(match error {
                 VaultError::InvalidInput => ErrorCode::InvalidRequest,
@@ -374,75 +363,61 @@ fn commit(
     }
 }
 
-#[tauri::command]
-pub fn pairing_request(bridge: State<'_, Arc<Bridge>>) -> Option<PairingRequest> {
-    let mut slot = bridge.pending.lock().ok()?;
-    if slot
-        .as_ref()
-        .is_some_and(|pending| pending.created.elapsed() >= PAIRING_LIFETIME)
-    {
-        *slot = None;
-    }
-    slot.as_ref().map(|pending| pending.request.clone())
-}
-
-/// Approves or refuses the waiting request. `code` must still be the one on
-/// screen, so a newer request can't be approved by accident.
-#[tauri::command]
-pub async fn answer_pairing(
-    window: WebviewWindow,
-    store: State<'_, Store>,
-    bridge: State<'_, Arc<Bridge>>,
-    code: String,
-    accept: bool,
-) -> Result<(), VaultError> {
-    let pending = {
-        let mut slot = bridge.pending.lock().map_err(|_| VaultError::Storage)?;
-        if !slot.as_ref().is_some_and(|pending| {
-            pending.request.code == code && pending.created.elapsed() < PAIRING_LIFETIME
-        }) {
-            return Err(VaultError::InvalidInput);
+impl App {
+    pub fn pairing_request(&self) -> Option<PairingRequest> {
+        let mut slot = self.state.bridge.pending.lock().ok()?;
+        if slot
+            .as_ref()
+            .is_some_and(|pending| pending.created.elapsed() >= PAIRING_LIFETIME)
+        {
+            *slot = None;
         }
-        slot.take().ok_or(VaultError::InvalidInput)?
-    };
-    if !accept {
-        return Ok(());
+        slot.as_ref().map(|pending| pending.request.clone())
     }
-    run(window, &store, move |vault| {
-        vault.add_browser(
-            &pending.client_id,
-            &pending.request.name,
-            &pending.public_key,
-        )
-    })
-    .await
-}
 
-#[tauri::command]
-pub async fn list_browsers(
-    window: WebviewWindow,
-    store: State<'_, Store>,
-) -> Result<Vec<BrowserSummary>, VaultError> {
-    run(window, &store, Vault::browsers).await
-}
+    /// Approves or refuses the waiting request. `code` must still be the one on
+    /// screen, so a newer request can't be approved by accident.
+    pub async fn answer_pairing(&self, code: String, accept: bool) -> Result<(), VaultError> {
+        let pending = {
+            let mut slot = self
+                .state
+                .bridge
+                .pending
+                .lock()
+                .map_err(|_| VaultError::Storage)?;
+            if !slot.as_ref().is_some_and(|pending| {
+                pending.request.code == code && pending.created.elapsed() < PAIRING_LIFETIME
+            }) {
+                return Err(VaultError::InvalidInput);
+            }
+            slot.take().ok_or(VaultError::InvalidInput)?
+        };
+        if !accept {
+            return Ok(());
+        }
+        self.with_vault(move |vault| {
+            vault.add_browser(
+                &pending.client_id,
+                &pending.request.name,
+                &pending.public_key,
+            )
+        })
+        .await
+    }
 
-#[tauri::command]
-pub async fn rename_browser(
-    window: WebviewWindow,
-    store: State<'_, Store>,
-    id: String,
-    label: String,
-) -> Result<(), VaultError> {
-    run(window, &store, move |vault| vault.rename_browser(&id, &label)).await
-}
+    pub async fn list_browsers(&self) -> Result<Vec<BrowserSummary>, VaultError> {
+        self.with_vault(Vault::browsers).await
+    }
 
-#[tauri::command]
-pub async fn remove_browser(
-    window: WebviewWindow,
-    store: State<'_, Store>,
-    id: String,
-) -> Result<(), VaultError> {
-    run(window, &store, move |vault| vault.remove_browser(&id)).await
+    pub async fn rename_browser(&self, id: String, label: String) -> Result<(), VaultError> {
+        self.with_vault(move |vault| vault.rename_browser(&id, &label))
+            .await
+    }
+
+    pub async fn remove_browser(&self, id: String) -> Result<(), VaultError> {
+        self.with_vault(move |vault| vault.remove_browser(&id))
+            .await
+    }
 }
 
 #[cfg(test)]

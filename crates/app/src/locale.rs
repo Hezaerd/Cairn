@@ -1,3 +1,4 @@
+use crate::App;
 use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
@@ -36,7 +37,7 @@ impl Locale {
 
 /// The language chosen in the settings, kept next to the vault. Without a choice, Cairn follows
 /// the Windows language read at startup.
-pub struct Languages {
+pub(crate) struct Languages {
     path: PathBuf,
     system: Locale,
     chosen: Mutex<Option<Locale>>,
@@ -56,7 +57,10 @@ impl Languages {
     }
 
     pub fn language(&self) -> Language {
-        let chosen = *self.chosen.lock().unwrap_or_else(|error| error.into_inner());
+        let chosen = *self
+            .chosen
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         Language {
             chosen,
             locale: chosen.unwrap_or(self.system),
@@ -64,7 +68,10 @@ impl Languages {
     }
 
     fn choose(&self, chosen: Option<Locale>) -> std::io::Result<Language> {
-        let mut current = self.chosen.lock().unwrap_or_else(|error| error.into_inner());
+        let mut current = self
+            .chosen
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         match chosen {
             Some(locale) => {
                 if let Some(directory) = self.path.parent() {
@@ -86,7 +93,7 @@ impl Languages {
 /// `chosen` is `null` when Cairn follows Windows; `locale` is the language in use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Language {
-    chosen: Option<Locale>,
+    pub chosen: Option<Locale>,
     pub locale: Locale,
 }
 
@@ -95,22 +102,17 @@ pub enum LanguageError {
     Storage,
 }
 
-#[tauri::command]
-pub fn locale(languages: tauri::State<Languages>) -> Language {
-    languages.language()
-}
+impl App {
+    pub fn language(&self) -> Language {
+        self.state.languages.language()
+    }
 
-#[tauri::command]
-pub fn set_language(
-    app: tauri::AppHandle,
-    languages: tauri::State<Languages>,
-    chosen: Option<Locale>,
-) -> Result<Language, LanguageError> {
-    let language = languages
-        .choose(chosen)
-        .map_err(|_| LanguageError::Storage)?;
-    crate::tray::translate(&app, language.locale);
-    Ok(language)
+    pub fn set_language(&self, chosen: Option<Locale>) -> Result<Language, LanguageError> {
+        self.state
+            .languages
+            .choose(chosen)
+            .map_err(|_| LanguageError::Storage)
+    }
 }
 
 #[cfg(test)]
@@ -134,10 +136,15 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
         let system = Languages::load(&directory).language().locale;
 
-        let chosen = Languages::load(&directory).choose(Some(Locale::FrFr)).unwrap();
+        let chosen = Languages::load(&directory)
+            .choose(Some(Locale::FrFr))
+            .unwrap();
         assert_eq!(chosen.locale, Locale::FrFr);
         let reloaded = Languages::load(&directory).language();
-        assert_eq!((reloaded.chosen, reloaded.locale), (Some(Locale::FrFr), Locale::FrFr));
+        assert_eq!(
+            (reloaded.chosen, reloaded.locale),
+            (Some(Locale::FrFr), Locale::FrFr)
+        );
 
         Languages::load(&directory).choose(None).unwrap();
         let reloaded = Languages::load(&directory).language();

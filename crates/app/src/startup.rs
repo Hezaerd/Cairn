@@ -1,5 +1,4 @@
 use serde::Serialize;
-use tauri::WebviewWindow;
 
 /// Windows passes this to the copy it starts at sign-in, which stays in the tray.
 pub const FLAG: &str = "--autostart";
@@ -68,25 +67,20 @@ fn register(_: bool) -> Result<(), String> {
 #[serde(rename_all = "camelCase")]
 pub struct StartupStatus {
     /// Debug builds back the end-to-end tests, which must not register themselves.
-    available: bool,
-    enabled: bool,
+    pub available: bool,
+    pub enabled: bool,
 }
 
-#[tauri::command]
-pub fn startup_status(window: WebviewWindow) -> Result<StartupStatus, String> {
-    if window.label() != "main" {
-        return Err("startup refused".into());
-    }
+pub fn startup_status() -> StartupStatus {
     let available = cfg!(windows) && !cfg!(debug_assertions);
-    Ok(StartupStatus {
+    StartupStatus {
         available,
         enabled: available && registered(),
-    })
+    }
 }
 
-#[tauri::command]
-pub fn startup_set(window: WebviewWindow, enabled: bool) -> Result<(), String> {
-    if window.label() != "main" || cfg!(debug_assertions) {
+pub fn startup_set(enabled: bool) -> Result<(), String> {
+    if cfg!(debug_assertions) {
         return Err("startup refused".into());
     }
     register(enabled)

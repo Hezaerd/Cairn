@@ -490,7 +490,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cairn-desktop"
+name = "cairn-app"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
@@ -508,13 +508,26 @@ dependencies = [
  "serde_json",
  "sha2",
  "sys-locale",
+ "tempfile",
+ "tokio",
+ "url",
+ "windows-registry",
+ "zeroize",
+]
+
+[[package]]
+name = "cairn-desktop"
+version = "0.1.0"
+dependencies = [
+ "cairn-app",
+ "cairn-vault",
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
- "tempfile",
  "tokio",
- "url",
  "windows-registry",
  "zeroize",
 ]
