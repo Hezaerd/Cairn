@@ -167,12 +167,13 @@ To test Rune, build it with `cargo build -p cairn-desktop-rune` and set `CAIRN_T
 
 ## Builds
 
-| Command                | Output                                                   |
-| ---------------------- | -------------------------------------------------------- |
-| `pnpm build`           | Desktop frontend and extension                           |
-| `pnpm build:desktop`   | Native app and NSIS installer in `target/release/bundle` |
-| `pnpm build:host`      | Native Messaging host                                    |
-| `pnpm build:connector` | Release native host, its manifest, and release extension |
+| Command                   | Output                                                   |
+| ------------------------- | -------------------------------------------------------- |
+| `pnpm build`              | Desktop frontend and extension                           |
+| `pnpm build:desktop`      | Native app and NSIS installer in `target/release/bundle` |
+| `pnpm build:desktop-rune` | Rune app and current-user NSIS installer                 |
+| `pnpm build:host`         | Native Messaging host                                    |
+| `pnpm build:connector`    | Release native host, its manifest, and release extension |
 
 `pnpm build:desktop` makes a plain installer. The installer the workflows publish also bundles the extension and native host; build it with the release config:
 
@@ -181,6 +182,18 @@ pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.release.conf.j
 ```
 
 Local builds aren't signed for the updater, so they can't be published as updates.
+
+On Windows, run `pnpm build:desktop-rune` with PowerShell 7 installed. Find the
+installer under `target/rune-installer/release/<version>/target/release/bundle/nsis`.
+It includes the release connector and uses the same install location and vault
+directory as the Tauri app. When the installer offers a choice for an existing
+installation, choose **Do not uninstall** to keep **Start with Windows** enabled.
+To rehearse an upgrade on a disposable machine, run
+`pwsh -File apps/desktop-rune/packaging/build.ps1 -Version <newer-version>`.
+
+The Rune installer workflow tests this migration, signed updates, and the Tauri
+updater on a disposable Windows runner. It reports the installer and installed
+sizes. The Nightly and Release workflows package the Tauri app.
 
 ## Releases
 

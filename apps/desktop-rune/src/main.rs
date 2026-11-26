@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_or_else(Locale::detect, |app| app.language().locale),
     );
     if !headless && let Some(app) = state.core() {
-        app.start_bridge(env!("CARGO_PKG_VERSION"));
+        app.start_bridge(env!("CAIRN_VERSION"));
     }
     let mut shell = app::build(state);
     let _tray = if headless {
