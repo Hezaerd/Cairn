@@ -8,23 +8,23 @@ use crate::{app::State, i18n::t};
 const MARKS: [(u32, &[u8], &[u8]); 4] = [
     (
         16,
-        include_bytes!("../../desktop/src-tauri/icons/mark/black-16.png"),
-        include_bytes!("../../desktop/src-tauri/icons/mark/white-16.png"),
+        include_bytes!("../icons/mark/black-16.png"),
+        include_bytes!("../icons/mark/white-16.png"),
     ),
     (
         24,
-        include_bytes!("../../desktop/src-tauri/icons/mark/black-24.png"),
-        include_bytes!("../../desktop/src-tauri/icons/mark/white-24.png"),
+        include_bytes!("../icons/mark/black-24.png"),
+        include_bytes!("../icons/mark/white-24.png"),
     ),
     (
         32,
-        include_bytes!("../../desktop/src-tauri/icons/mark/black-32.png"),
-        include_bytes!("../../desktop/src-tauri/icons/mark/white-32.png"),
+        include_bytes!("../icons/mark/black-32.png"),
+        include_bytes!("../icons/mark/white-32.png"),
     ),
     (
         64,
-        include_bytes!("../../desktop/src-tauri/icons/mark/black-64.png"),
-        include_bytes!("../../desktop/src-tauri/icons/mark/white-64.png"),
+        include_bytes!("../icons/mark/black-64.png"),
+        include_bytes!("../icons/mark/white-64.png"),
     ),
 ];
 

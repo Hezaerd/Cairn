@@ -43,11 +43,11 @@ edition = "2024"
     'fn main() {}' | Set-Content "$stage/src/main.rs"
     Copy-Item $binary "$bundleTarget/release/cairn-desktop.exe" -Force
 
-    $tauri = Join-Path $root 'apps/desktop/src-tauri'
+    $icon = Join-Path $PSScriptRoot '../icons/icon.ico'
     $config = Get-Content "$PSScriptRoot/tauri.conf.json" -Raw | ConvertFrom-Json -AsHashtable
     $config.version = $Version
-    $config.bundle.icon = @("$tauri/icons/icon.ico")
-    $config.bundle.windows.nsis.installerIcon = "$tauri/icons/icon.ico"
+    $config.bundle.icon = @($icon)
+    $config.bundle.windows.nsis.installerIcon = $icon
     $config.bundle.windows.nsis.installerHooks = "$PSScriptRoot/connector.nsh"
     $config.bundle.resources = @{
         "$target/release/cairn-native-host.exe" = 'cairn-native-host.exe'
@@ -59,7 +59,7 @@ edition = "2024"
     $env:TAURI_APP_PATH = $stage
     $env:TAURI_FRONTEND_PATH = $stage
     $env:CARGO_TARGET_DIR = $bundleTarget
-    pnpm --filter @cairn/desktop tauri bundle --ci --no-sign --no-binary-patching
+    pnpm --filter @cairn/installer exec tauri bundle --ci --no-sign --no-binary-patching
 } finally {
     Pop-Location
 }

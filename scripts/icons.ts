@@ -8,13 +8,13 @@ const root = process.cwd();
 
 const source = readFileSync(path.join(root, "brand/cairn.svg"), "utf8");
 
-const tauri = path.join(root, "apps/desktop/node_modules/@tauri-apps/cli/tauri.js");
+const tauri = path.join(root, "apps/desktop-rune/packaging/node_modules/@tauri-apps/cli/tauri.js");
 
-const desktopIcons = path.join(root, "apps/desktop/src-tauri/icons");
+const desktopIcons = path.join(root, "apps/desktop-rune/icons");
 
 const extensionIcons = path.join(root, "apps/extension/public/icons");
 
-const markSizes = [16, 24, 32, 64, 128, 256];
+const markSizes = [16, 24, 32, 64];
 
 // Windows reads the first entry of an .ico in some places, so 32 comes first.
 const icoSizes = [32, 16, 24, 48, 64, 128, 256];
@@ -95,15 +95,12 @@ function ico(files: { size: number; png: Buffer }[]) {
 const work = mkdtempSync(path.join(tmpdir(), "cairn-icons-"));
 
 try {
-  const app = path.join(work, "app");
-
   const tiles = path.join(work, "tiles");
 
   const smallTiles = path.join(work, "small-tiles");
 
   const tileSizes = [...new Set([...icoSizes, ...extensionSizes])];
 
-  render(tile(tileScale), app);
   render(
     tile(tileScale),
     tiles,
@@ -113,17 +110,6 @@ try {
 
   const tilePng = (size: number) =>
     path.join(smallTileSizes.includes(size) ? smallTiles : tiles, `${size}x${size}.png`);
-
-  for (const name of [
-    "32x32.png",
-    "64x64.png",
-    "128x128.png",
-    "128x128@2x.png",
-    "icon.png",
-    "icon.icns",
-  ]) {
-    copyFileSync(path.join(app, name), path.join(desktopIcons, name));
-  }
 
   writeFileSync(
     path.join(desktopIcons, "icon.ico"),

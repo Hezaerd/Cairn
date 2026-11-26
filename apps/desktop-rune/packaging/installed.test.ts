@@ -220,7 +220,6 @@ const env = {
   ...process.env,
   CAIRN_TEST_UPDATE_FEED: `${origin}/latest.json`,
   CAIRN_TEST_UPDATE_PUBKEY: publicKey,
-  CAIRN_TEST_TAURI_VERSION: baseline.version,
 };
 
 try {
@@ -258,34 +257,6 @@ try {
   const before = requests;
   await driveInstalled(env, "-Relaunched");
   assert.equal(requests, before, "Release Rune used the debug update feed");
-  await install(baseline.installer, baseline.version);
-  assert.equal(hash(executable), baseline.binaryHash);
-
-  const compat = await run(
-    "cargo",
-    [
-      "test",
-      "--locked",
-      "-p",
-      "cairn-desktop",
-      "--test",
-      "rune-update-compat",
-      "--",
-      "--ignored",
-      "--nocapture",
-    ],
-    { env, timeout: 300_000 },
-  );
-
-  process.stdout.write(compat.stderr);
-  await waitFor("Tauri's updater to install Rune", async () => {
-    return (await registry(uninstallKey, "/v", "DisplayVersion")) === second;
-  });
-  assert.equal(hash(executable), secondHash);
-  assert.equal(await registry(runKey, "/v", "Cairn"), expectedStartup);
-  assert.equal(hash(vault), baseline.vaultHash);
-  await assertConnector();
-  console.log("Tauri's updater accepted and installed the signed Rune feed");
 } finally {
   feed.close();
 }

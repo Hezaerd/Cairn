@@ -3,7 +3,6 @@ import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
-import { createServer } from "node:net";
 import path from "node:path";
 import { chromium, type Frame, type Page } from "playwright";
 import { Schema } from "effect";
@@ -15,11 +14,7 @@ const root = process.cwd();
 
 const local = path.join(root, ".local");
 
-const desktopOverride = process.env.CAIRN_TEST_DESKTOP_EXE;
-
-const desktopPath = path.resolve(root, desktopOverride ?? "target/debug/cairn-desktop.exe");
-
-const rune = path.basename(desktopPath) === "cairn-desktop-rune.exe";
+const desktopPath = path.join(root, "target/debug/cairn-desktop-rune.exe");
 
 const runeFixture = path.join(path.dirname(desktopPath), "examples/autofill-fixture.exe");
 
@@ -29,11 +24,10 @@ assert.equal(
   "Use a Cargo debug build so Cairn reads the isolated test data directory.",
 );
 
-if (rune)
-  assert.ok(
-    existsSync(runeFixture),
-    "Run cargo build -p cairn-desktop-rune --example autofill-fixture first.",
-  );
+assert.ok(
+  existsSync(runeFixture),
+  "Run cargo build -p cairn-desktop-rune --example autofill-fixture first.",
+);
 
 assert.ok(existsSync(desktopPath), `Debug desktop executable is missing at ${desktopPath}`);
 
@@ -47,28 +41,16 @@ execFileSync(
   [
     "-NoProfile",
     "-Command",
-    "if (Get-Process cairn-desktop,cairn-desktop-rune -ErrorAction SilentlyContinue) { throw 'Close Cairn before running the autofill test.' }",
+    "if (Get-Process cairn-desktop-rune -ErrorAction SilentlyContinue) { throw 'Close Cairn before running the autofill test.' }",
   ],
   { windowsHide: true, stdio: "pipe" },
 );
 
 const directory = mkdtempSync(path.join(local, "autofill-e2e-"));
 
-const master = "synthetic-master-password-only";
-
 const secret = "synthetic-credential-81!";
 
 const Address = Schema.Struct({ port: Schema.Number });
-
-async function freePort() {
-  const server = createServer();
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const { port } = Schema.decodeUnknownSync(Address)(server.address());
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-
-  return port;
-}
 
 const loginPage = `<!doctype html><title>Login</title><form>
   <input type="search" id="search" placeholder="Search">
@@ -161,16 +143,12 @@ manifest.host_permissions = ["http://127.0.0.1/*"];
 
 writeFileSync(manifestPath, JSON.stringify(manifest));
 
-const debugPort = await freePort();
-
 const runeMaster = "synthetic master password";
 
-const fixtureOtherId = rune
-  ? execFileSync(runeFixture, [path.join(directory, "data"), origin], {
-      windowsHide: true,
-      encoding: "utf8",
-    }).trim()
-  : undefined;
+const fixtureOtherId = execFileSync(runeFixture, [path.join(directory, "data"), origin], {
+  windowsHide: true,
+  encoding: "utf8",
+}).trim();
 
 const desktop = spawn(desktopPath, [], {
   cwd: root,
@@ -180,8 +158,6 @@ const desktop = spawn(desktopPath, [], {
     ...process.env,
     CAIRN_TEST_DATA_DIR: path.join(directory, "data"),
     CAIRN_TEST_LOCALE: "fr-FR",
-    WEBVIEW2_USER_DATA_FOLDER: path.join(directory, "webview"),
-    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}`,
   },
 });
 
@@ -412,56 +388,11 @@ const styleOverlay = (page: Page, opacity: string | null) =>
   }, opacity);
 
 try {
-  let app: Page | undefined;
-  let webview: Awaited<ReturnType<typeof chromium.connectOverCDP>> | undefined;
-  const appErrors: string[] = [];
-
-  if (rune) {
-    runeUi("Unlock", undefined, runeMaster);
-    runeUi("Wait", "Paramètres");
-    runeUi("Press", "Paramètres");
-    runeSettingsShots("Clair", "light");
-    runeUi("Press", "Retour au coffre");
-  } else {
-    // Desktop: create a vault with one login for the test site and one elsewhere.
-    let ready = false;
-
-    for (let attempt = 0; attempt < 80 && !ready; attempt++) {
-      assert.equal(desktop.exitCode, null, "Cairn exited before WebView2 was ready");
-      ready = await fetch(`http://127.0.0.1:${debugPort}/json/version`).then(
-        (response) => response.ok,
-        () => false,
-      );
-
-      if (!ready) await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-
-    assert.ok(ready, "WebView2 debugging endpoint did not start");
-    webview = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`);
-    const [context] = webview.contexts();
-    assert.ok(context);
-    app = context.pages()[0] ?? (await context.waitForEvent("page"));
-
-    app.setDefaultTimeout(20_000);
-    await app.emulateMedia({ reducedMotion: "reduce" });
-    app.on("pageerror", (error) => appErrors.push(error.message));
-    await app.getByLabel("Mot de passe maître", { exact: true }).fill(master);
-    await app.getByLabel("Confirmer le mot de passe").fill(master);
-    await app.getByRole("button", { name: "Créer le coffre" }).click();
-
-    for (const [name, url, username] of [
-      ["Site de test", origin, "synthetic@example.com"],
-      ["Autre site", "https://example.com", "other@example.com"],
-    ] as const) {
-      await app.getByRole("button", { name: "Ajouter un identifiant" }).click();
-      await app.getByLabel("Nom", { exact: true }).fill(name);
-      await app.getByLabel("Site", { exact: true }).fill(url);
-      await app.getByLabel("Identifiant", { exact: true }).fill(username);
-      await app.getByLabel("Mot de passe", { exact: true }).fill(secret);
-      await app.getByRole("button", { name: "Enregistrer", exact: true }).click();
-      await app.getByRole("complementary").getByText(name, { exact: true }).waitFor();
-    }
-  }
+  runeUi("Unlock", undefined, runeMaster);
+  runeUi("Wait", "Paramètres");
+  runeUi("Press", "Paramètres");
+  runeSettingsShots("Clair", "light");
+  runeUi("Press", "Retour au coffre");
 
   console.log("Vault with synthetic logins: OK");
 
@@ -485,10 +416,8 @@ try {
   assert.match(code, /^\d{4} \d{4}$/);
   await popup.screenshot({ path: path.join(directory, "popup-pairing.png") });
 
-  if (rune) {
-    runeUi("Wait", "Associer un navigateur ?");
-    runeUi("Wait", code);
-  }
+  runeUi("Wait", "Associer un navigateur ?");
+  runeUi("Wait", code);
 
   // Before approval, the key gets nothing.
   const loginTab = await tabId(popup, `${origin}/*`);
@@ -499,18 +428,8 @@ try {
   });
 
   // Desktop: the request shows the same code.
-  if (rune) {
-    runeShot("desktop-pairing-light");
-    runeUi("Press", "Approuver");
-  } else {
-    assert.ok(app);
-    const dialog = app.getByRole("dialog", { name: "Associer un navigateur ?" });
-    await dialog.waitFor();
-    assert.equal((await dialog.locator("p.font-mono").textContent())?.trim(), code);
-    await app.screenshot({ path: path.join(directory, "desktop-pairing.png") });
-    await dialog.getByRole("button", { name: "Approuver" }).click();
-    await app.locator("[data-sonner-toast]").filter({ hasText: "est associé" }).waitFor();
-  }
+  runeShot("desktop-pairing-light");
+  runeUi("Press", "Approuver");
 
   console.log(`Pairing approved with code ${code}: OK`);
 
@@ -538,21 +457,13 @@ try {
   console.log("Filled the login form: OK");
 
   // A login is never released to another site, even when asked by ID.
-  const desktopEntries = (): Promise<ReadonlyArray<Entry>> => {
-    assert.ok(app);
-
-    // SAFETY: Tauri injects its IPC bridge into the app's own WebView.
-    return app.evaluate(() => (window as any).__TAURI_INTERNALS__.invoke("list_entries"));
-  };
-
-  const otherId =
-    fixtureOtherId ?? (await desktopEntries()).find((entry) => entry.name === "Autre site")?.id;
-
-  assert.ok(otherId);
-  assert.deepEqual(await popupMessage(popup, { type: "Fill", tabId: loginTab, entryId: otherId }), {
-    type: "Unavailable",
-    code: "NotFound",
-  });
+  assert.deepEqual(
+    await popupMessage(popup, { type: "Fill", tabId: loginTab, entryId: fixtureOtherId }),
+    {
+      type: "Unavailable",
+      code: "NotFound",
+    },
+  );
   console.log("Login for another site is refused: OK");
 
   await open(`${origin}/`);
@@ -647,15 +558,12 @@ try {
   const changed = "synthetic-changed-81!";
 
   async function listEntries(): Promise<ReadonlyArray<Entry>> {
-    if (!rune) return desktopEntries();
     const tab = await tabId(popup, `${otherOrigin}/*`);
     const result = await popupMessage(popup, { type: "GetState", tabId: tab });
     assert.equal(result.type, "Logins");
 
     return result.logins.map((entry: Omit<Entry, "site">) => ({ ...entry, site: otherOrigin }));
   }
-
-  const initialEntries = rune ? 0 : 2;
 
   let welcome = await submitLogin("/account", "new@example.com", typed);
   let offer = await banner(welcome);
@@ -674,7 +582,7 @@ try {
   await welcome.waitForTimeout(600);
   await offer.getByRole("button", { name: "Enregistrer" }).click();
   await welcome.waitForTimeout(800);
-  assert.equal((await listEntries()).length, initialEntries, "A transparent banner must not save");
+  assert.equal((await listEntries()).length, 0, "A transparent banner must not save");
   await styleOverlay(welcome, null);
   await welcome.waitForTimeout(600);
 
@@ -683,12 +591,8 @@ try {
   await offer.getByText("Enregistré dans Cairn.").waitFor();
   await bannerClosed(welcome);
 
-  if (app) {
-    await app.getByRole("complementary").getByText("Site enregistré", { exact: true }).waitFor();
-  } else {
-    runeUi("WaitLogin", "Site enregistré, new@example.com");
-    console.log("Saved login visible in Rune: OK");
-  }
+  runeUi("WaitLogin", "Site enregistré, new@example.com");
+  console.log("Saved login visible in Rune: OK");
 
   const savedEntry = (await listEntries()).find((entry) => entry.name === "Site enregistré");
   assert.deepEqual(
@@ -709,7 +613,7 @@ try {
   await offer.getByRole("button", { name: "Mettre à jour" }).click();
   await offer.getByText("Enregistré dans Cairn.").waitFor();
   await bannerClosed(welcome);
-  assert.equal((await listEntries()).length, initialEntries + 1, "Updating doesn't add a login");
+  assert.equal((await listEntries()).length, 1, "Updating doesn't add a login");
 
   const account = await open(`${otherOrigin}/account`);
   const accountTab = await tabId(popup, `${otherOrigin}/account`);
@@ -735,7 +639,7 @@ try {
   await offer.getByText("signup@example.com").waitFor();
   await offer.getByRole("button", { name: "Plus tard" }).click();
   await bannerClosed(welcome);
-  assert.equal((await listEntries()).length, initialEntries + 1, "Not now saves nothing");
+  assert.equal((await listEntries()).length, 1, "Not now saves nothing");
   console.log("Sign-up offered, Not now closes it: OK");
 
   // A generated password isn't a fill: signing up with it offers to save it.
@@ -779,13 +683,8 @@ try {
   console.log("Signed up with a generated password and saved it: OK");
 
   // Locking the vault stops the extension.
-  if (rune) {
-    runeUi("Press", "Verrouiller");
-    runeUi("Wait", "Coffre verrouillé");
-  } else {
-    assert.ok(app);
-    await app.getByRole("button", { name: "Verrouiller", exact: true }).click();
-  }
+  runeUi("Press", "Verrouiller");
+  runeUi("Wait", "Coffre verrouillé");
 
   assert.deepEqual(await popupMessage(popup, { type: "GetState", tabId: loginTab }), {
     type: "Locked",
@@ -800,63 +699,30 @@ try {
   console.log("Locked vault: OK");
 
   // Removing the browser in Cairn revokes it.
-  if (rune) {
-    runeUi("Unlock", undefined, runeMaster);
-    runeUi("Press", "Paramètres");
-    runeSettingsShots("Sombre", "dark");
-    runeUi("Rename");
-    runeUi("Text", "Nom du navigateur", "Profil de test");
-    runeUi("Key", undefined, "{ESC}");
-    runeUi("Rename");
-    runeUi("Text", "Nom du navigateur", "Profil de test");
-    runeUi("Key", undefined, "{ENTER}");
-    runeUi("Wait", "Profil de test");
-    runeShot("desktop-browsers-renamed");
-    runeUi("Press", "Retirer Profil de test");
-    runeUi(
-      "Wait",
-      "Aucun navigateur associé. Ouvre l’extension Cairn et choisis Associer à Cairn.",
-    );
-  } else {
-    assert.ok(app);
-    await app.getByLabel("Mot de passe maître", { exact: true }).fill(master);
-    await app.getByRole("button", { name: "Déverrouiller", exact: true }).click();
-    await app.getByRole("link", { name: "Paramètres" }).click();
-    await app.getByRole("link", { name: "Extension de navigateur" }).click();
-    const browsers = app.getByRole("region", { name: "Navigateurs associés" });
-    await browsers.waitFor();
-    await app.screenshot({ path: path.join(directory, "desktop-browsers.png") });
-
-    // A name you give shows instead of the browser's own, and Escape leaves the field.
-    await browsers.getByRole("button", { name: /^Renommer / }).click();
-    await browsers.getByLabel("Nom du navigateur").fill("Profil de test");
-    await app.keyboard.press("Escape");
-    await browsers.getByRole("button", { name: /^Renommer / }).waitFor();
-    await browsers.getByRole("button", { name: /^Renommer / }).click();
-    await browsers.getByLabel("Nom du navigateur").fill("Profil de test");
-    await browsers.getByLabel("Nom du navigateur").press("Enter");
-    await browsers.getByText("Profil de test", { exact: true }).waitFor();
-    await app.screenshot({ path: path.join(directory, "desktop-browsers-renamed.png") });
-    console.log("Renaming a browser: OK");
-
-    await browsers.getByRole("button", { name: "Retirer Profil de test" }).click();
-    await browsers.getByText("Aucun navigateur associé.", { exact: false }).waitFor();
-  }
+  runeUi("Unlock", undefined, runeMaster);
+  runeUi("Press", "Paramètres");
+  runeSettingsShots("Sombre", "dark");
+  runeUi("Rename");
+  runeUi("Text", "Nom du navigateur", "Profil de test");
+  runeUi("Key", undefined, "{ESC}");
+  runeUi("Rename");
+  runeUi("Text", "Nom du navigateur", "Profil de test");
+  runeUi("Key", undefined, "{ENTER}");
+  runeUi("Wait", "Profil de test");
+  runeShot("desktop-browsers-renamed");
+  runeUi("Press", "Retirer Profil de test");
+  runeUi("Wait", "Aucun navigateur associé. Ouvre l’extension Cairn et choisis Associer à Cairn.");
 
   assert.equal((await popupMessage(popup, { type: "GetState", tabId: loginTab })).type, "Pairing");
   console.log("Removed browser is refused: OK");
 
-  if (rune) {
-    const second = await popupMessage(popup, { type: "Pair" });
-    assert.equal(second.type, "Pairing");
-    runeUi("Wait", second.code);
-    runeShot("desktop-pairing-dark");
-    runeUi("Press", "Refuser");
-  }
+  const second = await popupMessage(popup, { type: "Pair" });
+  assert.equal(second.type, "Pairing");
+  runeUi("Wait", second.code);
+  runeShot("desktop-pairing-dark");
+  runeUi("Press", "Refuser");
 
-  assert.deepEqual(appErrors, []);
   assert.deepEqual(popupErrors, []);
-  await webview?.close();
 } finally {
   desktop.kill();
   site.close();

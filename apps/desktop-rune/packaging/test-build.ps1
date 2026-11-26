@@ -9,9 +9,9 @@ pwsh -NoProfile -File "$PSScriptRoot/build.ps1" -Version $first -TestBuild
 pwsh -NoProfile -File "$PSScriptRoot/build.ps1" -Version $second
 
 $key = Join-Path (Resolve-Path .local) 'rune-test.key'
-pnpm --filter @cairn/desktop tauri signer generate --ci --force --password 'test-fixture' --write-keys $key
+pnpm --filter @cairn/installer exec tauri signer generate --ci --force --password 'test-fixture' --write-keys $key
 $installer = Resolve-Path "target/rune-installer/release/$second/target/release/bundle/nsis/Cairn_${second}_x64-setup.exe"
-pnpm --filter @cairn/desktop tauri signer sign --password 'test-fixture' --private-key-path $key --app-version $second "$installer"
+pnpm --filter @cairn/installer exec tauri signer sign --password 'test-fixture' --private-key-path $key --app-version $second "$installer"
 
 @{
     tauri = $nightly.version

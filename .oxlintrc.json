@@ -49,7 +49,6 @@
     "tools/oxlint/anti-slop/**",
     "**/dist/**",
     "target/**",
-    "**/gen/**",
     "**/routeTree.gen.ts",
     "**/.tanstack/**"
   ],
@@ -71,7 +70,7 @@
   ],
   "overrides": [
     {
-      "files": ["apps/desktop/src/**", "apps/extension/src/**", "packages/ui/src/**"],
+      "files": ["apps/extension/src/**", "packages/ui/src/**"],
       "rules": {
         "shadcn/no-restyle": [
           "error",
