@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import {
@@ -15,7 +15,6 @@ import path from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { promisify } from "node:util";
 import { Schema } from "effect";
-import { chromium } from "playwright";
 
 assert.equal(process.env.GITHUB_ACTIONS, "true");
 
@@ -25,11 +24,17 @@ assert.equal(process.platform, "win32");
 
 const run = promisify(execFile);
 
-const versions = Schema.decodeUnknownSync(
-  Schema.Struct({ tauri: Schema.String, first: Schema.String, second: Schema.String }),
-)(JSON.parse(readFileSync(".local/rune-test-versions.json", "utf8")));
-
 const serverAddress = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }));
+
+const baselinePath = ".local/tauri-install.json";
+
+const baselineSchema = Schema.Struct({
+  version: Schema.String,
+  binaryHash: Schema.String,
+  vaultHash: Schema.String,
+  installer: Schema.String,
+  installedBytes: Schema.Number,
+});
 
 const local = process.env.LOCALAPPDATA;
 
@@ -46,18 +51,6 @@ const runKey = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const uninstallKey = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Cairn";
 
 const hostKey = "HKCU\\Software\\Chromium\\NativeMessagingHosts\\com.hezaerd.cairn";
-
-const master = "synthetic installer fixture password";
-
-const tauri = path.resolve(".local/tauri-nightly", `Cairn_${versions.tauri}_x64-setup.exe`);
-
-const rune1 = path.resolve(
-  `target/rune-installer/test/${versions.first}/target/release/bundle/nsis/Cairn_${versions.first}_x64-setup.exe`,
-);
-
-const rune2 = path.resolve(
-  `target/rune-installer/release/${versions.second}/target/release/bundle/nsis/Cairn_${versions.second}_x64-setup.exe`,
-);
 
 const expectedStartup = `"${executable}" --autostart`;
 
@@ -112,76 +105,16 @@ async function assertConnector() {
   assert.ok(existsSync(path.join(directory, "extension", "manifest.json")));
 }
 
-async function stop(child: ReturnType<typeof spawn>) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  const exited = once(child, "exit");
-  child.kill();
-  await exited;
-}
-
-async function createTauriVault() {
-  const server = createServer().listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = serverAddress(server.address());
-  server.close();
-  await once(server, "close");
-  const url = `http://127.0.0.1:${address.port}`;
-
-  const child = spawn(executable, [], {
-    env: {
-      ...process.env,
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${address.port}`,
-      WEBVIEW2_USER_DATA_FOLDER: path.resolve(".local/tauri-webview"),
-    },
-    stdio: "ignore",
-  });
-
-  try {
-    await waitFor("the Tauri WebView", async () => {
-      assert.equal(child.exitCode, null, "Tauri exited before WebView2 came up");
-
-      return fetch(`${url}/json/version`).then(
-        (response) => response.ok,
-        () => false,
-      );
-    });
-    const browser = await chromium.connectOverCDP(url);
-
-    try {
-      const context = browser.contexts()[0];
-      assert.ok(context);
-      const page = context.pages()[0] ?? (await context.waitForEvent("page"));
-      page.setDefaultTimeout(30_000);
-      await page.getByLabel("Master password", { exact: true }).fill(master);
-      await page.getByLabel("Confirm password", { exact: true }).fill(master);
-      await page.getByRole("button", { name: "Create vault", exact: true }).click();
-      await page.getByRole("heading", { name: "No logins" }).waitFor();
-      await page.getByRole("link", { name: "Settings" }).click();
-      await page.getByRole("checkbox", { name: "Start with Windows" }).click();
-      await waitFor("Tauri to register startup", async () => {
-        return registry(runKey, "/v", "Cairn").then(
-          (value) => value === expectedStartup,
-          () => false,
-        );
-      });
-    } finally {
-      await browser.close();
-    }
-  } finally {
-    await stop(child);
-  }
-}
-
-async function unlockRune(env: NodeJS.ProcessEnv, relaunched = false) {
+async function driveInstalled(env: NodeJS.ProcessEnv, ...flags: string[]) {
   const { stdout } = await run(
     "powershell.exe",
     [
       "-NoProfile",
       "-File",
-      path.join(import.meta.dirname, "unlock.ps1"),
+      path.join(import.meta.dirname, "drive-installed.ps1"),
       "-Executable",
       executable,
-      ...(relaunched ? ["-Relaunched"] : []),
+      ...flags,
     ],
     { env, timeout: 90_000 },
   );
@@ -189,37 +122,65 @@ async function unlockRune(env: NodeJS.ProcessEnv, relaunched = false) {
   process.stdout.write(stdout);
 }
 
-assert.ok(!existsSync(directory) && !existsSync(vault), "Expected a fresh runner");
+if (process.argv.includes("--prepare-tauri")) {
+  assert.ok(!existsSync(directory) && !existsSync(vault), "Expected a fresh runner");
 
-await install(tauri, versions.tauri);
+  const { version } = Schema.decodeUnknownSync(Schema.Struct({ version: Schema.String }))(
+    JSON.parse(readFileSync(".local/tauri-nightly/latest.json", "utf8")),
+  );
 
-await assertConnector();
+  const installer = path.resolve(".local/tauri-nightly", `Cairn_${version}_x64-setup.exe`);
+  await install(installer, version);
+  await assertConnector();
+  const size = installedBytes();
+  await driveInstalled(process.env, "-CreateTauriVault");
+  assert.equal(await registry(runKey, "/v", "Cairn"), expectedStartup);
+  writeFileSync(
+    baselinePath,
+    JSON.stringify({
+      version,
+      binaryHash: hash(executable),
+      vaultHash: hash(vault),
+      installer,
+      installedBytes: size,
+    }),
+  );
+  process.exit(0);
+}
 
-const tauriBytes = installedBytes();
+const baseline = Schema.decodeUnknownSync(baselineSchema)(
+  JSON.parse(readFileSync(baselinePath, "utf8")),
+);
 
-const tauriHash = hash(executable);
+const { first, second } = Schema.decodeUnknownSync(
+  Schema.Struct({ first: Schema.String, second: Schema.String }),
+)(JSON.parse(readFileSync(".local/rune-test-versions.json", "utf8")));
 
-await createTauriVault();
+const rune1 = path.resolve(
+  `target/rune-installer/test/${first}/target/release/bundle/nsis/Cairn_${first}_x64-setup.exe`,
+);
 
-const vaultHash = hash(vault);
+const rune2 = path.resolve(
+  `target/rune-installer/release/${second}/target/release/bundle/nsis/Cairn_${second}_x64-setup.exe`,
+);
 
 const staleChunk = path.join(directory, "extension", "stale-fixture.js");
 
 writeFileSync(staleChunk, "");
 
-await install(rune1, versions.first);
+await install(rune1, first);
 
-assert.notEqual(hash(executable), tauriHash);
+assert.notEqual(hash(executable), baseline.binaryHash);
 
 assert.equal(await registry(runKey, "/v", "Cairn"), expectedStartup);
 
-assert.equal(hash(vault), vaultHash);
+assert.equal(hash(vault), baseline.vaultHash);
 
 assert.ok(!existsSync(staleChunk), "Old extension chunks survived");
 
 await assertConnector();
 
-await unlockRune(process.env);
+await driveInstalled(process.env);
 
 let corrupt = false;
 
@@ -238,7 +199,7 @@ const feed = createServer((request, response) => {
     response.setHeader("Content-Type", "application/json");
     response.end(
       JSON.stringify({
-        version: versions.second,
+        version: second,
         platforms: { "windows-x86_64": asset, "windows-x86_64-nsis": asset },
       }),
     );
@@ -259,7 +220,7 @@ const env = {
   ...process.env,
   CAIRN_TEST_UPDATE_FEED: `${origin}/latest.json`,
   CAIRN_TEST_UPDATE_PUBKEY: publicKey,
-  CAIRN_TEST_TAURI_VERSION: versions.tauri,
+  CAIRN_TEST_TAURI_VERSION: baseline.version,
 };
 
 try {
@@ -274,11 +235,11 @@ try {
   const { stdout } = await run(executable, ["--test-install-update"], { ...installerOptions, env });
   process.stdout.write(stdout);
   await waitFor("Rune to install the signed update", async () => {
-    return (await registry(uninstallKey, "/v", "DisplayVersion")) === versions.second;
+    return (await registry(uninstallKey, "/v", "DisplayVersion")) === second;
   });
   assert.equal(await registry(runKey, "/v", "Cairn"), expectedStartup);
   await assertConnector();
-  assert.equal(hash(vault), vaultHash);
+  assert.equal(hash(vault), baseline.vaultHash);
   const secondHash = hash(executable);
   assert.equal(secondHash, hash(path.join(path.dirname(rune2), "../../cairn-desktop.exe")));
   const runeBytes = installedBytes();
@@ -286,8 +247,8 @@ try {
   const summary = [
     "| Install | Installer bytes | Installed bytes |",
     "| --- | ---: | ---: |",
-    `| Tauri ${versions.tauri} | ${statSync(tauri).size} | ${tauriBytes} |`,
-    `| Rune ${versions.second} | ${statSync(rune2).size} | ${runeBytes} |`,
+    `| Tauri ${baseline.version} | ${statSync(baseline.installer).size} | ${baseline.installedBytes} |`,
+    `| Rune ${second} | ${statSync(rune2).size} | ${runeBytes} |`,
     "",
     "One run per installer. Installed bytes are the sum of file lengths under the Cairn install directory.",
   ].join("\n");
@@ -297,10 +258,10 @@ try {
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
 
   const before = requests;
-  await unlockRune(env, true);
+  await driveInstalled(env, "-Relaunched");
   assert.equal(requests, before, "Release Rune used the debug update feed");
-  await install(tauri, versions.tauri);
-  assert.equal(hash(executable), tauriHash);
+  await install(baseline.installer, baseline.version);
+  assert.equal(hash(executable), baseline.binaryHash);
 
   const compat = await run(
     "cargo",
@@ -320,11 +281,11 @@ try {
 
   process.stdout.write(compat.stderr);
   await waitFor("Tauri's updater to install Rune", async () => {
-    return (await registry(uninstallKey, "/v", "DisplayVersion")) === versions.second;
+    return (await registry(uninstallKey, "/v", "DisplayVersion")) === second;
   });
   assert.equal(hash(executable), secondHash);
   assert.equal(await registry(runKey, "/v", "Cairn"), expectedStartup);
-  assert.equal(hash(vault), vaultHash);
+  assert.equal(hash(vault), baseline.vaultHash);
   await assertConnector();
   console.log("Tauri's updater accepted and installed the signed Rune feed");
 } finally {
