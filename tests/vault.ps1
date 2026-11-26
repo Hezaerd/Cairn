@@ -4,9 +4,9 @@ param(
     [Parameter(Mandatory)][string]$Picture
 )
 
-. (Join-Path $PSScriptRoot "rune-window.ps1")
+. (Join-Path $PSScriptRoot "desktop-window.ps1")
 
-$labels = Get-Content -Raw -Encoding UTF8 "$PSScriptRoot/../apps/desktop-rune/src/i18n/messages/fr-FR.json" | ConvertFrom-Json
+$labels = Get-Content -Raw -Encoding UTF8 "$PSScriptRoot/../apps/desktop/src/i18n/messages/fr-FR.json" | ConvertFrom-Json
 $env:CAIRN_TEST_LOCALE = 'fr-FR'
 $env:CAIRN_TEST_DATA_DIR = Join-Path $Directory 'data'
 $vault = Join-Path $env:CAIRN_TEST_DATA_DIR 'vault.cairn'

@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
-use cairn_desktop_rune::updater::{Channel, Updates as Updater};
+use cairn_desktop::updater::{Channel, Updates as Updater};
 use rune::{El, LiveRegion, Tx, col, row};
 use rune_kit::{Button, ButtonVariant, Kit};
 use tokio::{runtime::Handle, sync::oneshot};

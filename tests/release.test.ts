@@ -4,11 +4,11 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { RELEASE_EXTENSION_ID, RELEASE_KEY } from "../apps/extension/release";
 
-import installer from "../apps/desktop-rune/packaging/tauri.conf.json";
+import installer from "../apps/desktop/packaging/tauri.conf.json";
 
 test("the installer preserves the Cairn identity and updater key", () => {
   const updaterKey = readFileSync(
-    new URL("../apps/desktop-rune/packaging/updater.pub", import.meta.url),
+    new URL("../apps/desktop/packaging/updater.pub", import.meta.url),
     "utf8",
   ).trim();
 

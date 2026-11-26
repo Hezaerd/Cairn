@@ -5,9 +5,9 @@
     [string]$Value
 )
 
-. (Join-Path $PSScriptRoot 'rune-window.ps1')
+. (Join-Path $PSScriptRoot 'desktop-window.ps1')
 Add-Type -AssemblyName System.Drawing
-$labels = Get-Content -Raw -Encoding UTF8 "$PSScriptRoot/../apps/desktop-rune/src/i18n/messages/fr-FR.json" | ConvertFrom-Json
+$labels = Get-Content -Raw -Encoding UTF8 "$PSScriptRoot/../apps/desktop/src/i18n/messages/fr-FR.json" | ConvertFrom-Json
 $app = Get-Process -Id $ProcessId
 
 function Focus-Cairn {

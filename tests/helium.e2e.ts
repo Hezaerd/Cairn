@@ -22,7 +22,7 @@ const executablePath =
   process.env.CAIRN_HELIUM_PATH ??
   path.join(process.env.LOCALAPPDATA!, "imput/Helium/Application/chrome.exe");
 
-const desktopPath = path.join(root, "target/debug/cairn-desktop-rune.exe");
+const desktopPath = path.join(root, "target/debug/cairn-desktop.exe");
 
 assert.ok(existsSync(desktopPath), `Debug desktop executable is missing at ${desktopPath}`);
 

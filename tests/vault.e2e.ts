@@ -6,15 +6,15 @@ import qr from "qrcode";
 
 const root = process.cwd();
 
-const executable = path.join(root, "target/debug/cairn-desktop-rune.exe");
+const executable = path.join(root, "target/debug/cairn-desktop.exe");
 
-assert.ok(existsSync(executable), "Run cargo build -p cairn-desktop-rune first.");
+assert.ok(existsSync(executable), "Run cargo build -p cairn-desktop first.");
 
 const local = path.join(root, ".local");
 
 mkdirSync(local, { recursive: true });
 
-const directory = mkdtempSync(path.join(local, "vault-rune-e2e-"));
+const directory = mkdtempSync(path.join(local, "vault-e2e-"));
 
 const picture = path.join(directory, "authenticator.png");
 
@@ -31,7 +31,7 @@ const result = spawnSync(
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    path.join(root, "tests/vault-rune.ps1"),
+    path.join(root, "tests/vault.ps1"),
     executable,
     directory,
     picture,
@@ -41,4 +41,4 @@ const result = spawnSync(
 
 if (result.error) throw result.error;
 
-assert.equal(result.status, 0, `Rune vault test failed. Test data is in ${directory}`);
+assert.equal(result.status, 0, `Vault test failed. Test data is in ${directory}`);

@@ -10,7 +10,7 @@ Push-Location $root
 try {
     if (!$Version) {
         $metadata = cargo metadata --format-version 1 --no-deps --locked | ConvertFrom-Json
-        $Version = ($metadata.packages | Where-Object name -eq 'cairn-desktop-rune').version
+        $Version = ($metadata.packages | Where-Object name -eq 'cairn-desktop').version
     }
     if ($Version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') {
         throw "Expected a Cairn release version, got '$Version'"
@@ -21,12 +21,12 @@ try {
     pnpm build:connector
 
     if ($TestBuild) {
-        cargo build --locked -p cairn-desktop-rune
-        $binary = "$target/debug/cairn-desktop-rune.exe"
+        cargo build --locked -p cairn-desktop
+        $binary = "$target/debug/cairn-desktop.exe"
         $variant = 'test'
     } else {
-        cargo build --locked --release -p cairn-desktop-rune
-        $binary = "$target/release/cairn-desktop-rune.exe"
+        cargo build --locked --release -p cairn-desktop
+        $binary = "$target/release/cairn-desktop.exe"
         $variant = 'release'
     }
 

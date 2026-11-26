@@ -8,9 +8,9 @@ const root = process.cwd();
 
 const source = readFileSync(path.join(root, "brand/cairn.svg"), "utf8");
 
-const tauri = path.join(root, "apps/desktop-rune/packaging/node_modules/@tauri-apps/cli/tauri.js");
+const tauri = path.join(root, "apps/desktop/packaging/node_modules/@tauri-apps/cli/tauri.js");
 
-const desktopIcons = path.join(root, "apps/desktop-rune/icons");
+const desktopIcons = path.join(root, "apps/desktop/icons");
 
 const extensionIcons = path.join(root, "apps/extension/public/icons");
 

@@ -1,6 +1,6 @@
 packages:
   - apps/extension
-  - apps/desktop-rune/packaging
+  - apps/desktop/packaging
   - packages/*
 allowBuilds:
   esbuild: true

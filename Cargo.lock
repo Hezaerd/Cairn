@@ -669,7 +669,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cairn-desktop-rune"
+name = "cairn-desktop"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",

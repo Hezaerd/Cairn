@@ -14,9 +14,9 @@ const root = process.cwd();
 
 const local = path.join(root, ".local");
 
-const desktopPath = path.join(root, "target/debug/cairn-desktop-rune.exe");
+const desktopPath = path.join(root, "target/debug/cairn-desktop.exe");
 
-const runeFixture = path.join(path.dirname(desktopPath), "examples/autofill-fixture.exe");
+const fixture = path.join(path.dirname(desktopPath), "examples/autofill-fixture.exe");
 
 assert.equal(
   path.basename(path.dirname(desktopPath)),
@@ -25,8 +25,8 @@ assert.equal(
 );
 
 assert.ok(
-  existsSync(runeFixture),
-  "Run cargo build -p cairn-desktop-rune --example autofill-fixture first.",
+  existsSync(fixture),
+  "Run cargo build -p cairn-desktop --example autofill-fixture first.",
 );
 
 assert.ok(existsSync(desktopPath), `Debug desktop executable is missing at ${desktopPath}`);
@@ -41,7 +41,7 @@ execFileSync(
   [
     "-NoProfile",
     "-Command",
-    "if (Get-Process cairn-desktop-rune -ErrorAction SilentlyContinue) { throw 'Close Cairn before running the autofill test.' }",
+    "if (Get-Process cairn-desktop -ErrorAction SilentlyContinue) { throw 'Close Cairn before running the autofill test.' }",
   ],
   { windowsHide: true, stdio: "pipe" },
 );
@@ -143,9 +143,9 @@ manifest.host_permissions = ["http://127.0.0.1/*"];
 
 writeFileSync(manifestPath, JSON.stringify(manifest));
 
-const runeMaster = "synthetic master password";
+const master = "synthetic master password";
 
-const fixtureOtherId = execFileSync(runeFixture, [path.join(directory, "data"), origin], {
+const fixtureOtherId = execFileSync(fixture, [path.join(directory, "data"), origin], {
   windowsHide: true,
   encoding: "utf8",
 }).trim();
@@ -163,7 +163,7 @@ const desktop = spawn(desktopPath, [], {
 
 let registered = false;
 
-function runeUi(action: string, target?: string, value?: string) {
+function desktopUi(action: string, target?: string, value?: string) {
   assert.ok(desktop.pid);
 
   return execFileSync(
@@ -173,7 +173,7 @@ function runeUi(action: string, target?: string, value?: string) {
       "-ExecutionPolicy",
       "Bypass",
       "-File",
-      path.join(root, "tests/autofill-rune.ps1"),
+      path.join(root, "tests/autofill.ps1"),
       "-ProcessId",
       String(desktop.pid),
       "-Action",
@@ -185,21 +185,21 @@ function runeUi(action: string, target?: string, value?: string) {
   ).trim();
 }
 
-function runeShot(name: string) {
-  runeUi("Screenshot", undefined, path.join(directory, `${name}.png`));
+function desktopShot(name: string) {
+  desktopUi("Screenshot", undefined, path.join(directory, `${name}.png`));
 }
 
-function runeSettingsShots(scheme: "Clair" | "Sombre", suffix: string) {
-  runeUi("Press", "Apparence");
-  runeUi("Press", scheme);
-  runeShot("desktop-appearance-" + suffix);
-  runeUi("Press", "Général");
-  runeShot("desktop-general-" + suffix);
-  runeUi("Press", "Mises à jour");
-  runeShot("desktop-updates-" + suffix);
-  runeUi("Press", "Extension de navigateur");
-  runeUi("Wait", "Navigateurs associés");
-  runeShot("desktop-extension-" + suffix);
+function desktopSettingsShots(scheme: "Clair" | "Sombre", suffix: string) {
+  desktopUi("Press", "Apparence");
+  desktopUi("Press", scheme);
+  desktopShot("desktop-appearance-" + suffix);
+  desktopUi("Press", "Général");
+  desktopShot("desktop-general-" + suffix);
+  desktopUi("Press", "Mises à jour");
+  desktopShot("desktop-updates-" + suffix);
+  desktopUi("Press", "Extension de navigateur");
+  desktopUi("Wait", "Navigateurs associés");
+  desktopShot("desktop-extension-" + suffix);
 }
 
 const powershell = (script: string, args: string[] = []) =>
@@ -388,11 +388,11 @@ const styleOverlay = (page: Page, opacity: string | null) =>
   }, opacity);
 
 try {
-  runeUi("Unlock", undefined, runeMaster);
-  runeUi("Wait", "Paramètres");
-  runeUi("Press", "Paramètres");
-  runeSettingsShots("Clair", "light");
-  runeUi("Press", "Retour au coffre");
+  desktopUi("Unlock", undefined, master);
+  desktopUi("Wait", "Paramètres");
+  desktopUi("Press", "Paramètres");
+  desktopSettingsShots("Clair", "light");
+  desktopUi("Press", "Retour au coffre");
 
   console.log("Vault with synthetic logins: OK");
 
@@ -416,8 +416,8 @@ try {
   assert.match(code, /^\d{4} \d{4}$/);
   await popup.screenshot({ path: path.join(directory, "popup-pairing.png") });
 
-  runeUi("Wait", "Associer un navigateur ?");
-  runeUi("Wait", code);
+  desktopUi("Wait", "Associer un navigateur ?");
+  desktopUi("Wait", code);
 
   // Before approval, the key gets nothing.
   const loginTab = await tabId(popup, `${origin}/*`);
@@ -428,8 +428,8 @@ try {
   });
 
   // Desktop: the request shows the same code.
-  runeShot("desktop-pairing-light");
-  runeUi("Press", "Approuver");
+  desktopShot("desktop-pairing-light");
+  desktopUi("Press", "Approuver");
 
   console.log(`Pairing approved with code ${code}: OK`);
 
@@ -591,8 +591,8 @@ try {
   await offer.getByText("Enregistré dans Cairn.").waitFor();
   await bannerClosed(welcome);
 
-  runeUi("WaitLogin", "Site enregistré, new@example.com");
-  console.log("Saved login visible in Rune: OK");
+  desktopUi("WaitLogin", "Site enregistré, new@example.com");
+  console.log("Saved login visible in Cairn: OK");
 
   const savedEntry = (await listEntries()).find((entry) => entry.name === "Site enregistré");
   assert.deepEqual(
@@ -683,8 +683,8 @@ try {
   console.log("Signed up with a generated password and saved it: OK");
 
   // Locking the vault stops the extension.
-  runeUi("Press", "Verrouiller");
-  runeUi("Wait", "Coffre verrouillé");
+  desktopUi("Press", "Verrouiller");
+  desktopUi("Wait", "Coffre verrouillé");
 
   assert.deepEqual(await popupMessage(popup, { type: "GetState", tabId: loginTab }), {
     type: "Locked",
@@ -699,28 +699,31 @@ try {
   console.log("Locked vault: OK");
 
   // Removing the browser in Cairn revokes it.
-  runeUi("Unlock", undefined, runeMaster);
-  runeUi("Press", "Paramètres");
-  runeSettingsShots("Sombre", "dark");
-  runeUi("Rename");
-  runeUi("Text", "Nom du navigateur", "Profil de test");
-  runeUi("Key", undefined, "{ESC}");
-  runeUi("Rename");
-  runeUi("Text", "Nom du navigateur", "Profil de test");
-  runeUi("Key", undefined, "{ENTER}");
-  runeUi("Wait", "Profil de test");
-  runeShot("desktop-browsers-renamed");
-  runeUi("Press", "Retirer Profil de test");
-  runeUi("Wait", "Aucun navigateur associé. Ouvre l’extension Cairn et choisis Associer à Cairn.");
+  desktopUi("Unlock", undefined, master);
+  desktopUi("Press", "Paramètres");
+  desktopSettingsShots("Sombre", "dark");
+  desktopUi("Rename");
+  desktopUi("Text", "Nom du navigateur", "Profil de test");
+  desktopUi("Key", undefined, "{ESC}");
+  desktopUi("Rename");
+  desktopUi("Text", "Nom du navigateur", "Profil de test");
+  desktopUi("Key", undefined, "{ENTER}");
+  desktopUi("Wait", "Profil de test");
+  desktopShot("desktop-browsers-renamed");
+  desktopUi("Press", "Retirer Profil de test");
+  desktopUi(
+    "Wait",
+    "Aucun navigateur associé. Ouvre l’extension Cairn et choisis Associer à Cairn.",
+  );
 
   assert.equal((await popupMessage(popup, { type: "GetState", tabId: loginTab })).type, "Pairing");
   console.log("Removed browser is refused: OK");
 
   const second = await popupMessage(popup, { type: "Pair" });
   assert.equal(second.type, "Pairing");
-  runeUi("Wait", second.code);
-  runeShot("desktop-pairing-dark");
-  runeUi("Press", "Refuser");
+  desktopUi("Wait", second.code);
+  desktopShot("desktop-pairing-dark");
+  desktopUi("Press", "Refuser");
 
   assert.deepEqual(popupErrors, []);
 } finally {
