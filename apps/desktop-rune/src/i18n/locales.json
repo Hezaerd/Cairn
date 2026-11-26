@@ -1,0 +1,7 @@
+{
+  "layers": ["messages"],
+  "locales": [
+    { "id": "en-US", "tag": "en-US", "label": "English (United States)" },
+    { "id": "fr-FR", "tag": "fr-FR", "label": "Français (France)" }
+  ]
+}
