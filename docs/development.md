@@ -126,6 +126,17 @@ It covers creation, the language setting, reveal and hide, the password generato
 
 It uses no network by default. To also check live favicons, set `$env:CAIRN_TEST_FAVICON_SITE = 'https://www.google.com'` in PowerShell before running it, and remove the variable afterwards.
 
+### Rune vault end-to-end
+
+Close Cairn and run these commands in an interactive Windows session.
+
+```sh
+cargo build -p cairn-desktop-rune
+pnpm test:vault-rune
+```
+
+The test uses Windows UI Automation and the native tray menu. It uses a French UI and a synthetic vault under `.local`. It checks creation, password masking, wrong passwords, locking, close-to-tray, second launches, autostart, restarts, encryption, and handling of a corrupt vault.
+
 ### Autofill end-to-end
 
 This test pairs an isolated Helium profile with the real app and fills a login page served on `127.0.0.1`. Close Cairn and unregister this checkout's host, then run:
@@ -151,6 +162,8 @@ pnpm test:helium
 ```
 
 The test creates isolated Helium profiles under `.local` and registers the host only for its run. It checks a missing host, a closed app, a live connection, two profiles, service worker restarts, connection while hidden in the tray, and process termination. Set `CAIRN_HELIUM_PATH` if Helium isn't in its default location.
+
+To test Rune, build it with `cargo build -p cairn-desktop-rune` and set `CAIRN_TEST_DESKTOP_EXE` to `target/debug/cairn-desktop-rune.exe` before running `pnpm test:helium`.
 
 ## Builds
 

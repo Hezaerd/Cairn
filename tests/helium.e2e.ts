@@ -22,12 +22,13 @@ const executablePath =
   process.env.CAIRN_HELIUM_PATH ??
   path.join(process.env.LOCALAPPDATA!, "imput/Helium/Application/chrome.exe");
 
-const desktopPath = path.join(root, "target/debug/cairn-desktop.exe");
+const desktopOverride = process.env.CAIRN_TEST_DESKTOP_EXE;
 
-assert.ok(
-  existsSync(desktopPath),
-  "Build the desktop app first with tauri build --debug --no-bundle.",
-);
+const desktopPath = desktopOverride
+  ? path.resolve(root, desktopOverride)
+  : path.join(root, "target/debug/cairn-desktop.exe");
+
+assert.ok(existsSync(desktopPath), `Debug desktop executable is missing at ${desktopPath}`);
 
 const extensionPath = path.join(root, "apps/extension/dist");
 
@@ -113,7 +114,7 @@ try {
   assert.ok(connected, "Desktop did not become available");
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(local, "helium-connected.png") });
-  console.log(`Connected through Helium to the actual Tauri app: OK (extension ${id})`);
+  console.log(`Connected through Helium to ${path.basename(desktopPath)}: OK (extension ${id})`);
 
   // A second popup request gets its own native connection.
   const second = await context.newPage();
@@ -170,7 +171,17 @@ try {
     [
       "-NoProfile",
       "-Command",
-      `if (!(Get-Process -Id ${desktop.pid}).CloseMainWindow()) { throw 'No Cairn window to close' }`,
+      `
+        Add-Type 'using System; using System.Runtime.InteropServices; public class CairnWindow { [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle); }'
+        $app = Get-Process -Id ${desktop.pid}
+        $window = $app.MainWindowHandle
+        if (!$app.CloseMainWindow()) { throw 'No Cairn window to close' }
+        for ($i = 0; $i -lt 50; $i++) {
+          if (![CairnWindow]::IsWindowVisible($window)) { exit 0 }
+          Start-Sleep -Milliseconds 100
+        }
+        throw 'Cairn did not hide its window'
+      `,
     ],
     { windowsHide: true, stdio: "pipe" },
   );
