@@ -59,7 +59,6 @@ impl SiteIcons {
     pub fn retain(&mut self, entries: &[EntrySummary]) {
         let sites: HashMap<_, _> = entries
             .iter()
-            .filter(|entry| entry.has_password)
             .map(|entry| (&entry.id, &entry.site))
             .collect();
         self.0.retain(|id, icon| sites.get(id) == Some(&&icon.site));

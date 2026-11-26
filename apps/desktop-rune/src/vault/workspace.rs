@@ -17,11 +17,10 @@ pub fn view(state: &State, kit: &Kit, compact: bool) -> El {
         None => empty(session.search.text.is_empty(), kit),
     };
     col()
-        .key("workspace")
+        .key("logins-workspace")
         .w_full()
         .grow(1.0)
         .min_h(0.0)
-        .child(toolbar(session, kit))
         .children(
             session
                 .error
@@ -57,41 +56,14 @@ pub fn view(state: &State, kit: &Kit, compact: bool) -> El {
         .children(dialogs::overlays(state, kit))
 }
 
-fn toolbar(session: &Session, kit: &Kit) -> El {
-    row()
-        .w_full()
-        .h(48.0)
-        .px(12.0)
-        .gap(8.0)
-        .center_y()
-        .child(
-            text(t!("credentials.title"))
-                .font(TextStyle::new(14.0, 600.0))
-                .color(kit.c.text_base),
-        )
-        .child(
-            text(session.entries.len().to_string())
-                .font(TextStyle::new(12.0, 400.0))
-                .color(kit.c.text_muted),
-        )
-        .child(el().grow(1.0))
-        .child(
-            Button::new(t!("add.open"))
-                .variant(ButtonVariant::Submit)
-                .disabled(session.pending.is_some())
-                .on_press_tx(|state: &mut State, tx| state.vault.open_editor(false, tx))
-                .build(kit)
-                .key("entry-add")
-                .h(32.0),
-        )
-        .child(
-            Button::new(t!("toolbar.lock"))
-                .variant(ButtonVariant::Outline)
-                .on_press_tx(State::lock)
-                .build(kit)
-                .key("lock")
-                .h(32.0),
-        )
+pub fn add_button(state: &State, kit: &Kit) -> El {
+    Button::new(t!("add.open"))
+        .variant(ButtonVariant::Submit)
+        .disabled(state.vault.session.pending.is_some())
+        .on_press_tx(|state: &mut State, tx| state.vault.open_editor(false, tx))
+        .build(kit)
+        .key("entry-add")
+        .h(32.0)
 }
 
 fn sidebar(session: &Session, kit: &Kit) -> El {
