@@ -9,6 +9,34 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hoste
     throw 'Run the installed vault test on a disposable GitHub-hosted runner'
 }
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+public static class FixtureInput {
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern void mouse_event(uint flags, int x, int y, uint data, IntPtr extra);
+    [DllImport("user32.dll")] private static extern void keybd_event(byte key, byte scan, uint flags, IntPtr extra);
+
+    public static void Click(int x, int y) {
+        if (!SetCursorPos(x, y)) throw new InvalidOperationException("Could not move the fixture pointer");
+        mouse_event(2, 0, 0, 0, IntPtr.Zero);
+        mouse_event(4, 0, 0, 0, IntPtr.Zero);
+    }
+
+    public static void EnterPassword() {
+        foreach (char character in "synthetic installer fixture password") {
+            byte key = (byte)char.ToUpperInvariant(character);
+            keybd_event(key, 0, 0, IntPtr.Zero);
+            keybd_event(key, 0, 2, IntPtr.Zero);
+            Thread.Sleep(15);
+        }
+    }
+}
+'@
 if ($CreateTauriVault) {
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--force-renderer-accessibility'
     $env:WEBVIEW2_USER_DATA_FOLDER = Join-Path (Resolve-Path .local) 'tauri-webview'
@@ -59,14 +87,22 @@ function Find-Control([string]$Name, [Windows.Automation.ControlType]$Type = $nu
 function Enter-Password([string]$Name) {
     $field = Find-Control $Name ([Windows.Automation.ControlType]::Edit)
     if (!$field.Current.IsPassword) { throw 'Master password edit is not secure' }
-    if (!$shell.AppActivate($app.Id)) { throw 'Could not activate Cairn' }
-    $field.SetFocus()
+    [FixtureInput]::SetForegroundWindow($app.MainWindowHandle) | Out-Null
+    Click-Control $field
     $deadline = [DateTime]::UtcNow.AddSeconds(5)
-    while (!$field.Current.HasKeyboardFocus) {
+    while (!$field.Current.HasKeyboardFocus -or [FixtureInput]::GetForegroundWindow() -ne $app.MainWindowHandle) {
         if ([DateTime]::UtcNow -ge $deadline) { throw "Could not focus '$Name'" }
         Start-Sleep -Milliseconds 50
     }
-    $shell.SendKeys('synthetic installer fixture password')
+    [FixtureInput]::EnterPassword()
+}
+
+function Click-Control($Control) {
+    $bounds = $Control.Current.BoundingRectangle
+    if ($bounds.IsEmpty -or $Control.Current.IsOffscreen) {
+        throw "Control '$($Control.Current.Name)' is offscreen"
+    }
+    [FixtureInput]::Click([int]($bounds.Left + $bounds.Width / 2), [int]($bounds.Top + $bounds.Height / 2))
 }
 
 function Press([string]$Name, [Windows.Automation.ControlType]$Type) {
@@ -76,16 +112,10 @@ function Press([string]$Name, [Windows.Automation.ControlType]$Type) {
         if ([DateTime]::UtcNow -ge $deadline) { throw "'$Name' stayed disabled" }
         Start-Sleep -Milliseconds 50
     }
-    $pattern = $null
-    if ($control.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern, [ref]$pattern)) {
-        $pattern.Toggle()
-    } else {
-        $control.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
-    }
+    Click-Control $control
 }
 
 try {
-    $shell = New-Object -ComObject WScript.Shell
     Enter-Password 'Master password'
     if ($CreateTauriVault) {
         Enter-Password 'Confirm password'
