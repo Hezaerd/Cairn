@@ -14,6 +14,8 @@ pub fn kit(dark: bool) -> Kit {
         fg,
         accent: primary,
     });
+    kit.c.layer_01 = token("#f3f3f3", "#272727");
+    kit.c.bg_accent = token("#e5eff9", "#293e50");
     kit.c.text_muted = token("#656565", "#aaaaaa");
     kit.c.bg_button_neutral = token("#f0f0f0", "#303030");
     kit.c.bg_icon_button_contrast = primary;

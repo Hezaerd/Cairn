@@ -80,15 +80,24 @@ impl Drop for ShellTray {
     }
 }
 
+fn menu_labels() -> [&'static str; 3] {
+    [t!("tray.open"), t!("tray.lock"), t!("tray.quit")]
+}
+
+fn menu([open, lock, quit]: [&str; 3]) -> Vec<TrayItem> {
+    vec![
+        TrayItem::action("open", open),
+        TrayItem::action("lock", lock),
+        TrayItem::action("quit", quit),
+    ]
+}
+
 pub fn install(handle: AppHandle<State>, runtime: &Handle) -> Result<ShellTray, TrayError> {
     let mut current = appearance();
+    let mut labels = menu_labels();
     let spec = TraySpec::new("com.hezaerd.cairn", t!("app.name"), icon(current))
         .tooltip(t!("app.name"))
-        .menu(vec![
-            TrayItem::action("open", t!("tray.open")),
-            TrayItem::action("lock", t!("tray.lock")),
-            TrayItem::action("quit", t!("tray.quit")),
-        ]);
+        .menu(menu(labels));
     let tray = Arc::new(Tray::new(spec, move |event| match event {
         TrayEvent::Activate { .. } => open(&handle),
         TrayEvent::Menu(id) => match id.as_str() {
@@ -109,6 +118,11 @@ pub fn install(handle: AppHandle<State>, runtime: &Handle) -> Result<ShellTray, 
             let next = appearance();
             if next != current && tray.set_icon(icon(next)).is_ok() {
                 current = next;
+            }
+            let next_labels = menu_labels();
+            if next_labels != labels {
+                tray.set_menu(menu(next_labels));
+                labels = next_labels;
             }
         }
     });
