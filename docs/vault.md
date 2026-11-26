@@ -9,13 +9,13 @@
 - The toolbar switches between two views: **Logins** lists the entries with a password, and **Authenticator** lists the entries with an authenticator key. An entry needs a password, a key, or both, and one with both shows in each view. See [authenticator codes](#authenticator-codes).
 - Deleting an entry asks for confirmation. `backups/previous.cairn` keeps the version that still holds the entry until the next change.
 - The backend locks after five minutes without activity, when closing the window to the tray, or through the tray's lock action. Activity is listing or revealing in the window, a change from the window or the browser, approving a pairing, or filling a login picked in the extension. The extension's background queries, listing a page's logins for suggestions and checking whether a typed login is new, don't count, so browsing can't keep the vault open. Typing alone doesn't reset the timer either. On lock, the desktop clears the list, the revealed secret, and the entry form. The bridge still answers while Cairn is in the tray, but only with its status: the vault is locked.
-- The WebView runs in private mode with form autofill turned off. No credential goes to browser storage or logs.
+- Vault credentials stay in the local encrypted vault. Cairn keeps credentials out of logs and preferences.
 
 Changing the master password, Windows Hello, sync, and recovery keys aren't built.
 
 ## Files
 
-Cairn stores its data in Tauri's `app_local_data_dir()`:
+Cairn stores its data under the current user's local app data directory.
 
 ```text
 %LOCALAPPDATA%\com.hezaerd.cairn\
@@ -85,7 +85,7 @@ Cairn generates time-based one-time codes (TOTP, RFC 6238) in Rust, in `crates/v
 
 ## Site icons
 
-Rust downloads icons outside the WebView. It tries `/favicon.ico`, then the icon links in the page's HTML.
+`crates/favicon` downloads site icons. It tries `/favicon.ico`, then the icon links in the page's HTML.
 
 - Requests go over public HTTPS on port 443, with no cookies, no authorization, no stored URL path, and no favicon proxy.
 - Cairn checks and pins DNS addresses, and rejects private destinations and cross-origin redirects.

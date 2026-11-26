@@ -5,9 +5,9 @@
 - Node.js 24+ and pnpm 12.6.0
 - Rust stable through rustup, with the MSVC toolchain
 - Visual Studio C++ build tools with a Windows SDK
-- Microsoft Edge WebView2
+- PowerShell 7 for installer builds
 
-See the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). Open a new terminal after installing Rust so Cargo is on `PATH`.
+Open a new terminal after installing Rust so Cargo is on `PATH`.
 
 ## Desktop app
 
@@ -19,15 +19,17 @@ pnpm dev:desktop
 
 Create a vault with a master password of at least 12 characters. Closing the window locks the vault and hides Cairn in the system tray; its status server keeps running. Click the tray icon or launch Cairn again to restore the window. Right-click the icon for **Open Cairn**, **Lock vault**, and **Quit**. Only **Quit** exits the app. Minimizing keeps the normal Windows behavior. **Start with Windows** in the general settings adds Cairn to the current user's `Run` key with `--autostart`, which starts it in the tray with the vault locked so the extension can reach it. Turning it off in Task Manager shows as off in Cairn, and turning it on in Cairn clears that choice. The uninstaller removes the entry. Debug builds don't offer the setting, so the end-to-end tests never register themselves.
 
-The desktop app and the extension's popup, picker, and save banner use the shadcn/ui components in `packages/ui/src/components`, with Tailwind CSS 4 and the Windows-style tokens in `packages/ui/src/styles.css`. An app's stylesheet imports only `@cairn/ui/styles.css`, which imports Tailwind and tells it to scan the shared components. Each app's `components.json` points shadcn at the package's components and stylesheet. Import a component as `@cairn/ui/components/button`. Add one with:
+The desktop app uses Rune and calls `crates/app` directly for vault and bridge operations. The Rune `Kit` in `apps/desktop/src/theme.rs` sets the window's design tokens. See [Design](../DESIGN.md).
+
+## Extension UI
+
+The extension's popup, picker, and save banner use the shadcn/ui components in `packages/ui/src/components`, with Tailwind CSS 4 and the Windows-style tokens in `packages/ui/src/styles.css`. The extension's stylesheet imports `@cairn/ui/styles.css`, which imports Tailwind and tells it to scan the shared components. Its `components.json` points shadcn at the package's components and stylesheet. Import a component as `@cairn/ui/components/button`. Add one with:
 
 ```sh
 pnpm dlx shadcn@latest add <component> -c packages/ui
 ```
 
 The CLI writes the component to `packages/ui` and installs its dependencies there. Take anything app-specific, like a translated label, as a prop. The extension has no theme setting: its pages follow the Windows light or dark mode, and the frames it adds to a page use the popover colors while they load. The content script's field icon stays plain DOM, without Tailwind or React.
-
-UI state that outlives a component lives in the Zustand stores in `apps/desktop/src/store`. `preferences.ts` holds the theme and the password generator options. `navigation.ts` holds the current view, each view's selected entry and each view's search. Components read a store with a selector, such as `usePreferences((state) => state.theme)`. Anything else, React or not, changes it through the exported actions or `setState`, and code outside React can `subscribe`, as `theme/follow.ts` does. Both stores persist to local storage with a version and decode what they read with Schema, so a bad field falls back to its default. Persist only settings and entry IDs there: never a credential or anything typed into a search, which is why `navigation.ts` leaves the searches out of storage.
 
 ## Browser extension
 
@@ -69,7 +71,7 @@ The registration stores absolute paths. Before moving the checkout, unregister i
 
 Cairn ships in English (`en-US`) and French (`fr-FR`) and follows the Windows display language by default: any French variant gets French, everything else gets English. Settings > General can pin either language instead; Rust saves that choice in `language.json` next to the vault.
 
-- The desktop window and tray menu get the language from Rust (`crates/app/src/locale.rs`). The window asks once at startup; changing it in the settings goes through Rust too, which relabels the tray menu. UI strings live in `apps/desktop/src/i18n`. Add a string to `en-US.ts` first; `fr-FR.ts` is typed against it, so `pnpm typecheck` fails until the French one exists. Read strings with `useT()`. Tray labels are in `tray.rs`.
+- The desktop window and tray use the Rune catalogs in `apps/desktop/src/i18n/messages`. Add each key to both `en-US.json` and `fr-FR.json`. Read it with `t!()`. Cargo generates the catalog and checks the keys at build time.
 - The extension uses Chrome's i18n and follows Helium's UI language. Its strings live in `apps/extension/public/_locales/{en,fr}/messages.json` and are read with `t()` from `src/popup/i18n.ts`, whose keys come from the English file. `pnpm test` checks both files have the same keys and placeholders.
 
 The end-to-end tests select elements by their French text. The vault test sets `CAIRN_TEST_LOCALE=fr-FR`, which only debug builds read in place of the Windows language, and the Helium test launches with `--lang=fr`.
@@ -82,16 +84,11 @@ The end-to-end tests select elements by their French text. The vault test sets `
 pnpm icons
 ```
 
-The script renders through `tauri icon` and writes the app icons to `apps/desktop/src-tauri/icons`, the bare mark in black and white at 16 to 256 pixels to `icons/mark`, and the extension icons to `apps/extension/public/icons`. The app and extension icons put the mark on a dark tile so it shows on light and dark taskbars and toolbars. The tray shows the bare mark, black or white to match the Windows taskbar mode. The title bar uses the SVG directly, in the text color.
+The script uses `tauri icon` to render the installer icon and tray marks under `apps/desktop/icons` and the extension icons under `apps/extension/public/icons`. The installer and extension use the mark on a dark tile. The tray uses the bare mark in black or white to match the taskbar.
 
 ## Routing
 
-Each app has its router in `src/router.ts` and its pages in `src/routes`. Navigate with TanStack's `Link` or `useNavigate`.
-
-- The desktop uses hash history, so a URL such as `/#/settings` survives a reload inside Tauri.
-- The popup uses memory history and always opens on `/`. Its navigation is lost when it closes.
-
-The Vite plugin generates `src/routeTree.gen.ts`, and the build and typecheck scripts run `tsr generate` first. The generated trees are committed. Don't edit them by hand. To regenerate one, run `pnpm --filter @cairn/desktop routes:generate` or the extension's equivalent.
+The extension popup uses TanStack Router with memory history. It opens on `/` every time. Its routes live in `apps/extension/src/routes`. The Vite plugin, the build, and typecheck generate `src/routeTree.gen.ts`. Regenerate the tree with `pnpm --filter @cairn/extension routes:generate`.
 
 ## Checks
 
@@ -103,7 +100,7 @@ pnpm format
 
 Oxlint and Oxfmt are configured once at the root for every TypeScript package. Anti-slop's generic and Effect rules run as errors. It is vendored in `tools/oxlint/anti-slop`, with its revision in [UPSTREAM.md](../tools/oxlint/anti-slop/UPSTREAM.md). Its Effect service-import rule only checks relative imports, so it misses aliases such as `@cairn/client`.
 
-[`@shadcn/lint`](https://github.com/shadcn-ui/lint) holds the desktop UI, the extension's pages, and `packages/ui` to the design system. It reads each project's `components.json` and the theme in `packages/ui/src/styles.css`. Each app's `components.json` names that file directly, because the linter ignores tokens it reaches through `node_modules`. It rejects raw colors, arbitrary values like `text-[11px]`, inline styles, classes Tailwind can't generate, and class names it can't read. Outside `packages/ui/src/components`, a kit component's `className` may only carry layout classes such as margins, widths, and positions. When a screen needs something the kit or the theme lacks, add a variant to the component or a token to `styles.css`. The content script draws its field icon and frames with plain DOM and a stylesheet string, so the class rules don't reach it.
+[`@shadcn/lint`](https://github.com/shadcn-ui/lint) holds the extension's pages and `packages/ui` to the design system. It reads each project's `components.json` and the theme in `packages/ui/src/styles.css`. The extension's `components.json` names that file directly, because the linter ignores tokens it reaches through `node_modules`. It rejects raw colors, arbitrary values like `text-[11px]`, inline styles, classes Tailwind can't generate, and class names it can't read. Outside `packages/ui/src/components`, a kit component's `className` may only carry layout classes such as margins, widths, and positions. When a screen needs something the kit or the theme lacks, add a variant to the component or a token to `styles.css`. The content script draws its field icon and frames with plain DOM and a stylesheet string, so the class rules don't reach it.
 
 ## Tests
 
@@ -115,27 +112,14 @@ Close Cairn first. The Rust integration test takes the user's status endpoint an
 
 ### Vault end-to-end
 
-This test drives the real Tauri app, WebView2, and filesystem with synthetic credentials. Close Cairn, then run:
+Close Cairn and run the test in an interactive Windows session.
 
 ```sh
-pnpm --filter @cairn/desktop tauri build --debug --no-bundle
+cargo build -p cairn-desktop
 pnpm test:vault
 ```
 
-It covers creation, the language setting, reveal and hide, the password generator and its remembered options, locking, close-to-tray and second-launch restoration, wrong passwords, restarts, encrypted disk contents, and corrupted files. Its data and WebView2 profile live under `.local`. Only debug builds read the `CAIRN_TEST_DATA_DIR` override, so the test never opens your own vault.
-
-It uses no network by default. To also check live favicons, set `$env:CAIRN_TEST_FAVICON_SITE = 'https://www.google.com'` in PowerShell before running it, and remove the variable afterwards.
-
-### Rune vault end-to-end
-
-Close Cairn and run these commands in an interactive Windows session.
-
-```sh
-cargo build -p cairn-desktop-rune
-pnpm test:vault-rune
-```
-
-The test uses Windows UI Automation and the native tray menu. It uses a French UI and a synthetic vault under `.local`. It checks creation, password masking, wrong passwords, locking, close-to-tray, second launches, autostart, restarts, encryption, and handling of a corrupt vault.
+The test uses Windows UI Automation and the native tray menu with a French UI and a synthetic vault under `.local`. It checks creation, secure fields, logins, the password generator, authenticator QR import, locking and clipboard clearing, close-to-tray, second launches, autostart, restarts, encryption, and corrupt vault handling. Only debug builds read the `CAIRN_TEST_DATA_DIR` override.
 
 ### Autofill end-to-end
 
@@ -144,7 +128,8 @@ This test pairs an isolated Helium profile with the real app and fills a login p
 ```sh
 pnpm build
 pnpm build:host
-pnpm --filter @cairn/desktop tauri build --debug --no-bundle
+cargo build -p cairn-desktop
+cargo build -p cairn-desktop --example autofill-fixture
 pnpm test:autofill
 ```
 
@@ -157,49 +142,30 @@ Close Cairn and unregister this checkout's host first. Then run:
 ```sh
 pnpm build
 pnpm build:host
-pnpm --filter @cairn/desktop tauri build --debug --no-bundle
+cargo build -p cairn-desktop
 pnpm test:helium
 ```
 
 The test creates isolated Helium profiles under `.local` and registers the host only for its run. It checks a missing host, a closed app, a live connection, two profiles, service worker restarts, connection while hidden in the tray, and process termination. Set `CAIRN_HELIUM_PATH` if Helium isn't in its default location.
 
-To test Rune, build it with `cargo build -p cairn-desktop-rune` and set `CAIRN_TEST_DESKTOP_EXE` to `target/debug/cairn-desktop-rune.exe` before running `pnpm test:helium`.
-
 ## Builds
 
-| Command                   | Output                                                   |
-| ------------------------- | -------------------------------------------------------- |
-| `pnpm build`              | Desktop frontend and extension                           |
-| `pnpm build:desktop`      | Native app and NSIS installer in `target/release/bundle` |
-| `pnpm build:desktop-rune` | Rune app and current-user NSIS installer                 |
-| `pnpm build:host`         | Native Messaging host                                    |
-| `pnpm build:connector`    | Release native host, its manifest, and release extension |
+| Command                | Output                                                   |
+| ---------------------- | -------------------------------------------------------- |
+| `pnpm build`           | Browser extension                                        |
+| `pnpm build:desktop`   | Rune desktop app and current-user NSIS installer         |
+| `pnpm build:host`      | Native Messaging host                                    |
+| `pnpm build:connector` | Release native host, its manifest, and release extension |
 
-`pnpm build:desktop` makes a plain installer. The installer the workflows publish also bundles the extension and native host; build it with the release config:
+Find the installer in `target/rune-installer/release/<version>/target/release/bundle/nsis`. It includes the browser connector. Local builds are unsigned. To rehearse an upgrade on a disposable machine, run `pnpm build:desktop -Version <newer-version>`. When the installer asks how to handle the existing installation, choose **Do not uninstall** to keep **Start with Windows** enabled.
 
-```sh
-pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.release.conf.json
-```
-
-Local builds aren't signed for the updater, so they can't be published as updates.
-
-On Windows, run `pnpm build:desktop-rune` with PowerShell 7 installed. Find the
-installer under `target/rune-installer/release/<version>/target/release/bundle/nsis`.
-It includes the release connector and uses the same install location and vault
-directory as the Tauri app. When the installer offers a choice for an existing
-installation, choose **Do not uninstall** to keep **Start with Windows** enabled.
-To rehearse an upgrade on a disposable machine, run
-`pwsh -File apps/desktop-rune/packaging/build.ps1 -Version <newer-version>`.
-
-The Rune installer workflow tests this migration, signed updates, and the Tauri
-updater on a disposable Windows runner. It reports the installer and installed
-sizes. The Nightly and Release workflows package the Tauri app.
+The Rune installer workflow installs the published Cairn nightly on a disposable Windows runner. It checks that the installer preserves the vault, shortcuts, startup registration, and browser connector. It also checks that Cairn rejects a tampered update and installs a signed update through **Settings**.
 
 ## Releases
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`. A Windows job builds the NSIS installer with `src-tauri/tauri.release.conf.json` and without the signing key. A second job signs it for the updater and attaches the installer, its `.sig`, and `latest.json` to a draft release.
+Pushing a `v*` tag runs `.github/workflows/release.yml`. A Windows job builds the NSIS installer with `pnpm build:desktop` and without the signing key. A second job signs it for the updater and attaches the installer, its `.sig`, and `latest.json` to a draft release.
 
-1. Set the same version in `apps/desktop/src-tauri/tauri.conf.json`, `apps/desktop/src-tauri/Cargo.toml`, and `apps/desktop/package.json`, and merge it into `main`.
+1. Set the version in `apps/desktop/Cargo.toml` and merge it into `main`.
 2. Tag the merge and push the tag:
 
    ```sh
@@ -207,13 +173,13 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`. A Windows job builds th
    git push origin v0.2.0
    ```
 
-   The workflow fails if the tag doesn't match the `tauri.conf.json` version.
+   The workflow fails if the tag doesn't match the desktop crate version.
 
 3. Install the draft's installer, check it, then publish the release.
 
 ### What the installer ships
 
-`src-tauri/tauri.release.conf.json` runs `pnpm build:connector` before the app build. That builds the release native host, builds the extension with `--mode release` into `target/connector/extension`, and writes the host manifest to `target/connector`. The installer copies them into the install folder, `%LOCALAPPDATA%\Cairn`:
+`pnpm build:desktop` runs `pnpm build:connector` before the app build. That builds the release native host, builds the extension with `--mode release` into `target/connector/extension`, and writes the host manifest to `target/connector`. The installer copies them into the install folder, `%LOCALAPPDATA%\Cairn`:
 
 | File                     | Contents                                                      |
 | ------------------------ | ------------------------------------------------------------- |
@@ -221,7 +187,7 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`. A Windows job builds th
 | `cairn-native-host.json` | Host manifest, with a relative `path` and the release ID only |
 | `extension\`             | The release extension, loaded unpacked in Helium              |
 
-The hooks in `src-tauri/windows/connector.nsh` delete the old `extension\` before copying, so stale popup chunks don't pile up across updates. They point `HKCU\Software\Chromium\NativeMessagingHosts\com.hezaerd.cairn` at the manifest in both registry views. Uninstalling removes the key if it still points at that install.
+The hooks in `apps/desktop/packaging/connector.nsh` delete the old `extension\` before copying, so stale popup chunks don't pile up across updates. They point `HKCU\Software\Chromium\NativeMessagingHosts\com.hezaerd.cairn` at the manifest in both registry views. Uninstalling removes the key if it still points at that install.
 
 A release build adds `key` from `apps/extension/release.ts` to the extension manifest. That fixes the extension ID at `kidgkbpjficoclfmfidbipkjdkiikklb` wherever the folder is loaded from, so the host's `allowed_origins` can name it and a pairing survives updates. Dev builds leave the key out. Only the public key is in the repository. Nothing in the build needs the private key, but keep a copy outside the repository: losing it means a new key, a new ID, and pairing every browser again if the extension is ever packed or published.
 
@@ -229,33 +195,33 @@ After an update replaces the files, reload the extension in `chrome://extensions
 
 ### Nightly builds
 
-`.github/workflows/nightly.yml` builds `main` every day at 03:00 UTC, and skips the build when `main` hasn't changed since the last nightly. Run it by hand from the Actions tab to build right away. It builds with the release config and signs the same way as a release, so a nightly ships the extension and host too. It then replaces a single prerelease tagged `nightly` with the new installer, its `.sig`, and a `latest.json` it writes itself.
+`.github/workflows/nightly.yml` builds `main` every day at 03:00 UTC, and skips the build when `main` hasn't changed since the last nightly. Run it by hand from the Actions tab to build right away. It uses the same build and signing commands as a release. It then replaces a single prerelease tagged `nightly` with the new installer, its `.sig`, and a `latest.json` it writes itself.
 
 A nightly takes the next patch version with a timestamp, such as `0.1.1-nightly.202610130300` after `0.1.0`. That keeps it newer than the stable release it was built after and older than the next one.
 
 ### Update channels
 
-Settings → General → Updates picks the channel and checks on demand. At launch, release builds also check and offer an update in a notification. Debug builds never check, so the end-to-end tests stay offline.
+Choose a channel and check for updates under **Settings → Updates**. Debug builds disable update checks unless the installer test supplies a local feed.
 
 | Channel | Manifest                                                                 |
 | ------- | ------------------------------------------------------------------------ |
 | Stable  | `https://github.com/Hezaerd/Cairn/releases/latest/download/latest.json`  |
 | Nightly | `https://github.com/Hezaerd/Cairn/releases/download/nightly/latest.json` |
 
-The URLs are fixed in `src-tauri/src/updater.rs`; the UI only sends a channel name. The choice is saved in `update-channel` next to the vault. Without it, a stable build starts on stable and a nightly build on nightly.
+The feed URLs live in `apps/desktop/src/updater.rs`. The choice is saved in `update-channel` next to the vault. Without it, a stable build starts on stable and a nightly build on nightly.
 
 Stable installs only see a release once it's published and marked latest. GitHub never marks a prerelease as latest, so the nightly never reaches them. Both manifests need the repository to be public.
 
 Updates never go back in version. Switching from nightly to stable keeps the nightly until a newer stable release comes out, so a vault a nightly touched isn't opened by an older Cairn.
 
-The installer isn't Authenticode-signed. SmartScreen warns on the first manual install (More info → Run anyway). Updates are protected by the updater signature instead: the app only installs an update whose `.sig` matches the public key in `tauri.conf.json`.
+The installer isn't Authenticode-signed. SmartScreen warns on the first manual install (More info → Run anyway). Updates are protected by the updater signature instead: the app only installs an update whose `.sig` matches the public key in `apps/desktop/packaging/updater.pub`.
 
 The private key is in `~/.tauri/cairn.key` and in the `TAURI_SIGNING_PRIVATE_KEY` secret of the `updater-signing` environment. Keep a backup of it outside this machine. Without it, installed copies can't accept updates and have to be reinstalled by hand. If the key gets a password, store it as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` in the same environment.
 
 The key is trusted for automatic installs, so the workflows keep it away from the build:
 
-- The build job runs `pnpm build` and the npm packages it pulls in. It has no signing key and a read-only token.
+- The build job runs `pnpm build:desktop` and the npm packages it pulls in. It has no signing key and a read-only token.
 - The signing job installs only `@tauri-apps/cli` at `TAURI_CLI_VERSION`, with install scripts off, and signs the downloaded installer. It's the only job in the `updater-signing` environment. Restrict that environment's deployment branches and tags to `main` and `v*`. When the lockfile moves to another `@tauri-apps/cli`, update `TAURI_CLI_VERSION` in both workflows; the build fails until they match.
 - Every action is pinned to a commit SHA, with its version in a comment.
 
-To sign by hand instead, build with the release config as in [Builds](#builds), then run `pnpm --filter @cairn/desktop tauri signer sign --private-key-path ~/.tauri/cairn.key --app-version <version> <installer>`. Pass `--app-version` so the signature carries the version, as `tauri build` does.
+To sign an installer by hand, run `pnpm --filter @cairn/installer exec tauri signer sign --private-key-path ~/.tauri/cairn.key --app-version <version> <installer>` with absolute paths to the key and installer. The signature includes the version from `--app-version`.
