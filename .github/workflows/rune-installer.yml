@@ -1,0 +1,44 @@
+name: Rune installer
+
+on:
+  pull_request:
+    paths:
+      - "apps/desktop-rune/packaging/**"
+      - "apps/desktop-rune/src/updater.rs"
+      - ".github/workflows/rune-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installed-updates:
+    runs-on: windows-2025
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+
+      - name: Download the published Tauri nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download nightly --repo Hezaerd/Cairn --pattern '*-setup.exe' --pattern latest.json --dir .local/tauri-nightly
+
+      - name: Build and sign the Rune installers with a throwaway key
+        run: ./apps/desktop-rune/packaging/test-build.ps1
+
+      - name: Verify installed migration and both updater paths
+        run: pnpm exec tsx apps/desktop-rune/packaging/installed.test.ts

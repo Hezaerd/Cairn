@@ -23,5 +23,12 @@ serde_json = "1"
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
 cairn-app = { path = "../../../crates/app" }
 
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+
+[[test]]
+name = "rune-update-compat"
+path = "../../desktop-rune/packaging/tauri-compat.rs"
+
 [target.'cfg(windows)'.dependencies]
 windows-registry = "0.6"
