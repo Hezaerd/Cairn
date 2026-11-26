@@ -1,6 +1,7 @@
 {
   "name": "@cairn/installer",
   "private": true,
+  "type": "module",
   "devDependencies": {
     "@tauri-apps/cli": "2.12.2"
   }
