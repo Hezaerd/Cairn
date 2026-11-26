@@ -1,10 +1,7 @@
-use crate::locale::{Languages, Locale};
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
-};
+use cairn_app::{App, locale::Locale};
+use std::sync::Mutex;
 use tauri::{
-    Emitter, Manager,
+    Manager,
     image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -92,63 +89,33 @@ pub fn refresh_icon(app: &tauri::AppHandle) {
     }
 }
 
-#[derive(Default, Clone)]
-pub(crate) struct Hidden(Arc<AtomicBool>);
-
-impl Hidden {
-    pub fn get(&self) -> bool {
-        self.0.load(Ordering::SeqCst)
-    }
-}
-
 pub fn restore(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         if window.show().is_err() {
             return;
         }
-        app.state::<Hidden>().0.store(false, Ordering::SeqCst);
+        app.state::<App>().set_hidden(false);
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
 }
 
-/// The window starts hidden; a launch at sign-in leaves it in the tray.
-pub fn open_at_launch(app: &tauri::AppHandle, open: bool) {
-    if open {
-        restore(app);
-    } else {
-        app.state::<Hidden>().0.store(true, Ordering::SeqCst);
-    }
-}
-
-fn lock(app: &tauri::AppHandle) {
-    let store = app.state::<crate::vault::Store>();
-    // Even a poisoned store must drop its session before the window is hidden.
-    let mut vault = store.lock().unwrap_or_else(|error| error.into_inner());
-    let expired = vault.expire();
-    let unlocked = matches!(vault.status(), Ok(cairn_vault::VaultStatus::Unlocked));
-    vault.lock();
-    if expired || unlocked {
-        let _ = app.emit_to("main", "vault-locked", ());
-    }
-}
-
 pub fn hide(app: &tauri::AppHandle) {
     // Reject queued vault IPC before waiting for any active operation to finish.
-    app.state::<Hidden>().0.store(true, Ordering::SeqCst);
-    lock(app);
+    let cairn = app.state::<App>();
+    cairn.set_hidden(true);
+    cairn.lock_now();
     if let Some(window) = app.get_webview_window("main") {
         if window.hide().is_err() {
-            app.state::<Hidden>().0.store(false, Ordering::SeqCst);
+            cairn.set_hidden(false);
         }
     }
 }
 
 pub fn setup(app: &tauri::App) -> tauri::Result<()> {
-    app.manage(Hidden::default());
     let (key, bytes) = mark(app.handle());
     app.manage(Mark(Mutex::new(Some(key))));
-    let [open, lock, quit] = labels(app.state::<Languages>().language().locale);
+    let [open, lock, quit] = labels(app.state::<App>().language().locale);
     let open = MenuItem::with_id(app, "open", open, true, None::<&str>)?;
     let lock = MenuItem::with_id(app, "lock", lock, true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", quit, true, None::<&str>)?;
@@ -161,9 +128,9 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => restore(app),
-            "lock" => self::lock(app),
+            "lock" => app.state::<App>().lock_now(),
             "quit" => {
-                self::lock(app);
+                app.state::<App>().lock_now();
                 app.exit(0);
             }
             _ => {}

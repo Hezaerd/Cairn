@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, State, WebviewWindow};
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -51,8 +51,8 @@ pub(crate) struct Updates {
 }
 
 impl Updates {
-    pub fn load(app: &AppHandle) -> tauri::Result<Self> {
-        let file = crate::vault::data_directory(app)?.join("update-channel");
+    pub fn load(app: &AppHandle, directory: &Path) -> Self {
+        let file = directory.join("update-channel");
         // An installed nightly stays on nightly until the user picks a channel.
         let default = if app.package_info().version.pre.is_empty() {
             Channel::Stable
@@ -63,13 +63,13 @@ impl Updates {
             .ok()
             .and_then(|name| Channel::parse(name.trim()))
             .unwrap_or(default);
-        Ok(Self {
+        Self {
             file,
             state: Mutex::new(Inner {
                 channel,
                 pending: None,
             }),
-        })
+        }
     }
 }
 

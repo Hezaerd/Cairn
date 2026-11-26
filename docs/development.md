@@ -69,7 +69,7 @@ The registration stores absolute paths. Before moving the checkout, unregister i
 
 Cairn ships in English (`en-US`) and French (`fr-FR`) and follows the Windows display language by default: any French variant gets French, everything else gets English. Settings > General can pin either language instead; Rust saves that choice in `language.json` next to the vault.
 
-- The desktop window and tray menu get the language from Rust (`src-tauri/src/locale.rs`). The window asks once at startup; changing it in the settings goes through Rust too, which relabels the tray menu. UI strings live in `apps/desktop/src/i18n`. Add a string to `en-US.ts` first; `fr-FR.ts` is typed against it, so `pnpm typecheck` fails until the French one exists. Read strings with `useT()`. Tray labels are in `tray.rs`.
+- The desktop window and tray menu get the language from Rust (`crates/app/src/locale.rs`). The window asks once at startup; changing it in the settings goes through Rust too, which relabels the tray menu. UI strings live in `apps/desktop/src/i18n`. Add a string to `en-US.ts` first; `fr-FR.ts` is typed against it, so `pnpm typecheck` fails until the French one exists. Read strings with `useT()`. Tray labels are in `tray.rs`.
 - The extension uses Chrome's i18n and follows Helium's UI language. Its strings live in `apps/extension/public/_locales/{en,fr}/messages.json` and are read with `t()` from `src/popup/i18n.ts`, whose keys come from the English file. `pnpm test` checks both files have the same keys and placeholders.
 
 The end-to-end tests select elements by their French text. The vault test sets `CAIRN_TEST_LOCALE=fr-FR`, which only debug builds read in place of the Windows language, and the Helium test launches with `--lang=fr`.

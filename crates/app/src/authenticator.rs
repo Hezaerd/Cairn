@@ -1,84 +1,60 @@
 //! Authenticator codes: the current code of an entry, and adding keys from
 //! `otpauth://` links, Google Authenticator exports, or a picture of their
 //! QR codes. Keys stay in Rust; the window gets codes and account names.
-use crate::vault::{Store, run};
-use cairn_vault::{OtpPreview, TotpCode, Vault, VaultError, parse_accounts};
-use tauri::{State, WebviewWindow, ipc::InvokeBody};
+use crate::{App, vault::locking_on_error};
+use cairn_vault::{OtpPreview, TotpCode, VaultError, parse_accounts};
 use zeroize::Zeroizing;
 
 const MAX_IMAGE_BYTES: usize = 32 * 1024 * 1024;
 const MAX_IMAGE_SIDE: u32 = 8192;
 
-/// Reading a code doesn't count as activity, so a selected entry can't keep
-/// the vault open.
-#[tauri::command]
-pub async fn totp_code(
-    window: WebviewWindow,
-    store: State<'_, Store>,
-    id: String,
-) -> Result<TotpCode, VaultError> {
-    run(window, &store, move |vault| vault.totp_code(&id)).await
+impl App {
+    /// Reading a code doesn't count as activity, so a selected entry can't keep
+    /// the vault open.
+    pub async fn totp_code(&self, id: String) -> Result<TotpCode, VaultError> {
+        self.with_vault(move |vault| vault.totp_code(&id)).await
+    }
+
+    /// Adds the accounts in `text`: `targets[i]` names the entry that gets the
+    /// i-th account's key, or is `None` for a new entry.
+    pub async fn import_otp(
+        &self,
+        text: Zeroizing<String>,
+        targets: Vec<Option<String>>,
+    ) -> Result<(), VaultError> {
+        self.with_vault(move |vault| {
+            let accounts = parse_accounts(&text)?;
+            if accounts.len() != targets.len() {
+                return Err(VaultError::InvalidInput);
+            }
+            locking_on_error(vault, |vault| {
+                vault.import_totp(accounts.into_iter().zip(targets).collect())
+            })
+        })
+        .await
+    }
+
+    /// Reads the authenticator links in the QR codes of a picture, such as a
+    /// screenshot of a site's setup page or of Google Authenticator's export.
+    pub async fn scan_qr(&self, bytes: &[u8]) -> Result<String, VaultError> {
+        if bytes.len() > MAX_IMAGE_BYTES {
+            return Err(VaultError::InvalidInput);
+        }
+        let bytes = Zeroizing::new(bytes.to_vec());
+        self.runtime
+            .spawn_blocking(move || scan(&bytes))
+            .await
+            .map_err(|_| VaultError::Storage)?
+    }
 }
 
 /// The accounts in `text`, without their keys, so you can choose where each goes.
-#[tauri::command]
-pub fn read_otp(window: WebviewWindow, text: String) -> Result<Vec<OtpPreview>, VaultError> {
-    if window.label() != "main" {
-        return Err(VaultError::Locked);
-    }
+pub fn read_otp(text: String) -> Result<Vec<OtpPreview>, VaultError> {
     let text = Zeroizing::new(text);
     Ok(parse_accounts(&text)?
         .iter()
         .map(|account| account.preview())
         .collect())
-}
-
-/// Adds the accounts in `text`: `targets[i]` names the entry that gets the
-/// i-th account's key, or is `None` for a new entry.
-#[tauri::command]
-pub async fn import_otp(
-    window: WebviewWindow,
-    store: State<'_, Store>,
-    text: String,
-    targets: Vec<Option<String>>,
-) -> Result<(), VaultError> {
-    let text = Zeroizing::new(text);
-    run(window, &store, move |vault: &mut Vault| {
-        let accounts = parse_accounts(&text)?;
-        if accounts.len() != targets.len() {
-            return Err(VaultError::InvalidInput);
-        }
-        let result = vault.import_totp(accounts.into_iter().zip(targets).collect());
-        // As for other changes, a failure other than invalid input reloads from disk.
-        if result.is_err_and(|error| error != VaultError::InvalidInput) {
-            vault.lock();
-        }
-        result
-    })
-    .await
-}
-
-/// Reads the authenticator links in the QR codes of a picture, such as a
-/// screenshot of a site's setup page or of Google Authenticator's export.
-/// The window sends the image as the raw request body.
-#[tauri::command]
-pub async fn scan_qr(
-    window: WebviewWindow,
-    request: tauri::ipc::Request<'_>,
-) -> Result<String, VaultError> {
-    if window.label() != "main" {
-        return Err(VaultError::Locked);
-    }
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err(VaultError::InvalidInput);
-    };
-    if bytes.len() > MAX_IMAGE_BYTES {
-        return Err(VaultError::InvalidInput);
-    }
-    let bytes = Zeroizing::new(bytes.clone());
-    tauri::async_runtime::spawn_blocking(move || scan(&bytes))
-        .await
-        .map_err(|_| VaultError::Storage)?
 }
 
 fn scan(bytes: &[u8]) -> Result<String, VaultError> {
@@ -146,10 +122,7 @@ mod tests {
         let (modules, colors) = (code.width() as u32, code.to_colors());
         let side = (modules + 2 * margin) * 4;
         let picture = image::GrayImage::from_fn(side, side, |x, y| {
-            let (column, row) = (
-                (x / 4).wrapping_sub(margin),
-                (y / 4).wrapping_sub(margin),
-            );
+            let (column, row) = ((x / 4).wrapping_sub(margin), (y / 4).wrapping_sub(margin));
             let dark = column < modules
                 && row < modules
                 && colors[(row * modules + column) as usize] == qrcode::Color::Dark;
@@ -188,4 +161,3 @@ mod tests {
         assert_eq!(scan(&png), Err(VaultError::InvalidInput));
     }
 }
-
