@@ -116,7 +116,7 @@ impl Settings {
         Self {
             page: None,
             theme: appearance::Preference::load(directory),
-            updates: updates::Updates::new(None),
+            updates: updates::Updates::new(directory),
             pairing: None,
             browsers: browsers::Browsers::default(),
             startup: startup::startup_status(),
@@ -182,7 +182,7 @@ impl Settings {
     }
 }
 
-fn show(state: &mut State, page: Page, tx: &mut Tx) {
+fn show(state: &mut State, page: Page) {
     state.settings.page = Some(page);
     state.settings.language_open = false;
     state.settings.browsers.editing = None;
@@ -193,8 +193,7 @@ fn show(state: &mut State, page: Page, tx: &mut Tx) {
             state.settings.startup_failed = false;
         }
         Page::Extension => browsers::refresh(state),
-        Page::Updates => state.settings.updates.load(&state.runtime, tx),
-        Page::Appearance => {}
+        Page::Updates | Page::Appearance => {}
     }
 }
 
@@ -207,7 +206,7 @@ pub fn open_button(kit: &Kit) -> El {
 }
 
 pub fn open(state: &mut State, tx: &mut Tx) {
-    show(state, Page::General, tx);
+    show(state, Page::General);
     tx.focus("settings-general", false);
 }
 
@@ -334,7 +333,7 @@ pub fn view(state: &State, page: Page, compact: bool, kit: &Kit, layer: &mut Vec
                 .focus_selected(selected)
                 .tab_index(0)
                 .focus_ring(2.0, -2.0, kit.c.border_focus)
-                .on_press_tx(move |state, tx| show(state, item, tx))
+                .on_press(move |state| show(state, item))
                 .child(marker.a11y_hidden())
                 .child(
                     icon(item.icon(), 16.0)

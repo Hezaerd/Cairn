@@ -116,7 +116,7 @@ async function driveInstalled(env: NodeJS.ProcessEnv, ...flags: string[]) {
       executable,
       ...flags,
     ],
-    { env, timeout: 90_000 },
+    { env, timeout: 180_000 },
   );
 
   process.stdout.write(stdout);
@@ -226,14 +226,12 @@ const env = {
 try {
   const firstHash = hash(executable);
   corrupt = true;
-  await assert.rejects(run(executable, ["--test-install-update"], { ...installerOptions, env }), {
-    stderr: /InvalidSignature/,
-  });
+  await driveInstalled(env, "-UpdateVersion", second, "-RejectUpdate");
   assert.equal(hash(executable), firstHash);
+  assert.equal(await registry(uninstallKey, "/v", "DisplayVersion"), first);
   corrupt = false;
 
-  const { stdout } = await run(executable, ["--test-install-update"], { ...installerOptions, env });
-  process.stdout.write(stdout);
+  await driveInstalled(env, "-UpdateVersion", second);
   await waitFor("Rune to install the signed update", async () => {
     return (await registry(uninstallKey, "/v", "DisplayVersion")) === second;
   });

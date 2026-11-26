@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "apps/desktop-rune/packaging/**"
+      - "apps/desktop-rune/src/settings/updates.rs"
       - "apps/desktop-rune/src/updater.rs"
       - ".github/workflows/rune-installer.yml"
   workflow_dispatch:
@@ -46,5 +47,5 @@ jobs:
       - name: Build and sign the Rune installers with a throwaway key
         run: ./apps/desktop-rune/packaging/test-build.ps1
 
-      - name: Verify installed migration and both updater paths
+      - name: Verify installed migration, Rune Settings updates, and Tauri compatibility
         run: pnpm exec tsx apps/desktop-rune/packaging/installed.test.ts

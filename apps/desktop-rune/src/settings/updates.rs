@@ -1,5 +1,6 @@
-use std::{sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
 
+use cairn_desktop_rune::updater::{Channel, Updates as Updater};
 use rune::{El, LiveRegion, Tx, col, row};
 use rune_kit::{Button, ButtonVariant, Kit};
 use tokio::{runtime::Handle, sync::oneshot};
@@ -7,46 +8,6 @@ use tokio::{runtime::Handle, sync::oneshot};
 use crate::{app::State, i18n::t};
 
 use super::{card, choice, description, divider, heading, section};
-
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
-pub enum Channel {
-    #[default]
-    Stable,
-    Nightly,
-}
-
-impl Channel {
-    fn label(self) -> &'static str {
-        match self {
-            Self::Stable => t!("update.stable"),
-            Self::Nightly => t!("update.nightly"),
-        }
-    }
-
-    fn hint(self) -> &'static str {
-        match self {
-            Self::Stable => t!("update.hints.stable"),
-            Self::Nightly => t!("update.hints.nightly"),
-        }
-    }
-}
-
-pub struct Status {
-    pub version: String,
-    pub channel: Channel,
-    pub enabled: bool,
-    pub available: Option<String>,
-}
-
-#[derive(Debug)]
-pub struct UpdateError;
-
-pub trait Backend: Send + Sync + 'static {
-    fn status(&self) -> Result<Status, UpdateError>;
-    fn set_channel(&self, channel: Channel) -> Result<(), UpdateError>;
-    fn check(&self) -> Result<Option<String>, UpdateError>;
-    fn install(&self) -> Result<(), UpdateError>;
-}
 
 enum Feedback {
     Idle,
@@ -57,65 +18,57 @@ enum Feedback {
 }
 
 enum Completion {
-    Status(Result<Status, UpdateError>),
-    Checked(Result<Option<String>, UpdateError>),
-    ChannelChanged(
-        Channel,
-        Result<Option<Result<Option<String>, UpdateError>>, UpdateError>,
-    ),
-    Installed(Result<(), UpdateError>),
+    Show(Feedback),
+    Quit,
 }
 
 enum Action {
-    Load,
     Check,
     SetChannel(Channel),
     Install,
 }
 
-#[derive(Default)]
 pub struct Updates {
-    backend: Option<Arc<dyn Backend>>,
-    status: Option<Status>,
+    updater: Arc<Updater>,
     feedback: Option<Feedback>,
     pending: Option<(bool, oneshot::Receiver<Completion>)>,
 }
 
 impl Updates {
-    pub fn new(backend: Option<Arc<dyn Backend>>) -> Self {
+    pub fn new(directory: &Path) -> Self {
         Self {
-            backend,
-            ..Self::default()
-        }
-    }
-
-    pub fn load(&mut self, runtime: &Handle, tx: &mut Tx) {
-        if self.status.is_none() {
-            self.start(Action::Load, runtime, tx);
+            updater: Arc::new(Updater::load(directory)),
+            feedback: None,
+            pending: None,
         }
     }
 
     fn start(&mut self, action: Action, runtime: &Handle, tx: &mut Tx) {
-        let Some(backend) = self.backend.clone() else {
-            return;
-        };
         if self.pending.is_some() {
             return;
         }
+        let updater = Arc::clone(&self.updater);
         let installing = matches!(action, Action::Install);
-        let enabled = self.status.as_ref().is_some_and(|status| status.enabled);
         let (sender, task) = oneshot::channel();
-        runtime.spawn_blocking(move || {
+        runtime.spawn(async move {
             let result = match action {
-                Action::Load => Completion::Status(backend.status()),
-                Action::Check => Completion::Checked(backend.check()),
-                Action::SetChannel(channel) => Completion::ChannelChanged(
-                    channel,
-                    backend
-                        .set_channel(channel)
-                        .map(|()| enabled.then(|| backend.check())),
-                ),
-                Action::Install => Completion::Installed(backend.install()),
+                Action::Check => Completion::Show(check(&updater).await),
+                Action::SetChannel(channel) => {
+                    let result = tokio::task::spawn_blocking({
+                        let updater = Arc::clone(&updater);
+                        move || updater.set_channel(channel)
+                    })
+                    .await;
+                    Completion::Show(match result {
+                        Ok(Ok(())) if updater.status().enabled => check(&updater).await,
+                        Ok(Ok(())) => Feedback::Idle,
+                        _ => Feedback::NotSaved,
+                    })
+                }
+                Action::Install => match updater.install().await {
+                    Ok(()) => Completion::Quit,
+                    Err(_) => Completion::Show(Feedback::Failed),
+                },
             };
             let _ = sender.send(result);
         });
@@ -128,58 +81,37 @@ impl Updates {
             return false;
         };
         let result = match task.try_recv() {
-            Ok(result) => Some(result),
+            Ok(result) => result,
             Err(oneshot::error::TryRecvError::Empty) => {
                 tx.wake_after(Duration::from_millis(30));
                 return false;
             }
-            Err(oneshot::error::TryRecvError::Closed) => None,
+            Err(oneshot::error::TryRecvError::Closed) => Completion::Show(Feedback::Unreachable),
         };
         self.pending = None;
         match result {
-            Some(Completion::Status(Ok(status))) => {
-                self.status = Some(status);
-                self.feedback = None;
-            }
-            Some(Completion::Checked(result)) => self.checked(result),
-            Some(Completion::ChannelChanged(channel, Ok(result))) => {
-                if let Some(status) = &mut self.status {
-                    status.channel = channel;
-                    status.available = None;
-                }
-                if let Some(result) = result {
-                    self.checked(result);
-                } else {
-                    self.feedback = Some(Feedback::Idle);
-                }
-            }
-            Some(Completion::ChannelChanged(_, Err(_))) => self.feedback = Some(Feedback::NotSaved),
-            Some(Completion::Installed(Ok(()))) => tx.quit(),
-            Some(Completion::Installed(Err(_))) => self.feedback = Some(Feedback::Failed),
-            _ => self.feedback = Some(Feedback::Unreachable),
+            Completion::Show(feedback) => self.feedback = Some(feedback),
+            Completion::Quit => tx.quit(),
         }
         true
     }
+}
 
-    fn checked(&mut self, result: Result<Option<String>, UpdateError>) {
-        if let Some(status) = &mut self.status {
-            status.available = result.as_ref().ok().and_then(Clone::clone);
-        }
-        self.feedback = Some(match result {
-            Ok(Some(_)) => Feedback::Idle,
-            Ok(None) => Feedback::UpToDate,
-            Err(_) => Feedback::Unreachable,
-        });
+async fn check(updater: &Updater) -> Feedback {
+    match updater.check().await {
+        Ok(Some(_)) => Feedback::Idle,
+        Ok(None) => Feedback::UpToDate,
+        Err(_) => Feedback::Unreachable,
     }
 }
 
 pub fn view(updates: &Updates, compact: bool, kit: &Kit) -> El {
-    let status = updates.status.as_ref();
-    let version = status.map_or(env!("CARGO_PKG_VERSION"), |s| s.version.as_str());
-    let selected = status.map_or(Channel::Stable, |s| s.channel);
-    let enabled = status.is_some_and(|s| s.enabled);
+    let status = updates.updater.status();
+    let version = status.version;
+    let selected = status.channel;
+    let enabled = status.enabled;
     let busy = updates.pending.is_some();
-    let available = status.and_then(|s| s.available.as_deref());
+    let available = status.available;
     let message = if let Some((installing, _)) = &updates.pending {
         if *installing {
             t!("update.downloading")
@@ -189,8 +121,8 @@ pub fn view(updates: &Updates, compact: bool, kit: &Kit) -> El {
         .into()
     } else if matches!(updates.feedback, Some(Feedback::Failed)) {
         t!("update.failed").into()
-    } else if let Some(version) = available {
-        t!("update.available").replace("{version}", version)
+    } else if let Some(version) = &available {
+        t!("update.available").replace("{version}", &version.to_string())
     } else {
         match updates.feedback {
             Some(Feedback::UpToDate) => t!("update.upToDate"),
@@ -205,19 +137,21 @@ pub fn view(updates: &Updates, compact: bool, kit: &Kit) -> El {
     let channels = row()
         .gap(12.0)
         .children([Channel::Stable, Channel::Nightly].map(|channel| {
-            let label = channel.label();
-            let disabled = status.is_none() || busy;
+            let (label, hint) = match channel {
+                Channel::Stable => (t!("update.stable"), t!("update.hints.stable")),
+                Channel::Nightly => (t!("update.nightly"), t!("update.hints.nightly")),
+            };
             let card = choice(
                 label,
                 channel == selected,
                 col()
                     .gap(4.0)
                     .child(heading(label, kit))
-                    .child(description(channel.hint(), kit)),
-                disabled,
+                    .child(description(hint, kit)),
+                busy,
                 kit,
             );
-            if disabled {
+            if busy {
                 card
             } else {
                 card.on_press_tx(move |state: &mut State, tx| {

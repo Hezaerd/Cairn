@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory)][string]$Executable,
     [switch]$CreateTauriVault,
-    [switch]$Relaunched
+    [switch]$Relaunched,
+    [string]$UpdateVersion,
+    [switch]$RejectUpdate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -134,6 +136,25 @@ try {
         Press 'Unlock' ([Windows.Automation.ControlType]::Button)
         Find-Control 'No logins' | Out-Null
         'Installed Rune opened the synthetic Tauri vault'
+        if ($UpdateVersion -or $Relaunched) {
+            $button = [Windows.Automation.ControlType]::Button
+            Press 'Settings' $button
+            Press 'Updates' $button
+            $check = Find-Control 'Check for updates' $button
+            if (!$check.Current.IsEnabled) { throw 'Update checks are disabled' }
+        }
+        if ($UpdateVersion) {
+            Press 'Check for updates' $button
+            Find-Control "Cairn $UpdateVersion is available" | Out-Null
+            Press 'Install' $button
+            if ($RejectUpdate) {
+                Find-Control 'The update failed.' | Out-Null
+                'Settings rejected the tampered installer'
+            } else {
+                if (!$app.WaitForExit(120000)) { throw 'Cairn did not exit after installing the update' }
+                'Settings launched the verified installer and quit'
+            }
+        }
     }
 } finally {
     if (!$app.HasExited) {
