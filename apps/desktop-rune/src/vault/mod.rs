@@ -95,7 +95,9 @@ impl Session {
     }
 
     fn replace(&mut self, entries: Vec<EntrySummary>) {
-        self.icons.retain(&entries);
+        if !self.refresh {
+            self.icons.retain(&entries);
+        }
         self.code_count = entries.iter().filter(|entry| entry.has_totp).count();
         self.entries = entries
             .into_iter()

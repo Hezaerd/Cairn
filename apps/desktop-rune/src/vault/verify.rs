@@ -34,7 +34,7 @@ fn workspace() -> (tokio::runtime::Runtime, Runtime<State>) {
             "https://birch.example",
             "",
             "other fixture",
-            "",
+            "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
         ),
         (
             "Code only",
@@ -167,6 +167,21 @@ fn search_matches_name_site_and_username_ignoring_case_and_excludes_code_only_en
     key(&mut view, Key::Text("zzz".into()));
     assert!(view.find("entry-title").is_none());
     assert!(view.find("empty-logins").is_some());
+
+    click(&mut view, "nav-authenticator");
+    wait_for(
+        &mut view,
+        "cached icon in the authenticator list and details",
+        |view| {
+            view.find("code-list").is_some()
+                && view
+                    .elements()
+                    .iter()
+                    .filter(|element| element.key.as_deref() == Some("cached-site-icon"))
+                    .count()
+                    == 2
+        },
+    );
 }
 
 #[test]
