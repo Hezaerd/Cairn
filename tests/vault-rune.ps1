@@ -196,7 +196,11 @@ try {
     Press $labels.'add.open'
     Enter-Text $labels.'entry.name' 'atlas fixture'
     Enter-Password $labels.'entry.password' $loginPassword
-    Enter-Text $labels.'entry.notes' $loginNotes
+    $notes = Find-Control $labels.'entry.notes' ([Windows.Automation.ControlType]::Edit)
+    $notes.GetCurrentPattern([Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+    $notes.SetFocus()
+    Wait-For 'notes keyboard focus' { $notes.Current.HasKeyboardFocus } | Out-Null
+    [CairnWindow]::TypeFixture($loginNotes)
     Press $labels.'common.save'
     Assert-HiddenWindow $labels.'add.title'
     Find-Control 'atlas fixture' | Out-Null
