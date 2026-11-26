@@ -4,28 +4,24 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { RELEASE_EXTENSION_ID, RELEASE_KEY } from "../apps/extension/release";
 
-import tauri from "../apps/desktop/src-tauri/tauri.conf.json";
-import rune from "../apps/desktop-rune/packaging/tauri.conf.json";
+import installer from "../apps/desktop/packaging/tauri.conf.json";
 
-test("the Rune installer keeps the Cairn identity, version and signing key", () => {
-  const manifest = readFileSync(
-    new URL("../apps/desktop-rune/Cargo.toml", import.meta.url),
-    "utf8",
-  );
-
-  const runeKey = readFileSync(
-    new URL("../apps/desktop-rune/packaging/updater.pub", import.meta.url),
+test("the installer preserves the Cairn identity and updater key", () => {
+  const updaterKey = readFileSync(
+    new URL("../apps/desktop/packaging/updater.pub", import.meta.url),
     "utf8",
   ).trim();
 
-  assert.equal(/^version = "([^"]+)"$/m.exec(manifest)?.[1], tauri.version);
-  assert.equal(rune.productName, tauri.productName);
-  assert.equal(rune.identifier, tauri.identifier);
-  assert.deepEqual(rune.bundle.targets, tauri.bundle.targets);
-  assert.equal(rune.bundle.windows.nsis.installMode, tauri.bundle.windows.nsis.installMode);
-  assert.equal(rune.bundle.windows.webviewInstallMode.type, "skip");
-  assert.equal(rune.bundle.windows.allowDowngrades, false);
-  assert.equal(runeKey, tauri.plugins.updater.pubkey);
+  assert.equal(installer.productName, "Cairn");
+  assert.equal(installer.identifier, "com.hezaerd.cairn");
+  assert.deepEqual(installer.bundle.targets, ["nsis"]);
+  assert.equal(installer.bundle.windows.nsis.installMode, "currentUser");
+  assert.equal(installer.bundle.windows.webviewInstallMode.type, "skip");
+  assert.equal(installer.bundle.windows.allowDowngrades, false);
+  assert.equal(
+    updaterKey,
+    "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4ODYxQkU5NzNGNzNDMkMKUldRc1BQZHo2UnVHbU9keU1Zck5ycXFXRjk2K2o4WmlINHg1czJjK3VUVUdsOURzVVQ2VUZpd3EK",
+  );
 });
 
 test("the release extension ID is the one Chromium derives from its key", () => {

@@ -3,9 +3,12 @@ name: Rune installer
 on:
   pull_request:
     paths:
-      - "apps/desktop-rune/packaging/**"
-      - "apps/desktop-rune/src/settings/updates.rs"
-      - "apps/desktop-rune/src/updater.rs"
+      - "apps/desktop/**"
+      - "apps/extension/**"
+      - "crates/native-host/**"
+      - "scripts/build-connector.ts"
+      - ".github/workflows/nightly.yml"
+      - ".github/workflows/release.yml"
       - ".github/workflows/rune-installer.yml"
   workflow_dispatch:
 
@@ -33,19 +36,19 @@ jobs:
           cache-on-failure: true
       - run: pnpm install --frozen-lockfile
 
-      - name: Download the published Tauri nightly
+      - name: Download the published Cairn nightly
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download nightly --repo Hezaerd/Cairn --pattern '*-setup.exe' --pattern latest.json --dir .local/tauri-nightly
+        run: gh release download nightly --repo Hezaerd/Cairn --pattern '*-setup.exe' --pattern latest.json --dir .local/published-nightly
 
-      - name: Create the synthetic vault in the installed Tauri nightly
-        run: pnpm exec tsx apps/desktop-rune/packaging/installed.test.ts --prepare-tauri
+      - name: Create the synthetic vault in the installed nightly
+        run: pnpm exec tsx apps/desktop/packaging/installed.test.ts --prepare-nightly
 
       - run: pnpm check
       - run: pnpm test
 
       - name: Build and sign the Rune installers with a throwaway key
-        run: ./apps/desktop-rune/packaging/test-build.ps1
+        run: ./apps/desktop/packaging/test-build.ps1
 
-      - name: Verify installed migration, Rune Settings updates, and Tauri compatibility
-        run: pnpm exec tsx apps/desktop-rune/packaging/installed.test.ts
+      - name: Verify installed migration and signed updates through Settings
+        run: pnpm exec tsx apps/desktop/packaging/installed.test.ts

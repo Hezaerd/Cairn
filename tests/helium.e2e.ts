@@ -22,11 +22,7 @@ const executablePath =
   process.env.CAIRN_HELIUM_PATH ??
   path.join(process.env.LOCALAPPDATA!, "imput/Helium/Application/chrome.exe");
 
-const desktopOverride = process.env.CAIRN_TEST_DESKTOP_EXE;
-
-const desktopPath = desktopOverride
-  ? path.resolve(root, desktopOverride)
-  : path.join(root, "target/debug/cairn-desktop.exe");
+const desktopPath = path.join(root, "target/debug/cairn-desktop.exe");
 
 assert.ok(existsSync(desktopPath), `Debug desktop executable is missing at ${desktopPath}`);
 
@@ -92,7 +88,6 @@ try {
     env: {
       ...process.env,
       CAIRN_TEST_DATA_DIR: mkdtempSync(path.join(local, "helium-vault-")),
-      WEBVIEW2_USER_DATA_FOLDER: mkdtempSync(path.join(local, "helium-webview-")),
     },
   });
   let connected = false;

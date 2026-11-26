@@ -1,6 +1,6 @@
 # Cairn
 
-Cairn is a personal password manager for Windows: a Tauri desktop app that holds an encrypted local vault, and a Chromium extension for Helium that talks to it through a Native Messaging host. Hezaerd builds it for their own use.
+Cairn is a personal password manager for Windows: a Rune desktop app that holds an encrypted local vault, and a Chromium extension for Helium that talks to it through a Native Messaging host. Hezaerd builds it for their own use.
 
 ## Working with me
 
@@ -11,12 +11,12 @@ Read what the task needs. [Development](docs/development.md) covers setup, the e
 ## Project boundaries
 
 - The repository is a pnpm workspace and a Cargo workspace. Add an app's dependencies to that app; keep only repository-wide tooling in the root `package.json`.
-- `apps/desktop` is the Tauri app. Its Rust side is in `apps/desktop/src-tauri`.
+- `apps/desktop` is the Rune desktop crate. It draws the window and tray, and `packaging` builds the Windows installer.
 - `apps/extension` is the popup, the service worker, the content script, the picker frame, and the save banner. The service worker accepts messages only from its popup, its picker, its save banner, and its content script in a page's top frame. Keep its required permissions to `nativeMessaging`, `activeTab`, and `scripting`. Access to websites stays optional, asked for only when the user turns on suggestions, which also turns on saving.
-- `packages/ui` holds the design system both apps share: the shadcn/ui components, `cn`, and the tokens in `src/styles.css`. [DESIGN.md](DESIGN.md) says when to use each. Reuse them instead of styling a surface by hand; `pnpm lint` enforces this with `@shadcn/lint`. If a screen needs something new, add a variant or a token instead of restyling through `className`. Keep app-specific code such as translations out of the package.
+- `packages/ui` holds the extension's shadcn/ui components, `cn`, and the tokens in `src/styles.css`. [DESIGN.md](DESIGN.md) says when to use each. Reuse them instead of styling a surface by hand; `pnpm lint` enforces this with `@shadcn/lint`. If a screen needs something new, add a variant or a token instead of restyling through `className`. Keep app-specific code such as translations out of the package.
 - `packages/contracts` holds the Effect Schema wire contracts and typed errors. `packages/client` holds the Effect services and the Native Messaging adapter.
-- `crates/vault` holds the vault format, crypto, sessions, storage, and the paired-browser list, and doesn't depend on Tauri. `crates/favicon` downloads site icons and owns their cache. `crates/protocol`, `crates/local-bridge`, and `crates/native-host` carry the browser bridge; `crates/app` owns the desktop app logic and answers the bridge.
-- Each app keeps its routes in `src/routes`. Don't edit the generated `src/routeTree.gen.ts` files.
+- `crates/vault` holds the vault format, crypto, sessions, storage, and the paired-browser list. `crates/favicon` downloads site icons and owns their cache. `crates/protocol`, `crates/local-bridge`, and `crates/native-host` carry the browser bridge; `crates/app` owns the desktop app logic and answers the bridge.
+- The extension keeps its routes in `src/routes`. Don't edit its generated `src/routeTree.gen.ts`.
 
 ## Security rules
 

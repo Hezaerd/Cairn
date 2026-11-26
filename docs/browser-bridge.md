@@ -108,7 +108,7 @@ Both hops send UTF-8 JSON behind a four-byte little-endian length. Messages over
 
 ## Pipe
 
-The desktop app is the only pipe server.
+The Rune desktop app is the only pipe server. `crates/app/src/bridge` starts the pipe and handles browser requests against the vault session.
 
 - The endpoint name includes the Windows user SID and session ID.
 - It rejects remote clients. Its protected DACL lets the current user read, write, and query it, but not create pipe instances. An `OWNER RIGHTS` entry stops the owner from rewriting the DACL.

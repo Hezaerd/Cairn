@@ -1,6 +1,6 @@
 ---
 name: cairn-design
-description: "Design, build, or change any screen in Cairn: the desktop app, the extension popup, the picker under a login field, or the save banner. Covers the Windows 11 look, the tokens and components in packages/ui, how secrets appear on screen, and the copy."
+description: "Design, build, or change any screen in Cairn: the desktop app, the extension popup, the picker under a login field, or the save banner. Covers the Windows 11 look, the Rune Kit and extension components, how secrets appear on screen, and the copy."
 ---
 
 # Design Cairn
@@ -9,7 +9,7 @@ Cairn is a password manager that lives on one Windows 11 computer. It should loo
 
 Trust comes from restraint and predictability. A password manager that looks busy or playful makes people wonder what else it does. Keep every screen calm, and make every state obvious: locked or unlocked, hidden or revealed, paired or not.
 
-This file is for anyone who changes the UI, people and agents alike. The tokens and components live in [`packages/ui`](packages/ui/src), and `pnpm lint` enforces most of what follows. When this file and the code disagree, fix one of them.
+This file is for anyone who changes the UI, people and agents alike. The desktop uses a Rune `Kit`. The extension uses [`packages/ui`](packages/ui/src), and `pnpm lint` checks its components and tokens. When this file and the code disagree, fix one of them.
 
 ## When rules compete
 
@@ -30,40 +30,37 @@ Protect them in this order:
 | Picker         | 300 px wide, at most 320 px tall         | The logins under a login field, or the generator under a new-password field         |
 | Save banner    | 320 px wide                              | Offering to save or update the login the user just submitted                        |
 
-The desktop window draws its own title bar ([`TitleBar`](apps/desktop/src/window/TitleBar.tsx)) with Segoe Fluent Icons glyphs, so it matches the system caption buttons. Under it, each view has a toolbar, then a list on the left and details on the right. Below 680 px the window is compact. Use the `max-compact:` variant to narrow the panes and reduce padding there. Don't add other breakpoints.
+The desktop window draws its own [title bar](apps/desktop/src/title_bar.rs) with Segoe Fluent Icons and falls back to Rune's caption controls. The desktop switches to compact spacing below 680 px.
 
 The picker and the save banner sit in frames on someone else's page. Keep them small. Each one shows one decision. They size themselves to their content, so don't give them fixed heights. Escape closes both.
 
-## Composition
+## Desktop
 
-**List and details.** A view that holds entries uses the `sidebar` grid: a 270 px list (210 px when compact) with a search field, a quiet heading, and `ListItem` rows, then a details pane capped at `max-w-180`. The details pane opens with the entry's icon, its name in `text-xl`, and a line saying what kind of entry it is. Its fields follow as `DetailField` rows separated by borders. When nothing is selected, show an `Empty` state that says why and what to do.
+Reuse the Rune `Kit` in [`theme.rs`](apps/desktop/src/theme.rs). Its palette pairs the extension's light and dark colors for the background, foreground, accent, selection, input borders, and errors. Use the Kit's semantic colors and its 3, 4, 6, and 8 px radii. The theme follows Windows until the user chooses one in **Settings → Appearance**. Check changes in both themes.
 
-**Toolbar.** `Toolbar` holds the view switcher on the left, then the view's own commands, then settings and Lock. The view's main command, such as Add login, is the one `default` button. Everything else is `outline` or `ghost`.
+The window uses Segoe UI Variable with Segoe UI as a fallback. Use Consolas for secrets, codes, and paths. Keep labels and hints at 11 to 12 px, body text at 13 px, entry and dialog headings at 20 px, and the lock heading at 22 px.
 
-**Settings.** The settings route has a navigation pane of `ListItem size="sm"` links and a single column capped at `max-w-190`. Group settings in a `Section` with a `SectionTitle`, and put each setting in a `Card`. Use `layout="row"` for a label and one control. It stacks in a compact window. Use `ChoiceCard` for two or three choices that are easier to pick when you can see them, such as a theme or an update channel.
+- **List and details.** Give the searchable list 270 px, or 210 px in a compact window. Cap the details pane at 720 px. Separate fields with borders and mark the selected row with a fill and an accent indicator. Show an empty state when there is no selection.
+- **Toolbar.** Put the view switcher on the left, the current view's main action beside it, and Settings and Lock on the right. Use the Kit's submit variant for the main action and quieter controls for secondary actions.
+- **Settings.** Keep navigation beside one column capped at 760 px. Group related controls in bordered cards and use the existing selection treatment for theme and update channel choices.
+- **Dialogs.** Use a dialog for short tasks such as editing a login, confirming deletion, or approving pairing. Put Cancel first and the action last. Use the danger colors for destructive actions and name what the action deletes.
+- **Locked and first-run screens.** Center a narrow column with an icon, a heading, one sentence, and the form. Use a secure `TextInput` for master passwords.
 
-**Dialogs.** Use a dialog for a short task that interrupts the view: adding or editing a login, confirming a delete, approving a browser. The title is a question or a short task name. The footer puts Cancel first and the action last. A destructive action uses the `destructive` button and names what it deletes.
-
-**Locked and first-run screens.** Center one narrow column (`w-80`) with an icon, a `text-title` heading, one sentence, and the form. Nothing else.
+## Extension
 
 **Popup and frames.** Start with the answer. The popup's first content is the logins for the site, or one sentence explaining why there are none and a single button. Keep the connection state in the header and the version in the footer, both in muted text.
 
-## Visual system
-
 ### Typography
 
-Cairn uses Segoe UI Variable (`font-sans`) for everything people read, Consolas (`font-mono`) for secrets, codes, and paths, and Segoe Fluent Icons (`font-icons`) only for caption buttons. The type scale is closed. `styles.css` removes Tailwind's own sizes, so any size missing from this table doesn't generate and `pnpm lint` reports it.
+The extension uses Segoe UI Variable (`font-sans`) for UI text and Consolas (`font-mono`) for codes and generated passwords. The type scale is closed. `styles.css` removes Tailwind's own sizes, so any size missing from this table doesn't generate and `pnpm lint` reports it.
 
 | Class           | Size  | Use it for                                                                         |
 | --------------- | ----- | ---------------------------------------------------------------------------------- |
-| `text-glyph`    | 10 px | Caption button glyphs                                                              |
 | `text-2xs`      | 11 px | The second line of a list item, section titles, hints under fields, footers        |
 | `text-xs`       | 12 px | List item names, field and detail labels, descriptions, most copy in the extension |
 | `text-body`     | 13 px | Running text. The body default                                                     |
 | `text-sm`       | 14 px | Buttons, inputs, menus, card titles                                                |
 | `text-subtitle` | 15 px | Empty state titles, the popup's status heading                                     |
-| `text-xl`       | 20 px | Dialog titles, the selected entry's name, one-time codes                           |
-| `text-title`    | 22 px | The locked and first-run headings                                                  |
 | `text-display`  | 28 px | Pairing codes the user compares between two windows                                |
 
 There are three weights: `font-normal`, `font-medium` for button labels, and `font-semibold` for headings, names, and the current tab. Peers share a size and a weight. Don't make one list item bigger because its name is longer.
@@ -74,79 +71,65 @@ Use sentence case everywhere. Don't use all caps, letter-spaced labels, or decor
 
 Design in neutrals. The accent marks what the user can act on or has selected, and red marks what destroys data. Nothing else gets color. Every color is a semantic token. `styles.css` removes Tailwind's palette, so `bg-blue-500` doesn't exist.
 
-| Token                            | Light                 | Dark                  | Use it for                                                 |
-| -------------------------------- | --------------------- | --------------------- | ---------------------------------------------------------- |
-| `background` / `foreground`      | `#fafafa` / `#202020` | `#202020` / `#f0f0f0` | The window and its text                                    |
-| `muted` / `muted-foreground`     | `#f3f3f3` / `#656565` | `#272727` / `#aaa`    | Side panes, cards, and secondary text                      |
-| `popover`                        | `#fff`                | `#282828`             | Menus, popovers, the picker and banner frames              |
-| `primary` / `primary-foreground` | `#0067c0` / `#fff`    | `#80c4ff` / `#002d51` | The main button, the selection indicator, links            |
-| `secondary`                      | `#f0f0f0`             | `#303030`             | Secondary buttons                                          |
-| `accent`                         | `#ebebeb`             | `#353535`             | Hover and keyboard focus on rows and ghost buttons         |
-| `selection`                      | `#e5eff9`             | `#293e50`             | The selected row, the chosen card, selected text           |
-| `destructive`                    | `#b42318`             | `#ffaaa4`             | Delete buttons, errors                                     |
-| `border` / `input`               | `#e2e2e2` / `#d1d1d1` | `#383838` / `#515151` | Dividers, and the edges of fields                          |
-| `ring`                           | `#0067c0`             | `#80c4ff`             | Focus outlines                                             |
-| `caption-close`                  | `#c42b1c`             | `#c42b1c`             | The title bar's close button on hover, as Windows draws it |
+| Token                            | Light                 | Dark                  | Use it for                                         |
+| -------------------------------- | --------------------- | --------------------- | -------------------------------------------------- |
+| `background` / `foreground`      | `#fafafa` / `#202020` | `#202020` / `#f0f0f0` | The window and its text                            |
+| `muted` / `muted-foreground`     | `#f3f3f3` / `#656565` | `#272727` / `#aaa`    | Side panes, cards, and secondary text              |
+| `popover`                        | `#fff`                | `#282828`             | Menus, popovers, the picker and banner frames      |
+| `primary` / `primary-foreground` | `#0067c0` / `#fff`    | `#80c4ff` / `#002d51` | The main button, the selection indicator, links    |
+| `secondary`                      | `#f0f0f0`             | `#303030`             | Secondary buttons                                  |
+| `accent`                         | `#ebebeb`             | `#353535`             | Hover and keyboard focus on rows and ghost buttons |
+| `selection`                      | `#e5eff9`             | `#293e50`             | The selected row, the chosen card, selected text   |
+| `destructive`                    | `#b42318`             | `#ffaaa4`             | Delete buttons, errors                             |
+| `border` / `input`               | `#e2e2e2` / `#d1d1d1` | `#383838` / `#515151` | Dividers, and the edges of fields                  |
+| `ring`                           | `#0067c0`             | `#80c4ff`             | Focus outlines                                     |
 
-`black` and `white` remain for the caption buttons' hover tints and text on red. Opacity modifiers such as `bg-muted/50` are fine.
+The extension follows the Windows theme. Check every change in both themes.
 
-Both themes follow Windows until the user picks one in Settings. Check every change in both. The extension always follows Windows. A `.light` class keeps a subtree, such as a theme preview, in the light palette inside a dark window.
+Never pair color with meaning alone. An error has text, a selected row has the indicator as well as the fill, and a selected control has a visible state.
 
-Never pair color with meaning alone. An error has text, a selected row has the indicator as well as the fill, and a chosen card has a heavier title as well as the ring.
+### Spacing and depth
 
-### Surfaces and depth
+Use Tailwind's spacing scale. Arbitrary values fail `pnpm lint`. Let the parent own the gap. Keep a label close to its field and use more space between groups.
 
-The window is one flat `background`. Side panes are `bg-muted` with a border on their edge. Cards are `bg-muted/50` with a border and `rounded-lg`. That's two levels, and it's enough. Don't nest cards.
-
-Shadows belong only to things that float over the window: dialogs, popovers, menus, toasts. Inputs and outline buttons keep their `shadow-xs`. Nothing else casts one.
-
-The radius scale is `rounded-sm` (3 px), `rounded-md` (4 px), `rounded-lg` (6 px), and `rounded-xl` (8 px). Use `md` for controls and rows, `lg` for cards, site icons, and dialogs, and `xl` only for `ChoiceCard`. `rounded-full` is for the slider and nothing else.
-
-### Spacing
-
-Use Tailwind's spacing scale. Arbitrary values fail `pnpm lint`. Let the parent own the gap. A list is `grid gap-0.5`, a form is `grid gap-4`, and a stack of settings sections is `grid gap-4`. Children don't add their own margins to space themselves out.
-
-Keep related things close and unrelated things apart. A label sits close to its field, a field sits further from the next field, and a section sits further still. Panes use `p-8` for details and `px-6 py-6` for settings, less when compact.
+Keep the popup and frames flat. Use the existing radius tokens and reserve shadows for controls or frames that need an edge against their background.
 
 ### Icons
 
-Use [Lucide](https://lucide.dev) icons. Inside buttons and rows they're 16 px, which `Button` and `ListItem` set for you. Empty states and the lock screen use a 28 px icon with a stroke width of 1.25 to 1.3, in `muted-foreground`. The Cairn mark appears only in the title bar and the popup header, through the `mask-mark` utility so it takes the text color.
+Use [Lucide](https://lucide.dev) icons. Inside buttons and rows they're 16 px, which `Button` and `ListItem` set for you. The popup header uses the `mask-mark` utility so the Cairn mark takes the text color.
 
 An icon-only button needs an `aria-label` and a matching `title`. Don't put icons in colored tiles, and don't add an icon to a button whose label is already clear unless its neighbors have one.
 
 ### Motion
 
-Default to stillness. Dialogs and menus fade and zoom in through `tw-animate-css`, a choice card's fill transitions, and spinners spin while something is loading. That's all. `styles.css` turns animations off for people who ask for reduced motion.
+Default to stillness. `styles.css` turns animations off for people who ask for reduced motion.
 
-## Components
+### Components
 
 Everything below is in `packages/ui/src/components`. Import from `@cairn/ui/components/<name>`.
 
 | Component                                                                       | Use it for                                                                                                                                                                                                                                                                            |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Button`                                                                        | Actions. Variants: `default` for the one main action, `outline` for the others, `ghost` for toolbar and row actions, `destructive` for deleting, `link` for inline links. Sizes: `sm` in toolbars, frames, and cards, `default` in dialogs and forms, `icon-sm` for icon-only buttons |
-| `Input`, `Textarea`, `Select`, `Checkbox`, `Slider`                             | Form controls. `Input variant="search"` leaves room for a search icon                                                                                                                                                                                                                 |
+| `Input`, `Checkbox`, `Slider`                                                   | Form controls. `Input variant="search"` leaves room for a search icon                                                                                                                                                                                                                 |
 | `Field`, `FieldLabel`, `FieldDescription`, `FieldError`                         | A labelled control with its hint and error                                                                                                                                                                                                                                            |
 | `ListItem`, `ListItemContent`, `ListItemTitle`, `ListItemDescription`           | A row you pick. Mark the selected one with `aria-current`. `size="sm"` is for navigation panes and the extension                                                                                                                                                                      |
-| `Toolbar`                                                                       | The bar under the title bar                                                                                                                                                                                                                                                           |
 | `Section`, `SectionTitle`, `Card`, `CardHeader`, `CardTitle`, `CardDescription` | Settings and other grouped content. `Card layout="row"` puts a header beside one control                                                                                                                                                                                              |
 | `ChoiceCard`, `ChoiceCardTitle`, `ChoiceCardDescription`                        | Two or three side-by-side choices in a `role="group"`. Mark the chosen one with `aria-pressed`. `size="media"` puts a preview above a short label                                                                                                                                     |
-| `Dialog`                                                                        | Short interrupting tasks. `DialogContent` needs a translated `closeLabel`                                                                                                                                                                                                             |
 | `Popover`, `DropdownMenu`                                                       | Small panels and menus anchored to a button                                                                                                                                                                                                                                           |
-| `Empty`                                                                         | What a pane shows when it has nothing to show                                                                                                                                                                                                                                         |
 | `Separator`                                                                     | A divider inside a card. Between panes, use a border                                                                                                                                                                                                                                  |
 | `Toaster`, `toast`                                                              | Confirming something finished, or reporting a failure that has no field to attach to                                                                                                                                                                                                  |
 
-Selection and pressed states come from attributes, not from conditional classes. `aria-current` drives the `current:` variant, which gives the selection fill and the 3 × 18 px accent indicator. `aria-pressed` drives a choice card's ring. Focus is a 2 px `ring` outline, drawn inside the element.
+Selection comes from attributes. `aria-current` drives the `current:` variant, which gives the selection fill and the 3 × 18 px accent indicator. Focus is a 2 px `ring` outline, drawn inside the element.
 
 Components own their look. Pass layout classes such as `w-56`, `mt-0.5`, or `justify-self-start`, but not color, padding, or type. `shadcn/no-restyle` reports the rest. When a screen needs a treatment the components don't have, add a variant or a token in `packages/ui`.
 
 ## Secrets on screen
 
-- A password shows as twelve dots in `font-mono` until the user presses the eye button. The reveal hides itself after 30 seconds, and the hint under the field says so.
+- A password shows as twelve dots in Consolas until the user presses the eye button. The reveal hides itself after 30 seconds, and the hint under the field says so.
 - Notes stay hidden with the password and appear only with it.
-- One-time codes are `font-mono text-xl tabular-nums`, split in two halves, with a ring that counts down to the next code. The copy button beside it shows a toast when the code is on the clipboard.
-- A pairing code is `font-mono text-display font-semibold tracking-widest`. Both the popup and the app show it at that size so the user can compare them.
+- One-time codes use 20 px Consolas, split in two halves, with a ring that counts down to the next code. The copy button beside it shows a toast when the code is on the clipboard.
+- A pairing code uses 28 px semibold Consolas with extra space between digits. The popup and desktop use the same size so the user can compare them.
 - The extension shows login names and usernames, never passwords. The save banner shows the site and the username, never the password it's about to save.
 - Generated passwords appear in a `font-mono text-body/snug` box with `wrap-anywhere`, so a long password wraps instead of overflowing.
 
@@ -165,8 +148,8 @@ Cairn ships in English and French. Every string lives in [`apps/desktop/src/i18n
 ## Changing the system
 
 1. Look for a component, variant, or token that already does the job.
-2. If none does, add a variant to the component, or a token to [`styles.css`](packages/ui/src/styles.css). Give it a comment that says what it's for, and add it to this file.
-3. A repeated pattern across two screens belongs in `packages/ui`. A pattern that knows about vaults, translations, or Tauri stays in its app.
+2. If none does, add a variant to the component or a token to the app's theme. The desktop theme is in `theme.rs`. The extension theme is in [`styles.css`](packages/ui/src/styles.css).
+3. Share patterns between extension pages through `packages/ui`. Keep patterns that know about vaults or translations in their app.
 4. Don't silence a lint rule to get a design through. If a rule blocks something the design genuinely needs, change the system.
 
 ## Before you call a screen done

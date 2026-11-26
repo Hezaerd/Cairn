@@ -4,11 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:desktop": "pnpm --filter @cairn/desktop tauri dev",
+    "dev:desktop": "cargo run -p cairn-desktop",
     "dev:extension": "pnpm --filter @cairn/extension dev",
     "build": "pnpm -r build",
-    "build:desktop": "pnpm --filter @cairn/desktop tauri build",
-    "build:desktop-rune": "pwsh -NoProfile -File apps/desktop-rune/packaging/build.ps1",
+    "build:desktop": "pwsh -NoProfile -File apps/desktop/packaging/build.ps1",
     "build:extension": "pnpm --filter @cairn/extension build",
     "typecheck": "pnpm -r typecheck",
     "check:rust": "cargo check --workspace",
@@ -24,7 +23,6 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "test:vault": "tsx tests/vault.e2e.ts",
-    "test:vault-rune": "tsx tests/vault-rune.e2e.ts",
     "test:autofill": "tsx tests/autofill.e2e.ts",
     "icons": "tsx scripts/icons.ts"
   },
