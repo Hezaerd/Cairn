@@ -686,7 +686,7 @@ try {
   if (app) {
     await app.getByRole("complementary").getByText("Site enregistré", { exact: true }).waitFor();
   } else {
-    runeUi("Wait", "Site enregistré");
+    runeUi("WaitLogin", "Site enregistré, new@example.com");
     console.log("Saved login visible in Rune: OK");
   }
 

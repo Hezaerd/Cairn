@@ -20,6 +20,7 @@ function Focus-Cairn {
 switch ($Action) {
     Press { Press $Target }
     Wait { Find-Control $Target | Out-Null }
+    WaitLogin { Find-Control $Target ([Windows.Automation.ControlType]::ListItem) | Out-Null }
     Rename {
         $button = Wait-For 'browser rename button' {
             $window = Main-Window $app
