@@ -1,5 +1,5 @@
 use cairn_vault::{VaultError, VaultStatus};
-use rune::{Color, El, LiveRegion, TextEdit, TextStyle, Tx, col, row, text};
+use rune::{Color, El, LiveRegion, TextEdit, TextStyle, Tx, col, text};
 use rune_kit::{Button, ButtonVariant, Kit, TextInput};
 use zeroize::Zeroizing;
 
@@ -187,21 +187,6 @@ pub fn view(state: &State, kit: &Kit) -> El {
             )
             .child(form),
     )
-}
-
-pub fn workspace(kit: &Kit) -> El {
-    col()
-        .w_full()
-        .grow(1.0)
-        .child(
-            row().w_full().px(16.0).py(8.0).justify_end().child(
-                Button::new(t!("toolbar.lock"))
-                    .on_press_tx(State::lock)
-                    .build(kit)
-                    .key("lock"),
-            ),
-        )
-        .child(panel(heading(t!("credentials.empty"), kit).center()))
 }
 
 pub fn recovery(kit: &Kit) -> El {

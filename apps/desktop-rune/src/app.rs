@@ -9,14 +9,15 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
-use crate::{i18n::t, lock, theme, title_bar};
+use crate::{i18n::t, lock, theme, title_bar, vault};
 
 pub struct State {
-    core: Option<Core>,
+    pub(crate) core: Option<Core>,
     events: Option<mpsc::UnboundedReceiver<AppEvent>>,
-    runtime: Handle,
+    pub(crate) runtime: Handle,
     pub status: Result<VaultStatus, VaultError>,
     pub form: lock::Form,
+    pub vault: vault::Vault,
     pending: Option<Pending>,
     hidden: bool,
     pub caption_font: Option<&'static str>,
@@ -48,6 +49,7 @@ impl State {
             runtime: runtime.handle().clone(),
             status,
             form: lock::Form::default(),
+            vault: vault::Vault::new(directory),
             pending: None,
             hidden,
             caption_font,
@@ -113,6 +115,7 @@ impl State {
             self.status = Ok(VaultStatus::Locked);
         }
         self.form = lock::Form::default();
+        self.vault.clear();
         tx.clear_secret_clipboard();
         self.focus_master(tx);
     }
@@ -138,15 +141,19 @@ impl State {
         }
     }
 
-    fn poll(&mut self, _: f64, tx: &mut Tx) -> bool {
+    fn poll(&mut self, clock: f64, tx: &mut Tx) -> bool {
         let mut changed = false;
         if let Some(events) = &mut self.events {
             while let Ok(event) = events.try_recv() {
+                if matches!(event, AppEvent::VaultChanged) {
+                    self.vault.refresh();
+                }
                 if matches!(event, AppEvent::VaultLocked)
                     && self.status == Ok(VaultStatus::Unlocked)
                 {
                     self.status = Ok(VaultStatus::Locked);
                     self.form = lock::Form::default();
+                    self.vault.clear();
                     tx.clear_secret_clipboard();
                     changed = true;
                 }
@@ -171,6 +178,9 @@ impl State {
                         let (operation, status) =
                             result.unwrap_or((Err(VaultError::Storage), Err(VaultError::Storage)));
                         self.status = status;
+                        if self.status == Ok(VaultStatus::Unlocked) {
+                            self.vault.refresh();
+                        }
                         self.form.error = operation.err().map(lock::AuthError::Vault);
                     }
                     changed = true;
@@ -179,6 +189,16 @@ impl State {
         }
         if self.status == Ok(VaultStatus::Unlocked) {
             tx.wake_after(Duration::from_millis(250));
+            if let Some(core) = &self.core {
+                match self.vault.poll(core, &self.runtime, clock, tx) {
+                    Ok(updated) => changed |= updated,
+                    Err(error) => {
+                        self.lock(tx);
+                        self.form.error = Some(lock::AuthError::Vault(error));
+                        changed = true;
+                    }
+                }
+            }
         }
         if changed {
             self.focus_master(tx);
@@ -213,7 +233,12 @@ pub fn build(state: State) -> App<State> {
 fn view(state: &State, cx: &mut Cx<State>) -> El {
     let kit = theme::kit(cx.system_dark());
     let body = match state.status {
-        Ok(VaultStatus::Unlocked) => lock::workspace(&kit).key("workspace"),
+        Ok(VaultStatus::Unlocked) => vault::view(
+            state,
+            &kit,
+            cx.layout_size("root")
+                .is_some_and(|[width, _]| width < 680.0),
+        ),
         Ok(VaultStatus::Recovery) => lock::recovery(&kit).key("recovery"),
         Ok(VaultStatus::Missing | VaultStatus::Locked) => {
             lock::view(state, &kit).key("lock-screen")

@@ -796,6 +796,7 @@ dependencies = [
 name = "cairn-desktop-rune"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "cairn-app",
  "cairn-vault",
  "dirs 6.0.0",
@@ -803,6 +804,7 @@ dependencies = [
  "rune",
  "rune-i18n",
  "rune-kit",
+ "serde_json",
  "tokio",
  "windows-registry",
  "windows-sys 0.61.2",
