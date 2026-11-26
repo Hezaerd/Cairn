@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory)][string]$Executable,
-    [switch]$CreateTauriVault,
+    [switch]$CreateVault,
     [switch]$Relaunched,
     [string]$UpdateVersion,
     [switch]$RejectUpdate
@@ -39,7 +39,7 @@ public static class FixtureInput {
     }
 }
 '@
-if ($CreateTauriVault) {
+if ($CreateVault) {
     $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--force-renderer-accessibility'
     $env:WEBVIEW2_USER_DATA_FOLDER = Join-Path (Resolve-Path .local) 'tauri-webview'
 }
@@ -107,7 +107,7 @@ function Click-Control($Control) {
     [FixtureInput]::Click([int]($bounds.Left + $bounds.Width / 2), [int]($bounds.Top + $bounds.Height / 2))
 }
 
-function Press([string]$Name, [Windows.Automation.ControlType]$Type) {
+function Press([string]$Name, [Windows.Automation.ControlType]$Type = $null) {
     $control = Find-Control $Name $Type
     $deadline = [DateTime]::UtcNow.AddSeconds(5)
     while (!$control.Current.IsEnabled) {
@@ -119,23 +119,23 @@ function Press([string]$Name, [Windows.Automation.ControlType]$Type) {
 
 try {
     Enter-Password 'Master password'
-    if ($CreateTauriVault) {
+    if ($CreateVault) {
         Enter-Password 'Confirm password'
         Press 'Create vault' ([Windows.Automation.ControlType]::Button)
         Find-Control 'No logins' | Out-Null
-        Press 'Settings' ([Windows.Automation.ControlType]::Hyperlink)
+        Press 'Settings'
         Press 'Start with Windows' ([Windows.Automation.ControlType]::CheckBox)
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
         $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
         while ((Get-ItemProperty $runKey -Name Cairn -ErrorAction SilentlyContinue).Cairn -ne "`"$Executable`" --autostart") {
-            if ([DateTime]::UtcNow -ge $deadline) { throw 'Tauri did not register startup' }
+            if ([DateTime]::UtcNow -ge $deadline) { throw 'Cairn did not register startup' }
             Start-Sleep -Milliseconds 100
         }
-        'The installed Tauri nightly created a synthetic vault and registered startup'
+        'The published nightly created a synthetic vault and registered startup'
     } else {
         Press 'Unlock' ([Windows.Automation.ControlType]::Button)
         Find-Control 'No logins' | Out-Null
-        'Installed Rune opened the synthetic Tauri vault'
+        'The installed build opened the synthetic vault'
         if ($UpdateVersion -or $Relaunched) {
             $button = [Windows.Automation.ControlType]::Button
             Press 'Settings' $button

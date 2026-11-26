@@ -26,7 +26,7 @@ const run = promisify(execFile);
 
 const serverAddress = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }));
 
-const baselinePath = ".local/tauri-install.json";
+const baselinePath = ".local/published-install.json";
 
 const baselineSchema = Schema.Struct({
   version: Schema.String,
@@ -34,6 +34,7 @@ const baselineSchema = Schema.Struct({
   vaultHash: Schema.String,
   installer: Schema.String,
   installedBytes: Schema.Number,
+  shortcuts: Schema.Array(Schema.String),
 });
 
 const local = process.env.LOCALAPPDATA;
@@ -105,6 +106,21 @@ async function assertConnector() {
   assert.ok(existsSync(path.join(directory, "extension", "manifest.json")));
 }
 
+async function shortcuts() {
+  const { stdout } = await run("powershell.exe", [
+    "-NoProfile",
+    "-Command",
+    `$shell = New-Object -ComObject WScript.Shell
+    foreach ($folder in @('Programs', 'DesktopDirectory')) {
+      Get-ChildItem ([Environment]::GetFolderPath($folder)) -Filter Cairn.lnk -Recurse |
+        Where-Object { $shell.CreateShortcut($_.FullName).TargetPath -eq (Join-Path $env:LOCALAPPDATA 'Cairn/cairn-desktop.exe') } |
+        Select-Object -ExpandProperty FullName
+    }`,
+  ]);
+
+  return stdout.trim().split(/\r?\n/).filter(Boolean).sort();
+}
+
 async function driveInstalled(env: NodeJS.ProcessEnv, ...flags: string[]) {
   const { stdout } = await run(
     "powershell.exe",
@@ -122,18 +138,20 @@ async function driveInstalled(env: NodeJS.ProcessEnv, ...flags: string[]) {
   process.stdout.write(stdout);
 }
 
-if (process.argv.includes("--prepare-tauri")) {
+if (process.argv.includes("--prepare-nightly")) {
   assert.ok(!existsSync(directory) && !existsSync(vault), "Expected a fresh runner");
 
   const { version } = Schema.decodeUnknownSync(Schema.Struct({ version: Schema.String }))(
-    JSON.parse(readFileSync(".local/tauri-nightly/latest.json", "utf8")),
+    JSON.parse(readFileSync(".local/published-nightly/latest.json", "utf8")),
   );
 
-  const installer = path.resolve(".local/tauri-nightly", `Cairn_${version}_x64-setup.exe`);
+  const installer = path.resolve(".local/published-nightly", `Cairn_${version}_x64-setup.exe`);
   await install(installer, version);
   await assertConnector();
+  const installedShortcuts = await shortcuts();
+  assert.ok(installedShortcuts.length > 0, "Expected a Cairn shortcut");
   const size = installedBytes();
-  await driveInstalled(process.env, "-CreateTauriVault");
+  await driveInstalled(process.env, "-CreateVault");
   assert.equal(await registry(runKey, "/v", "Cairn"), expectedStartup);
   writeFileSync(
     baselinePath,
@@ -143,6 +161,7 @@ if (process.argv.includes("--prepare-tauri")) {
       vaultHash: hash(vault),
       installer,
       installedBytes: size,
+      shortcuts: installedShortcuts,
     }),
   );
   process.exit(0);
@@ -179,6 +198,8 @@ assert.equal(hash(vault), baseline.vaultHash);
 assert.ok(!existsSync(staleChunk), "Old extension chunks survived");
 
 await assertConnector();
+
+assert.deepEqual(await shortcuts(), baseline.shortcuts);
 
 await driveInstalled(process.env);
 
@@ -236,6 +257,7 @@ try {
   });
   assert.equal(await registry(runKey, "/v", "Cairn"), expectedStartup);
   await assertConnector();
+  assert.deepEqual(await shortcuts(), baseline.shortcuts);
   assert.equal(hash(vault), baseline.vaultHash);
   const secondHash = hash(executable);
   assert.equal(secondHash, hash(path.join(path.dirname(rune2), "../../cairn-desktop.exe")));
@@ -244,7 +266,7 @@ try {
   const summary = [
     "| Install | Installer bytes | Installed bytes |",
     "| --- | ---: | ---: |",
-    `| Tauri ${baseline.version} | ${statSync(baseline.installer).size} | ${baseline.installedBytes} |`,
+    `| Published nightly ${baseline.version} | ${statSync(baseline.installer).size} | ${baseline.installedBytes} |`,
     `| Rune ${second} | ${statSync(rune2).size} | ${runeBytes} |`,
     "",
     "One run per installer. Installed bytes are the sum of file lengths under the Cairn install directory.",

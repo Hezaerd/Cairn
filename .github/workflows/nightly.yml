@@ -39,7 +39,7 @@ jobs:
         if: steps.compare.outputs.build == 'true'
         with:
           persist-credentials: false
-          sparse-checkout: apps/desktop/src-tauri/tauri.conf.json
+          sparse-checkout: apps/desktop/Cargo.toml
           sparse-checkout-cone-mode: false
 
       # The next patch version keeps a nightly ahead of the stable release it
@@ -50,13 +50,12 @@ jobs:
         if: steps.compare.outputs.build == 'true'
         shell: pwsh
         run: |
-          $current = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $current = [regex]::Match((Get-Content apps/desktop/Cargo.toml -Raw), '(?m)^version = "([^"]+)"\r?$').Groups[1].Value
           $core = [version]($current -replace '[-+].*$', '')
           $stamp = Get-Date -AsUTC -Format yyyyMMddHHmm
           "version=$($core.Major).$($core.Minor).$($core.Build + 1)-nightly.$stamp" >> $env:GITHUB_OUTPUT
 
-  # Builds the unsigned installer. The build runs vite, Tailwind, the router CLI,
-  # and their plugins, so it never sees the signing key or a token that can write.
+  # The build runs repository dependencies with a read-only token and no signing key.
   build:
     needs: changes
     if: needs.changes.outputs.build == 'true'
@@ -65,15 +64,6 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
-
-      - name: Set the nightly version
-        shell: pwsh
-        env:
-          VERSION: ${{ needs.changes.outputs.version }}
-        run: |
-          @{ version = $env:VERSION } |
-            ConvertTo-Json |
-            Set-Content apps/desktop/src-tauri/tauri.nightly.conf.json
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
@@ -93,24 +83,23 @@ jobs:
       - name: Check the signing CLI version
         shell: pwsh
         run: |
-          $installed = (Get-Content apps/desktop/node_modules/@tauri-apps/cli/package.json -Raw | ConvertFrom-Json).version
+          $installed = (Get-Content apps/desktop/packaging/node_modules/@tauri-apps/cli/package.json -Raw | ConvertFrom-Json).version
           if ($installed -ne $env:TAURI_CLI_VERSION) {
             throw "TAURI_CLI_VERSION is $env:TAURI_CLI_VERSION but pnpm-lock.yaml has @tauri-apps/cli $installed"
           }
 
-      # The release config bundles the extension and native host; the nightly
-      # config only sets the version.
       - name: Build the unsigned installer
-        run: pnpm --filter @cairn/desktop tauri build --config src-tauri/tauri.release.conf.json --config src-tauri/tauri.nightly.conf.json
+        env:
+          VERSION: ${{ needs.changes.outputs.version }}
+        run: pnpm build:desktop -Version $env:VERSION
 
-      # The Rust cache can bring back older bundles, so pick this version's installer.
       - name: Find the installer
         id: installer
         shell: pwsh
         env:
           VERSION: ${{ needs.changes.outputs.version }}
         run: |
-          $installer = Get-Item "target/release/bundle/nsis/*_$($env:VERSION)_*-setup.exe"
+          $installer = Get-Item "target/rune-installer/release/$env:VERSION/target/release/bundle/nsis/*_$($env:VERSION)_*-setup.exe"
           if (@($installer).Count -ne 1) { throw "Expected one NSIS installer, found $(@($installer).Count)" }
           "path=$($installer.FullName)" >> $env:GITHUB_OUTPUT
 
