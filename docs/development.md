@@ -188,6 +188,8 @@ installer under `target/rune-installer/release/<version>/target/release/bundle/n
 It includes the release connector and uses the same install location and vault
 directory as the Tauri app. When the installer offers a choice for an existing
 installation, choose **Do not uninstall** to keep **Start with Windows** enabled.
+To rehearse an upgrade on a disposable machine, run
+`pwsh -File apps/desktop-rune/packaging/build.ps1 -Version <newer-version>`.
 
 The Rune installer workflow tests this migration, signed updates, and the Tauri
 updater on a disposable Windows runner. It reports the installer and installed

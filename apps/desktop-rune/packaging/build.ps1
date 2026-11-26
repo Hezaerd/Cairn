@@ -20,13 +20,15 @@ try {
     $env:CARGO_TARGET_DIR = $target
     pnpm build:connector
 
-    $profile = @()
-    $variant = 'release'
     if ($TestBuild) {
-        $profile = @('--config', 'profile.release.package.cairn-desktop-rune.debug-assertions=true')
+        cargo build --locked -p cairn-desktop-rune
+        $binary = "$target/debug/cairn-desktop-rune.exe"
         $variant = 'test'
+    } else {
+        cargo build --locked --release -p cairn-desktop-rune
+        $binary = "$target/release/cairn-desktop-rune.exe"
+        $variant = 'release'
     }
-    cargo build --locked --release -p cairn-desktop-rune @profile
 
     $stage = Join-Path $target "rune-installer/$variant/$Version"
     $bundleTarget = Join-Path $stage 'target'
@@ -39,7 +41,7 @@ version = "$Version"
 edition = "2024"
 "@ | Set-Content "$stage/Cargo.toml"
     'fn main() {}' | Set-Content "$stage/src/main.rs"
-    Copy-Item "$target/release/cairn-desktop-rune.exe" "$bundleTarget/release/cairn-desktop.exe" -Force
+    Copy-Item $binary "$bundleTarget/release/cairn-desktop.exe" -Force
 
     $tauri = Join-Path $root 'apps/desktop/src-tauri'
     $config = Get-Content "$PSScriptRoot/tauri.conf.json" -Raw | ConvertFrom-Json -AsHashtable

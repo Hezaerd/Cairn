@@ -20,9 +20,15 @@ if ($Relaunched) {
     $app = Start-Process -FilePath $Executable -PassThru
 }
 
-function Find-Control([string]$Name) {
+function Find-Control([string]$Name, [Windows.Automation.ControlType]$Type = $null) {
     $condition = [Windows.Automation.PropertyCondition]::new(
         [Windows.Automation.AutomationElement]::NameProperty, $Name)
+    if ($Type) {
+        $typeCondition = [Windows.Automation.PropertyCondition]::new(
+            [Windows.Automation.AutomationElement]::ControlTypeProperty, $Type)
+        $condition = [Windows.Automation.AndCondition]::new(
+            [Windows.Automation.Condition[]]@($condition, $typeCondition))
+    }
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
     while ([DateTime]::UtcNow -lt $deadline) {
         $app.Refresh()
@@ -38,13 +44,13 @@ function Find-Control([string]$Name) {
 }
 
 try {
-    $field = Find-Control 'Master password'
+    $field = Find-Control 'Master password' ([Windows.Automation.ControlType]::Edit)
     if (!$field.Current.IsPassword) { throw 'Master password edit is not secure' }
     $shell = New-Object -ComObject WScript.Shell
     if (!$shell.AppActivate($app.Id)) { throw 'Could not activate Cairn' }
     $field.SetFocus()
     $shell.SendKeys('synthetic installer fixture password')
-    $button = Find-Control 'Unlock'
+    $button = Find-Control 'Unlock' ([Windows.Automation.ControlType]::Button)
     $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
     Find-Control 'No logins' | Out-Null
     'Installed Rune opened the synthetic Tauri vault'
