@@ -23,7 +23,7 @@ rxing = { version = "0.9.3", default-features = false, features = ["qrcode", "de
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-registry = "0.6"
+winshell = { git = "https://github.com/Hezaerd/winshell", rev = "7e065cfbe83e9fddfcf8bab651fbd58b96ef0de9" }
 
 [dev-dependencies]
 qrcode = { version = "0.14.1", default-features = false }
