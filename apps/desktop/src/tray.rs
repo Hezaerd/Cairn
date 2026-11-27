@@ -5,64 +5,44 @@ use tokio::runtime::Handle;
 
 use crate::{app::State, i18n::t};
 
-const MARKS: [(u32, &[u8], &[u8]); 4] = [
-    (
-        16,
-        include_bytes!("../icons/mark/black-16.png"),
-        include_bytes!("../icons/mark/white-16.png"),
-    ),
-    (
-        24,
-        include_bytes!("../icons/mark/black-24.png"),
-        include_bytes!("../icons/mark/white-24.png"),
-    ),
-    (
-        32,
-        include_bytes!("../icons/mark/black-32.png"),
-        include_bytes!("../icons/mark/white-32.png"),
-    ),
-    (
-        64,
-        include_bytes!("../icons/mark/black-64.png"),
-        include_bytes!("../icons/mark/white-64.png"),
-    ),
+const WHITE_16: &[u8] = include_bytes!("../icons/mark/white-16.png");
+
+#[cfg(windows)]
+const MARKS: &[winshell::Mark] = &[
+    winshell::Mark {
+        px: 16,
+        black: include_bytes!("../icons/mark/black-16.png"),
+        white: WHITE_16,
+    },
+    winshell::Mark {
+        px: 24,
+        black: include_bytes!("../icons/mark/black-24.png"),
+        white: include_bytes!("../icons/mark/white-24.png"),
+    },
+    winshell::Mark {
+        px: 32,
+        black: include_bytes!("../icons/mark/black-32.png"),
+        white: include_bytes!("../icons/mark/white-32.png"),
+    },
+    winshell::Mark {
+        px: 64,
+        black: include_bytes!("../icons/mark/black-64.png"),
+        white: include_bytes!("../icons/mark/white-64.png"),
+    },
 ];
 
-fn appearance() -> (bool, usize) {
+fn current_mark() -> (u32, &'static [u8]) {
     #[cfg(windows)]
     {
-        use windows_sys::Win32::UI::{
-            HiDpi::{GetDpiForSystem, GetDpiForWindow},
-            WindowsAndMessaging::FindWindowW,
-        };
-        let dpi = unsafe {
-            let taskbar = FindWindowW(windows_sys::w!("Shell_TrayWnd"), std::ptr::null());
-            if taskbar.is_null() {
-                GetDpiForSystem()
-            } else {
-                GetDpiForWindow(taskbar)
-            }
-        };
-        let light = windows_registry::CURRENT_USER
-            .open(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
-            .and_then(|key| key.get_u32("SystemUsesLightTheme"))
-            .is_ok_and(|value| value != 0);
-        let size = (16 * dpi).div_ceil(96);
-        let mark = MARKS
-            .iter()
-            .position(|(width, ..)| *width >= size)
-            .unwrap_or(MARKS.len() - 1);
-        (light, mark)
+        winshell::Taskbar::current().mark(MARKS)
     }
     #[cfg(not(windows))]
     {
-        (false, 0)
+        (16, WHITE_16)
     }
 }
 
-fn icon((light, index): (bool, usize)) -> TrayIcon {
-    let (size, black, white) = MARKS[index];
-    let bytes = if light { black } else { white };
+fn icon((size, bytes): (u32, &[u8])) -> TrayIcon {
     let rgba = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
         .expect("Cairn tray mark is a PNG")
         .into_rgba8();
@@ -93,7 +73,7 @@ fn menu([open, lock, quit]: [&str; 3]) -> Vec<TrayItem> {
 }
 
 pub fn install(handle: AppHandle<State>, runtime: &Handle) -> Result<ShellTray, TrayError> {
-    let mut current = appearance();
+    let mut current = current_mark();
     let mut labels = menu_labels();
     let spec = TraySpec::new("com.hezaerd.cairn", t!("app.name"), icon(current))
         .tooltip(t!("app.name"))
@@ -115,7 +95,7 @@ pub fn install(handle: AppHandle<State>, runtime: &Handle) -> Result<ShellTray, 
             let Some(tray) = refresh_tray.upgrade() else {
                 break;
             };
-            let next = appearance();
+            let next = current_mark();
             if next != current && tray.set_icon(icon(next)).is_ok() {
                 current = next;
             }

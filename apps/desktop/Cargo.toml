@@ -32,5 +32,4 @@ qrcode = { version = "0.14.1", default-features = false, features = ["image"] }
 rune-i18n = { git = "https://github.com/anomalyco/rune", rev = "4918969f04dce020f63b34e024368a86e5e1857d", features = ["codegen"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-registry = "0.6"
-windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi"] }
+winshell = { git = "https://github.com/Hezaerd/winshell", rev = "7e065cfbe83e9fddfcf8bab651fbd58b96ef0de9" }
